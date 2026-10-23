@@ -1,0 +1,119 @@
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertCircle, ArrowRight, Briefcase } from 'lucide-react';
+import { AuthShell } from '../components/auth/AuthShell';
+import { VerifyCodeStep } from '../components/auth/VerifyCodeStep';
+import { DemoHint } from '../components/auth/DemoHint';
+import { homeFor } from '../components/auth/RouteGuards';
+import { TextField } from '../components/ui/FormField';
+import { Button } from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
+import { emailSchema, type EmailForm } from '../lib/validation';
+import { ApiError, type OtpRequestResult } from '../lib/api/types';
+import { DEMO_ACCOUNTS } from '../lib/api/mockAuth';
+
+/** Student and parent login: email, then a one-time code. No passwords. */
+export function LoginPage() {
+  const { requestOtp, verifyOtp } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  const [sent, setSent] = useState<{ email: string; result: OtpRequestResult } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm<EmailForm>({ resolver: zodResolver(emailSchema), defaultValues: { email: '' } });
+
+  const onSubmit = handleSubmit(async ({ email }) => {
+    setFormError(null);
+    try {
+      setSent({ email, result: await requestOtp(email) });
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+    }
+  });
+
+  return (
+    <AuthShell
+      title={sent ? 'Check your email' : 'Student login'}
+      subtitle={
+        sent ? (
+          'Enter the 6-digit code to log in.'
+        ) : (
+          <>
+            We'll email you a one-time code, so there's no password to remember. New here?{' '}
+            <Link to="/register" className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
+              Create a free account
+            </Link>
+          </>
+        )
+      }
+    >
+      {sent ? (
+        <VerifyCodeStep
+          email={sent.email}
+          initial={sent.result}
+          onVerify={async (code) => {
+            const user = await verifyOtp(sent.email, code);
+            navigate(from && homeFor(user.role) === '/dashboard' ? from : homeFor(user.role), { replace: true });
+          }}
+          onResend={() => requestOtp(sent.email)}
+          onBack={() => setSent(null)}
+        />
+      ) : (
+        <>
+          <div className="mb-6">
+            <DemoHint title="Try the demo student account">
+              <p className="break-all">{DEMO_ACCOUNTS.student.email}</p>
+              <button
+                type="button"
+                onClick={() => setValue('email', DEMO_ACCOUNTS.student.email, { shouldValidate: true })}
+                className="font-semibold underline underline-offset-4 hover:text-amber-700"
+              >
+                Fill in demo email
+              </button>
+            </DemoHint>
+          </div>
+
+          {formError && (
+            <div role="alert" className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+              {formError}
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} noValidate className="space-y-5">
+            <TextField
+              label="Email address"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              error={errors.email?.message}
+              {...register('email')}
+            />
+            <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+              Send me a code <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
+            </Button>
+          </form>
+
+          <div className="mt-10 border-t border-navy-100 pt-6">
+            <Link
+              to="/staff/login"
+              state={{ email: getValues('email') }}
+              className="flex items-center justify-center gap-2 text-sm font-medium text-navy-500 transition hover:text-navy-900"
+            >
+              <Briefcase className="h-4 w-4" aria-hidden /> AHatIn staff? Staff sign in
+            </Link>
+          </div>
+        </>
+      )}
+    </AuthShell>
+  );
+}

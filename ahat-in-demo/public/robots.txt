@@ -1,0 +1,3 @@
+# Client demo with fictional data: keep it out of search engines.
+User-agent: *
+Disallow: /
