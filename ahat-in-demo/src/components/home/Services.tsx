@@ -3,22 +3,8 @@ import { SectionHeading } from '../ui/SectionHeading';
 import { Reveal } from '../ui/Reveal';
 import { services } from '../../data/site';
 
-/** Stage of the journey each service belongs to (2 · 3 · 2). */
-const phases = ['Plan', 'Plan', 'Apply', 'Apply', 'Apply', 'Go', 'Go'];
-
-/**
- * Seven cards with no empty gaps: one column on phones, 3 + 2 + 2 on tablets (6-column grid),
- * 4 + 3 on desktops (12-column grid). Class names are written out in full for Tailwind.
- */
-const spans = [
-  'md:col-span-2 lg:col-span-3',
-  'md:col-span-2 lg:col-span-3',
-  'md:col-span-2 lg:col-span-3',
-  'md:col-span-3 lg:col-span-3',
-  'md:col-span-3 lg:col-span-4',
-  'md:col-span-3 lg:col-span-4',
-  'md:col-span-3 lg:col-span-4',
-];
+/** Stage of the journey each service belongs to (2 · 3 · 2 · 2). */
+const phases = ['Plan', 'Plan', 'Apply', 'Apply', 'Apply', 'Go', 'Go', 'Thrive', 'Thrive'];
 
 export function Services() {
   return (
@@ -29,16 +15,17 @@ export function Services() {
         <SectionHeading
           light
           eyebrow="Our services"
-          title={<>Seven services. <span className="italic text-gold-400">One seamless journey.</span></>}
+          title={<>Nine services. <span className="italic text-gold-400">One seamless journey.</span></>}
           description="Every service is free, and each one hands over smoothly to the next. Your portal shows where you are at all times."
         />
 
-        <ol className="mt-16 grid gap-5 md:grid-cols-6 lg:grid-cols-12">
+        {/* Nine cards in an even 3 × 3 grid (one column on phones). */}
+        <ol className="mt-16 grid gap-5 md:grid-cols-3">
           {services.map((s, i) => {
             const Icon = s.icon;
             return (
-              <li key={s.code} className={spans[i]}>
-                <Reveal delay={(i % 4) * 90} className="h-full">
+              <li key={s.code}>
+                <Reveal delay={(i % 3) * 90} className="h-full">
                   <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-7 transition-all duration-500 hover:-translate-y-1 hover:border-gold-500/40 hover:bg-white/[0.07]">
                     <span className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-gradient-to-r from-gold-400 to-gold-600 transition-transform duration-500 group-hover:scale-x-100" aria-hidden />
                     <div className="flex items-start justify-between gap-4">

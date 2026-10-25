@@ -73,15 +73,19 @@ export function FilterChips<T extends string>({ options, value, onChange, label 
   );
 }
 
-/** Seven small segments showing a student's progress through AHatIn's services. */
+/** Seven small segments showing a student's progress through AHat's services (3 = not needed). */
 export function ServiceBar({ values, names }: { values: number[]; names: string[] }) {
+  const counted = values.filter((v) => v !== 3).length;
   return (
-    <div className="flex gap-1" aria-label={`Services: ${values.filter((v) => v === 2).length} of 7 completed`} role="img">
+    <div className="flex gap-1" aria-label={`Services: ${values.filter((v) => v === 2).length} of ${counted} completed`} role="img">
       {values.map((v, i) => (
         <span
           key={i}
-          title={`${names[i]}: ${v === 2 ? 'Completed' : v === 1 ? 'In progress' : 'Not started'}`}
-          className={cn('h-1.5 flex-1 rounded-full', v === 2 ? 'bg-emerald-500' : v === 1 ? 'bg-sky-400' : 'bg-navy-100')}
+          title={`${names[i]}: ${v === 2 ? 'Completed' : v === 1 ? 'In progress' : v === 3 ? 'Not needed' : 'Not started'}`}
+          className={cn(
+            'h-1.5 flex-1 rounded-full',
+            v === 2 ? 'bg-emerald-500' : v === 1 ? 'bg-sky-400' : v === 3 ? 'bg-[repeating-linear-gradient(45deg,#CBD5E1_0_3px,transparent_3px_6px)]' : 'bg-navy-100',
+          )}
         />
       ))}
     </div>

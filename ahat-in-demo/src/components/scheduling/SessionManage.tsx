@@ -11,6 +11,7 @@ import { counsellorName, counsellors, type StaffStudent } from '../../data/staff
 import { sessionTypes } from '../../data/dashboard';
 import type { Session, SessionMode, Slot } from '../../lib/scheduling';
 import { uid } from '../../lib/crypto';
+import { useStudentActions } from '../../hooks/useJourney';
 import { cn, formatDate } from '../../lib/utils';
 
 export const sessionStatusTone = { booked: 'blue', completed: 'green', no_show: 'red', cancelled: 'grey' } as const;
@@ -18,6 +19,10 @@ export const sessionStatusLabel = { booked: 'Booked', completed: 'Completed', no
 
 /** Has the session's start time passed? */
 export const hasStarted = (s: Session) => new Date(`${s.date}T${s.time}:00`).getTime() <= Date.now();
+/** Has the session's scheduled end passed? */
+export const hasEnded = (s: Session) => new Date(`${s.date}T${s.time}:00`).getTime() + s.durationMinutes * 60_000 <= Date.now();
+/** Online sessions can be joined until they end. */
+export const canJoin = (s: Session) => s.status === 'booked' && s.mode === 'online' && !hasEnded(s);
 
 type Action = 'complete' | 'no_show' | 'reschedule' | 'cancel';
 
@@ -35,13 +40,13 @@ function useSessionUpdater() {
 }
 
 /** One session with its status and the actions a counsellor can take. */
-export function SessionRow({ session, studentName, showCounsellor }: { session: Session; studentName: string; showCounsellor?: boolean }) {
+export function SessionRow({ session, studentName, showCounsellor, stacked }: { session: Session; studentName: string; showCounsellor?: boolean; stacked?: boolean }) {
   const [action, setAction] = useState<Action | null>(null);
   const started = hasStarted(session);
   const Icon = session.mode === 'online' ? Video : Building2;
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-navy-100 bg-white p-4 sm:flex-row sm:items-center">
+    <div className={cn('flex flex-col gap-3 rounded-2xl border border-navy-100 bg-white p-4', !stacked && 'sm:flex-row sm:items-center')}>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <div className="w-14 shrink-0 text-center">
           <p className="font-display text-xl text-navy-900">{session.time}</p>
@@ -63,17 +68,22 @@ export function SessionRow({ session, studentName, showCounsellor }: { session: 
           {session.cancelReason && <p className="mt-1 text-xs text-navy-500">Reason: {session.cancelReason}</p>}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+      <div className={cn('flex flex-wrap items-center gap-2', !stacked && 'sm:justify-end')}>
         <Pill tone={sessionStatusTone[session.status]}>{sessionStatusLabel[session.status]}</Pill>
+        {canJoin(session) && (
+          <ActionButton onClick={() => alert('Demo: this opens your meeting link.')} primary={started}>
+            <Video className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
+            Join meeting
+          </ActionButton>
+        )}
         {session.status === 'booked' &&
           (started ? (
             <>
-              <ActionButton onClick={() => setAction('complete')} primary>Complete</ActionButton>
+              <ActionButton onClick={() => setAction('complete')} primary={!canJoin(session)}>Complete</ActionButton>
               <ActionButton onClick={() => setAction('no_show')}>No-show</ActionButton>
             </>
           ) : (
             <>
-              {session.mode === 'online' && <ActionButton onClick={() => alert('Demo: this opens your meeting link.')}>Join</ActionButton>}
               <ActionButton onClick={() => setAction('reschedule')}>Reschedule</ActionButton>
               <ActionButton onClick={() => setAction('cancel')} danger>Cancel</ActionButton>
             </>
@@ -108,6 +118,20 @@ function SessionActionModal({ session, studentName, action, onClose }: { session
   const [text, setText] = useState('');
   const [pick, setPick] = useState<{ date: string; time: string; slot?: Slot }>({ date: '', time: '' });
   const [error, setError] = useState<string | null>(null);
+  // Rescheduling keeps the meeting type unless the new time doesn't offer it.
+  const [mode, setMode] = useState<SessionMode>(session.mode);
+  const slotModes: SessionMode[] = pick.slot?.modes ?? ['online', 'office'];
+  const newMode = slotModes.includes(mode) ? mode : slotModes[0]!;
+
+  // Completing certain sessions also moves the student's progress forward.
+  const [students] = useStaffStudents();
+  const journeyActions = useStudentActions(session.studentId);
+  const student = students.find((s) => s.id === session.studentId);
+  const canRecordPlan = action === 'complete' && session.type === 'Career counselling' && !!student && !student.journey.careerPlan;
+  const canFinalCheckIn = action === 'complete' && session.type === 'Post-arrival check-in' && !!student?.journey.arrival.arrivedAt && !student.journey.arrival.finalCheckInAt;
+  const [markPlan, setMarkPlan] = useState(true);
+  const [planSummary, setPlanSummary] = useState('');
+  const [markFinal, setMarkFinal] = useState(false);
 
   const titles: Record<Action, string> = {
     complete: 'Complete session',
@@ -120,7 +144,10 @@ function SessionActionModal({ session, studentName, action, onClose }: { session
     const t = text.trim();
     if (action === 'complete') {
       if (t.length < 5) return setError('Add a few words about what was discussed and agreed.');
+      if (canRecordPlan && markPlan && planSummary.trim().length < 3) return setError('Add the agreed career direction, or untick “career plan shared”.');
       update(session.id, { status: 'completed', outcomeNotes: t }, 'Marked completed.', session.studentId, `${session.type} session completed: ${t}`);
+      if (canRecordPlan && markPlan) journeyActions.recordCareerPlan(planSummary.trim());
+      if (canFinalCheckIn && markFinal) journeyActions.recordFinalCheckIn(t);
     } else if (action === 'no_show') {
       update(session.id, { status: 'no_show' }, 'Marked as no-show.', session.studentId, `Missed the ${session.type.toLowerCase()} session on ${formatDate(session.date)}.${t ? ` ${t}` : ''}`);
     } else if (action === 'cancel') {
@@ -129,13 +156,13 @@ function SessionActionModal({ session, studentName, action, onClose }: { session
     } else {
       if (!pick.date || !pick.time) return setError('Choose a new date and time.');
       if (t.length < 5) return setError('Give a reason; the student will see it.');
-      const mode: SessionMode = pick.slot && !pick.slot.modes.includes(session.mode) ? pick.slot.modes[0]! : session.mode;
+      const modeText = newMode === session.mode ? '' : ` (now ${newMode === 'online' ? 'online' : 'at the office'})`;
       update(
         session.id,
-        { date: pick.date, time: pick.time, mode },
-        `Rescheduled from ${formatDate(session.date)} ${session.time} to ${formatDate(pick.date)} ${pick.time}: ${t}`,
+        { date: pick.date, time: pick.time, mode: newMode },
+        `Rescheduled from ${formatDate(session.date)} ${session.time} to ${formatDate(pick.date)} ${pick.time}${modeText}: ${t}`,
         session.studentId,
-        `${session.type} session moved to ${formatDate(pick.date)} at ${pick.time}: ${t}`,
+        `${session.type} session moved to ${formatDate(pick.date)} at ${pick.time}${modeText}: ${t}`,
       );
     }
     onClose();
@@ -170,6 +197,33 @@ function SessionActionModal({ session, studentName, action, onClose }: { session
             ignoreNotice
           />
         )}
+        {action === 'reschedule' && (
+          <div>
+            <p className="mb-2 text-sm font-medium text-navy-800">Meeting type</p>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Meeting type">
+              {(['online', 'office'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={newMode === m}
+                  disabled={!slotModes.includes(m)}
+                  onClick={() => setMode(m)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40',
+                    newMode === m ? 'bg-navy-900 text-white' : 'bg-white text-navy-700 ring-1 ring-navy-100',
+                  )}
+                >
+                  {m === 'online' ? <Video className="h-4 w-4" aria-hidden /> : <Building2 className="h-4 w-4" aria-hidden />}
+                  {m === 'online' ? 'Online meeting' : 'At the office'}
+                </button>
+              ))}
+            </div>
+            {pick.slot && slotModes.length === 1 && (
+              <p className="mt-2 text-xs text-amber-700">This time is {slotModes[0] === 'office' ? 'for office visits only' : 'online only'}.</p>
+            )}
+          </div>
+        )}
         <div>
           <label htmlFor="session-text" className="mb-1.5 block text-sm font-medium text-navy-800">
             {action === 'complete' ? 'Session notes (added to the student record)' : action === 'no_show' ? 'Note (optional)' : 'Reason (shown to the student)'}
@@ -187,6 +241,23 @@ function SessionActionModal({ session, studentName, action, onClose }: { session
             placeholder={action === 'complete' ? 'What was discussed, and the agreed next steps…' : action === 'no_show' ? 'e.g. Called twice, no answer' : 'e.g. I’m at an education fair that day'}
           />
         </div>
+        {canRecordPlan && (
+          <div className="space-y-2 rounded-xl bg-ivory p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-navy-800">
+              <input type="checkbox" checked={markPlan} onChange={(e) => setMarkPlan(e.target.checked)} className="h-4 w-4 accent-navy-900" />
+              Career plan shared in this session (completes Career Counselling)
+            </label>
+            {markPlan && (
+              <input aria-label="Agreed career direction" value={planSummary} onChange={(e) => setPlanSummary(e.target.value)} maxLength={120} className="input py-2" placeholder="Agreed direction, e.g. Data Science, UK first" />
+            )}
+          </div>
+        )}
+        {canFinalCheckIn && (
+          <label className="flex items-center gap-2 rounded-xl bg-ivory p-3 text-sm font-medium text-navy-800">
+            <input type="checkbox" checked={markFinal} onChange={(e) => setMarkFinal(e.target.checked)} className="h-4 w-4 accent-navy-900" />
+            This was the final check-in (completes Post-Arrival Support)
+          </label>
+        )}
         {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
         {(action === 'cancel' || action === 'reschedule') && <p className="text-xs text-navy-400">The student would be notified by email and WhatsApp. (Demo: no message is sent.)</p>}
       </div>

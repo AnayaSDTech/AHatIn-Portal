@@ -4,18 +4,23 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const NAVY = [11, 31, 58];
+const IVORY = [250, 247, 242];
 const GOLD = [201, 162, 39];
 const GOLD_DARK = [168, 133, 28];
 
-// Shapes in 0..1 coordinates, drawn in order.
+// The AHat mark (an "A" wearing a graduation cap), in 0..1 coordinates, drawn in order.
+// Matches public/favicon.svg and the Logo component.
 const shapes = [
+  // The A and its crossbar
+  { color: IVORY, points: [[0.44, 0.41], [0.56, 0.41], [0.78, 0.82], [0.665, 0.82], [0.5, 0.51], [0.335, 0.82], [0.22, 0.82]] },
+  { color: IVORY, points: [[0.385, 0.63], [0.615, 0.63], [0.646, 0.69], [0.354, 0.69]] },
   // Cap base
-  { color: GOLD_DARK, points: [[0.32, 0.5], [0.5, 0.58], [0.68, 0.5], [0.68, 0.66], [0.5, 0.73], [0.32, 0.66]] },
+  { color: GOLD_DARK, points: [[0.38, 0.37], [0.5, 0.42], [0.62, 0.37], [0.62, 0.44], [0.5, 0.49], [0.38, 0.44]] },
   // Mortarboard top
-  { color: GOLD, points: [[0.5, 0.29], [0.82, 0.44], [0.5, 0.59], [0.18, 0.44]] },
+  { color: GOLD, points: [[0.5, 0.17], [0.82, 0.3], [0.5, 0.43], [0.18, 0.3]] },
   // Tassel cord and end
-  { color: GOLD, points: [[0.795, 0.44], [0.815, 0.44], [0.815, 0.63], [0.795, 0.63]] },
-  { color: GOLD, points: [[0.78, 0.62], [0.83, 0.62], [0.84, 0.69], [0.77, 0.69]] },
+  { color: GOLD, points: [[0.792, 0.3], [0.814, 0.3], [0.814, 0.46], [0.792, 0.46]] },
+  { color: GOLD, points: [[0.778, 0.45], [0.828, 0.45], [0.84, 0.53], [0.766, 0.53]] },
 ];
 
 function inside(x, y, pts) {

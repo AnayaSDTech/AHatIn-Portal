@@ -4,6 +4,30 @@ import { ButtonLink } from '../ui/Button';
 import { DemoBadge } from '../ui/DemoBadge';
 import { SmartImage } from '../ui/SmartImage';
 import { images, stats } from '../../data/site';
+import { cn } from '../../lib/utils';
+
+/** Demo journey shown in the hero card (a preview of the student portal). */
+const heroSteps: { title: string; note: string; state: 'done' | 'now' | 'next' }[] = [
+  { title: 'Career counselling', note: 'Plan shared: Data Science, UK', state: 'done' },
+  { title: 'University shortlist', note: '4 universities approved', state: 'done' },
+  { title: 'Applications', note: '3 submitted · 1 offer received', state: 'now' },
+  { title: 'Scholarships & funding', note: '1 scholarship applied', state: 'now' },
+  { title: 'Visa', note: 'Starts after you accept an offer', state: 'next' },
+];
+
+function ProgressRing({ value }: { value: number }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative h-16 w-16 shrink-0">
+      <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="32" cy="32" r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="#D4AF37" strokeWidth="6" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (value / 100) * c} />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center font-display text-lg">{value}%</span>
+    </div>
+  );
+}
 
 export function Hero() {
   return (
@@ -29,7 +53,7 @@ export function Hero() {
             <span className="italic text-gold-400">guided every step</span> of the way.
           </h1>
           <p className="mt-6 max-w-xl animate-fade-up text-lg leading-relaxed text-navy-100 [animation-delay:200ms]">
-            From choosing the right course to settling in abroad, AHatIn gives Indian students honest advice, a dedicated
+            From choosing the right course to settling in abroad, AHat gives Indian students honest advice, a dedicated
             counsellor and a portal that shows exactly what happens next.
           </p>
           <div className="mt-9 flex animate-fade-up flex-col gap-3 [animation-delay:300ms] sm:flex-row">
@@ -55,35 +79,57 @@ export function Hero() {
         <div className="hidden lg:col-span-5 lg:block">
           <div className="relative mx-auto max-w-sm animate-float">
             <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-gold-400/30 to-transparent blur-2xl" aria-hidden />
-            <div className="relative rounded-3xl border border-white/15 bg-white/10 p-6 text-white shadow-lift backdrop-blur-xl">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">Your progress</p>
-                <DemoBadge light label="Demo" />
+            <div className="relative overflow-hidden rounded-3xl border border-white/15 bg-navy-950/55 text-white shadow-lift backdrop-blur-xl">
+              {/* Header: who and how far */}
+              <div className="relative flex items-center gap-4 border-b border-white/10 p-5">
+                <ProgressRing value={43} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-gold-300">Your journey</p>
+                  <p className="mt-1 font-semibold leading-snug">MSc Data Science</p>
+                  <p className="text-xs text-navy-200">United Kingdom · Sept 2027 intake</p>
+                </div>
+                <span className="absolute right-4 top-4">
+                  <DemoBadge light label="Demo" />
+                </span>
               </div>
-              <div className="mt-5 space-y-4">
-                {[
-                  ['Career counselling', 100],
-                  ['University shortlist', 100],
-                  ['Applications', 75],
-                  ['Scholarships & funding', 50],
-                  ['Visa', 0],
-                ].map(([label, pct]) => (
-                  <div key={label as string}>
-                    <div className="flex justify-between text-xs text-navy-100">
-                      <span>{label}</span>
-                      <span>{pct}%</span>
+
+              {/* Steps, like the student portal */}
+              <ol className="space-y-0 px-5 pt-4">
+                {heroSteps.map((s, i) => (
+                  <li key={s.title} className="relative flex gap-3 pb-3.5 last:pb-0">
+                    {i < heroSteps.length - 1 && (
+                      <span className={cn('absolute left-[11px] top-6 h-[calc(100%-1rem)] w-px', s.state === 'done' ? 'bg-emerald-400/60' : 'bg-white/15')} aria-hidden />
+                    )}
+                    <span className="relative z-10 mt-0.5 grid h-6 w-6 shrink-0 place-items-center">
+                      {s.state === 'done' ? (
+                        <CheckCircle2 className="h-6 w-6 text-emerald-400" aria-hidden />
+                      ) : s.state === 'now' ? (
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-gold-400/20 ring-1 ring-gold-400">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-gold-400" />
+                        </span>
+                      ) : (
+                        <span className="h-5 w-5 rounded-full border border-white/25" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className={cn('text-sm font-medium', s.state === 'next' ? 'text-navy-300' : 'text-white')}>{s.title}</p>
+                        {s.state === 'now' && <span className="rounded-full bg-gold-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-300">In progress</span>}
+                      </div>
+                      <p className="text-xs text-navy-300">{s.note}</p>
                     </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-white/15">
-                      <div className="h-full rounded-full bg-gold-400" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
-              <div className="mt-6 flex items-center gap-3 rounded-2xl bg-white/10 p-4">
-                <ShieldCheck className="h-8 w-8 shrink-0 text-gold-300" aria-hidden />
+              </ol>
+
+              {/* Next step */}
+              <div className="m-5 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-gold-400/20 to-gold-400/5 p-4 ring-1 ring-gold-400/30">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gold-400 text-navy-950">
+                  <ShieldCheck className="h-5 w-5" aria-hidden />
+                </span>
                 <p className="text-xs leading-relaxed text-navy-100">
-                  <span className="font-semibold text-white">Offer received</span> from a UK university. Next step: accept
-                  your offer by the deadline.
+                  <span className="block font-semibold text-white">Next: reply to your offer</span>
+                  University of Manchester · by 23 Nov
                 </p>
               </div>
             </div>

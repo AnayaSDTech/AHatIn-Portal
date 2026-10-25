@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Demo website and student portal for AHatIn International Educational Consultancy",
+  "description": "Demo website and student portal for AHat International Educational Consultancy",
   "engines": {
     "node": "22.x"
   },

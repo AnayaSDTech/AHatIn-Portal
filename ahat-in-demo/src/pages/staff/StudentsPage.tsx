@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, FileSearch } from 'lucide-react';
-import { useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
+import { useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
+import { computeServices, serviceValues } from '../../lib/journey';
 import { EmptyState, FilterChips, PageHeader, SearchBox, ServiceBar } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
 import { counsellorName, counsellors, serviceShortNames, stageIndex, stageLabel } from '../../data/staff';
@@ -20,6 +21,7 @@ const groupOf = (stage: string): Exclude<Group, 'all'> => {
 export function StudentsPage() {
   const scope = useStaffScope();
   const [allStudents] = useStaffStudents();
+  const [sessions] = useSessions();
   const [owner, setOwner] = useState('all');
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState<Group>('all');
@@ -78,6 +80,7 @@ export function StudentsPage() {
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((s) => {
             const pending = s.documents.filter((d) => d.state === 'pending').length;
+            const values = serviceValues(computeServices(s, sessions));
             return (
               <li key={s.id}>
                 <Link to={`/staff/students/${s.id}`} className="card group block h-full p-5 transition hover:-translate-y-0.5 hover:shadow-lift">
@@ -104,8 +107,8 @@ export function StudentsPage() {
                     )}
                   </div>
                   <div className="mt-4">
-                    <ServiceBar values={s.services} names={serviceShortNames} />
-                    <p className="mt-1.5 text-xs text-navy-400">{s.services.filter((v) => v === 2).length} of 7 services completed</p>
+                    <ServiceBar values={values} names={serviceShortNames} />
+                    <p className="mt-1.5 text-xs text-navy-400">{values.filter((v) => v === 2).length} of {values.filter((v) => v !== 3).length} services completed</p>
                   </div>
                 </Link>
               </li>

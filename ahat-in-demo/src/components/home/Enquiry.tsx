@@ -18,7 +18,7 @@ function ThankYou({ name, result, onAgain }: { name: string; result: EnquiryResu
   const first = name.trim().split(/\s+/)[0];
   const text =
     result.kind === 'student'
-      ? `You already have an AHatIn account, so we've passed this to your counsellor, ${result.counsellor}, who will get back to you. You can also log in to see your progress.`
+      ? `You already have an AHat account, so we've passed this to your counsellor, ${result.counsellor}, who will get back to you. You can also log in to see your progress.`
       : result.kind === 'lead'
         ? `We've added this to your earlier enquiry. ${result.counsellor} will call you to talk it through.`
         : result.counsellor
@@ -163,7 +163,7 @@ export function Enquiry() {
                     <label className="flex items-start gap-3 text-sm leading-relaxed text-navy-700">
                       <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-navy-300 accent-navy-900" aria-invalid={!!errors.consent} {...register('consent')} />
                       <span>
-                        I agree that AHatIn may contact me by phone, email or WhatsApp about my enquiry, as described in the{' '}
+                        I agree that AHat may contact me by phone, email or WhatsApp about my enquiry, as described in the{' '}
                         <a href="#" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>.
                       </span>
                     </label>

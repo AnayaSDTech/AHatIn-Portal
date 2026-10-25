@@ -91,7 +91,7 @@ export function BookSessionModal({ open, onClose, studentId, studentName, counse
           </span>
           <p className="mt-4 text-lg font-semibold text-navy-900">{booked.type}</p>
           <p className="mt-1 text-navy-600">
-            {formatDate(booked.date)} at {booked.time} IST · {booked.mode === 'online' ? 'Online meeting' : 'At the AHatIn office'}
+            {formatDate(booked.date)} at {booked.time} IST · {booked.mode === 'online' ? 'Online meeting' : 'At the AHat office'}
           </p>
           <p className="mt-1 text-sm text-navy-500">with {counsellor.name}</p>
           <p className="mt-5 rounded-xl bg-ivory px-4 py-3 text-sm text-navy-600">

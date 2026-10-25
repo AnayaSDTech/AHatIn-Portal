@@ -7,6 +7,8 @@ import {
   Stamp,
   Luggage,
   HeartHandshake,
+  MapPinned,
+  Briefcase,
 } from 'lucide-react';
 
 const img = (id: string, w = 1200) =>
@@ -111,6 +113,18 @@ export const services: Service[] = [
     description: 'Safe-arrival check, local registration help and regular check-ins during your first months.',
     icon: HeartHandshake,
   },
+  {
+    code: 'S8',
+    title: 'On-site Support',
+    description: 'Help on the ground in your study country: settling into housing, local appointments, and a contact to call when you need a hand.',
+    icon: MapPinned,
+  },
+  {
+    code: 'S9',
+    title: 'Job Assistance',
+    description: 'A CV for the local market, part-time job search within your visa rules, and guidance on graduate jobs and post-study work.',
+    icon: Briefcase,
+  },
 ];
 
 export const aboutPoints = [
@@ -120,19 +134,26 @@ export const aboutPoints = [
   { title: 'Your progress, always visible', text: 'Track every application, document and deadline in your student portal.' },
 ];
 
+/** Edition the ranks below come from. Update the list and this label together once a year. */
+export const qsEdition = 'QS World University Rankings 2027';
+
 /**
- * DEMO: examples of universities Indian students commonly apply to.
- * Shown for illustration only; not a claim of direct partnership.
+ * Top UK and European universities, in QS World University Rankings 2027 order (published 18 June 2026).
+ * "=" marks a joint rank. Shown for illustration only; not a claim of partnership.
  */
 export const universities = [
-  { name: 'University of Manchester', country: 'United Kingdom', city: 'Manchester', programmes: 'Business, Data Science, Engineering' },
-  { name: 'University of Leeds', country: 'United Kingdom', city: 'Leeds', programmes: 'Management, Computing, Public Health' },
-  { name: 'King’s College London', country: 'United Kingdom', city: 'London', programmes: 'Law, Health, Digital Humanities' },
-  { name: 'University of Glasgow', country: 'United Kingdom', city: 'Glasgow', programmes: 'Computing, Engineering, Business' },
-  { name: 'RWTH Aachen University', country: 'Germany', city: 'Aachen', programmes: 'Engineering, Computer Science' },
-  { name: 'Technical University of Munich', country: 'Germany', city: 'Munich', programmes: 'Engineering, Informatics' },
-  { name: 'Trinity College Dublin', country: 'Ireland', city: 'Dublin', programmes: 'Computer Science, Business, Biotech' },
-  { name: 'University College Dublin', country: 'Ireland', city: 'Dublin', programmes: 'Business Analytics, Finance' },
+  { name: 'Imperial College London', country: 'United Kingdom', city: 'London', qsRank: '=2', programmes: 'Engineering, Medicine, Business' },
+  { name: 'University of Oxford', country: 'United Kingdom', city: 'Oxford', qsRank: '4', programmes: 'Humanities, Sciences, Business' },
+  { name: 'University of Cambridge', country: 'United Kingdom', city: 'Cambridge', qsRank: '6', programmes: 'Sciences, Engineering, Economics' },
+  { name: 'ETH Zurich', country: 'Switzerland', city: 'Zurich', qsRank: '=8', programmes: 'Engineering, Computer Science, Architecture' },
+  { name: 'University College London (UCL)', country: 'United Kingdom', city: 'London', qsRank: '=8', programmes: 'Architecture, Education, Life Sciences' },
+  { name: 'EPFL', country: 'Switzerland', city: 'Lausanne', qsRank: '=22', programmes: 'Engineering, Computer Science' },
+  { name: 'Technical University of Munich', country: 'Germany', city: 'Munich', qsRank: '25', programmes: 'Engineering, Informatics, Management' },
+  { name: 'Université PSL', country: 'France', city: 'Paris', qsRank: '34', programmes: 'Sciences, Economics, Arts' },
+  { name: 'University of Edinburgh', country: 'United Kingdom', city: 'Edinburgh', qsRank: '35', programmes: 'Informatics, Medicine, Business' },
+  { name: 'King’s College London', country: 'United Kingdom', city: 'London', qsRank: '37', programmes: 'Law, Health, Digital Humanities' },
+  { name: 'University of Manchester', country: 'United Kingdom', city: 'Manchester', qsRank: '=40', programmes: 'Business, Data Science, Engineering' },
+  { name: 'Trinity College Dublin', country: 'Ireland', city: 'Dublin', qsRank: '75', programmes: 'Computer Science, Business, Biotech' },
 ];
 
 /** DEMO: fictional student stories. */
@@ -162,7 +183,7 @@ export const testimonials = [
 
 export const faqs = [
   {
-    q: 'Is AHatIn’s guidance really free?',
+    q: 'Is AHat’s guidance really free?',
     a: 'Yes. Our counselling and application support are free for students. Universities and our partner agencies pay us when a student enrols, and we always tell you which universities earn us commission.',
   },
   {

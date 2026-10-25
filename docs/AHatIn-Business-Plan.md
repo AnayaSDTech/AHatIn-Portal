@@ -6,9 +6,9 @@ Oct 20, 2026 · @qubra
 
 AHatIn can grow from a small counselling practice to about 300 enrolled students and ₹4.1 crore revenue a year by FY29-30. To do it, AHatIn should focus on UK and European master's admissions, earn mostly from university commissions, and run every student's journey through a new portal. The plan needs ₹40 to 45 lakh up front and breaks even in Year 1 at about 62 enrolments.
 
-- **What AHatIn is:** An India-based consultancy guiding students to universities in the UK, USA and Europe. Today it has a WordPress website and a counselling service delivered by people.
+- **What AHatIn is:** An India-based consultancy guiding students to universities in the UK and Europe. Today it has a WordPress website and a counselling service delivered by people.
 - **The opportunity:** 1.25 million Indians studied abroad in 2025, the first fall in four years. Demand is moving away from Canada and the USA towards the UK, Germany, Ireland and France, which suits AHatIn's focus.
-- **The model:** Low fees for students going to commission-paying universities (UK, Ireland, European private institutions). Premium fees for US, top-ranked and German public-university applications. Referral income from loans, forex and accommodation.
+- **The model:** Low fees for students going to commission-paying universities (UK, Ireland, European private institutions). Premium fees for top-ranked and German public-university applications. Referral income from loans, forex and accommodation.
 - **The portal (planned):** One system for students, parents, counsellors and administrators, covering leads, profiles, counselling, documents, applications, visas, payments and reports. It connects to the WordPress site. MVP live in April 2027 for ₹12 to 15 lakh.
 - **Financials (base case):** Revenue of ₹0.94 crore, ₹2.2 crore and ₹4.1 crore over FY27-28 to FY29-30. EBITDA margin rising from 11% to 28%.
 - **Biggest risks:** Visa policy changes and commission timing. These are managed through destination spread, fee income, a cash reserve and strict compliance.
@@ -27,7 +27,7 @@ Today AHatIn runs on a WordPress website and a counselling service delivered by 
 | Applications | Prepared by counsellors using university portals and email | Application tracker per student; status, deadlines and offers visible to student and counsellor |
 | Documents | Collected through email/WhatsApp (assumed) | Secure document vault with checklists, version control and verification status |
 | Payments | Offline (bank transfer/UPI) (assumed) | Online invoices and payments through Razorpay (UPI, cards, net banking), GST invoices |
-| University partners | To be confirmed: direct agreements or sub-agent arrangements | Direct UK agreements plus aggregator access (e.g. ApplyBoard/Adventus/Crizac-type platforms) for the USA and Europe |
+| University partners | To be confirmed: direct agreements or sub-agent arrangements | Direct UK agreements plus aggregator access (e.g. ApplyBoard/Adventus/Crizac-type platforms) for wider UK and European choice |
 | Reporting | Manual | Admin dashboards: funnel, conversion, revenue, counsellor performance |
 
 **Assumptions to confirm:** The working folder holds no website files, so the "exists today" column reflects a typical early-stage consultancy. Please correct anything that is wrong. In particular, confirm team size, current student volume, existing university agreements and the WordPress plugins in use. Each of these changes the cost and revenue figures that follow.
@@ -42,7 +42,7 @@ Over three years, AHatIn aims to grow from a small counselling practice into a t
 | Paid counselling clients | 120 | 260 | 450 |
 | Enquiry-to-paid conversion | 8% | 10% | 12% |
 | Visa success rate | 90%+ | 92%+ | 95%+ |
-| Direct university partners | 15 UK + aggregator access | 30 | 50 (UK, Ireland, Germany, France, Netherlands, USA) |
+| Direct university partners | 15 UK + aggregator access | 30 | 50 (UK, Ireland, Germany, France, Netherlands) |
 | Revenue (INR) | about ₹0.94 crore | about ₹2.2 crore | about ₹4.1 crore |
 | Portal adoption | 100% of new students on portal | Mobile-friendly PWA, parent access | Partner/franchise access |
 | Reputation | 50 Google reviews at 4.6+ | 150 reviews | 300 reviews; British Council-trained counsellors |
@@ -51,7 +51,7 @@ The revenue figures come from the model in section 10. Every target is reviewed 
 
 ## 3. Market analysis
 
-The Indian outbound market is still large but shrinking for the first time in years, and it is moving away from Canada and the USA towards the UK and Europe. That suits AHatIn's UK, USA and Europe focus, provided it leads with the UK and Europe and treats the USA carefully.
+The Indian outbound market is still large but shrinking for the first time in years, and it is moving away from Canada and the USA towards the UK and Europe. That suits AHatIn's decision to focus only on the UK and Europe.
 
 ### Market size and direction
 
@@ -65,7 +65,6 @@ The Indian outbound market is still large but shrinking for the first time in ye
 | Destination | Current signal | Implication for AHatIn |
 | --- | --- | --- |
 | UK | 98,015 sponsored study visas to Indians in the year to June 2025, a 96% approval rate, and 81% for master's courses ([ICEF](https://monitor.icef.com/2025/12/the-number-of-indian-students-abroad-fell-in-2025/)). Graduate Route falls from 2 years to 18 months for applications from 1 January 2027 ([Home Office guidance](https://assets.publishing.service.gov.uk/media/68f62f24f5d433238a14c7df/Graduate+route.pdf)). Universities must use the Agent Quality Framework, and stricter compliance (BCA) thresholds apply ([ICEF](https://monitor.icef.com/2025/05/uk-sets-out-new-immigration-strategy-will-reduce-graduate-route-work-term-to-18-months/)). A £925 per-student levy on English universities starts in August 2028 ([ICEF](https://monitor.icef.com/2025/11/uk-confirms-international-fee-levy-of-925-per-student-starting-august-2028)). | **Core market.** One-year master's degrees, high approval rates and agent-paid commission make the UK the main revenue engine. Universities will prefer compliant, well-trained agents, which favours a careful newcomer. |
-| USA | India is the top source country, with 363,019 students in 2024-25, but new international enrolment fell 17% in fall 2025 and graduate enrolment fell 12% ([Careers360, Open Doors 2025](https://news.careers360.com/india-retains-top-position-source-of-international-students-in-us-amid-17-dip-in-college-admissions-report)). F-1 visas to Indians fell 44% in H1 2025 ([ICEF](https://monitor.icef.com/2025/12/the-number-of-indian-students-abroad-fell-in-2025/)). | **Selective.** Few US universities pay commission, so serve this market through fee-based premium counselling for strong profiles. Keep visa expectations honest. |
 | Germany | Indian students more than doubled, from 28,905 (2020) to 59,420 (2024). India is Germany's top source market and 60% study engineering ([ICEF](https://monitor.icef.com/2025/12/the-number-of-indian-students-abroad-fell-in-2025/)). | **Growth market.** Public universities charge little or no tuition, so commissions are rare. Earn through service fees: APS, blocked account, uni-assist and German-language support. |
 | Ireland | Over 7,000 Indian enrolments in 2023-24, up 50%. India is Ireland's top international market (ICEF). | **Growth market.** English-taught degrees with commission-paying universities. A natural next step after the UK. |
 | France | 9,100 Indian students in 2024-25, up 17%. France targets 30,000 by 2030 (ICEF). | **Opportunity.** Business schools pay commission. |
@@ -89,15 +88,15 @@ The Indian outbound market is still large but shrinking for the first time in ye
 
 ## 4. Services and pricing
 
-AHatIn should sell four clear packages and a few add-ons, each priced openly on the website. Charge students least where universities pay commission (UK, Ireland, private European institutions), and charge most where they don't (USA, German public universities). All prices are **proposed**. They exclude 18% GST and should be checked against local competitors before launch.
+AHatIn should sell four clear packages and a few add-ons, each priced openly on the website. Charge students least where universities pay commission (UK, Ireland, private European institutions), and charge most where they don't (German public universities and some top-ranked universities). All prices are **proposed**. They exclude 18% GST and should be checked against local competitors before launch.
 
 | Package | Who it is for | What is included | Proposed fee (INR) |
 | --- | --- | --- | --- |
 | Free profile assessment | Every enquiry | 30-minute call, profile score, country fit, budget check | Free |
 | Essentials: UK and Ireland | Master's and undergraduate applicants to partner universities | Shortlist of up to 5 universities, SOP review, applications, offer comparison, CAS/visa filing, pre-departure briefing | ₹10,000 commitment fee, adjusted against add-ons |
 | Europe Plus | Germany, France, Netherlands and other EU destinations | Shortlist, APS and uni-assist guidance, blocked account and insurance setup, visa file, accommodation help | ₹45,000 |
-| Premium: USA and top-ranked | USA, Russell Group/Ivy-level targets, MBA | Senior counsellor, up to 8 applications, essay development, scholarship strategy, F-1 interview preparation | ₹75,000 to ₹1,25,000 |
-| Undergraduate journey | Class 10 to 12 students and parents | Two-year roadmap, profile building, test planning, UCAS/Common App applications, parent sessions | ₹60,000 to ₹1,50,000 |
+| Premium: top-ranked | Russell Group and top European university targets, MBA | Senior counsellor, up to 8 applications, essay development, scholarship strategy, visa and credibility interview preparation | ₹75,000 to ₹1,25,000 |
+| Undergraduate journey | Class 10 to 12 students and parents | Two-year roadmap, profile building, test planning, UCAS and European applications, parent sessions | ₹60,000 to ₹1,50,000 |
 
 **Add-ons:** SOP/LOR writing support (₹8,000 to ₹15,000), visa-only service (₹15,000 to ₹25,000), IELTS/PTE/German-language coaching through a partner (referral or revenue share), scholarship applications, and mock visa interviews.
 
@@ -156,7 +155,7 @@ AHatIn will run as a small specialist team in one office, working one standard s
 | --- | --- | --- | --- | --- |
 | Founder / Director | 1 | 1 | 1 | University partnerships, premium counselling, finance, hiring |
 | Senior counsellors | 2 | 4 | 6 | Assessments, shortlisting, SOP guidance, student ownership |
-| Application and visa officers | 1 | 2 | 3 | Applications, CAS/I-20/visa files, document verification |
+| Application and visa officers | 1 | 2 | 3 | Applications, CAS/visa files, document verification |
 | Marketing executive | 1 | 1 | 2 | Ads, content, events, WordPress site |
 | Front desk / tele-counsellor | 1 | 1 | 2 | First response, scheduling, lead qualification |
 | Operations/portal administrator | 0 | 1 | 1 | Portal administration, reporting, partner payments |
@@ -173,14 +172,14 @@ Staff are paid a fixed salary plus an incentive of ₹5,000 to ₹7,500 per enro
 4. Shortlist approved by the student and a parent, with commission disclosure
 5. Applications submitted, with deadlines tracked
 6. Offers received, compared and accepted, and the deposit paid
-7. CAS/I-20/admission letter received, then financial documents checked and the visa filed
+7. CAS/admission letter received, then financial documents checked and the visa filed
 8. Visa decided, then pre-departure briefing, accommodation and travel
 9. Arrival and enrolment confirmed, commission invoiced, review and referral requested
 
 ### Compliance and quality
 
 - **Company set-up:** Private limited company or LLP, GST registration, Shops and Establishments licence, Udyam (MSME) registration, and a trademark for "AHatIn".
-- **Agent standards:** UK universities must now follow the Agent Quality Framework, so every counsellor should complete British Council agent training in the first 90 days. Plan for ICEF agency accreditation in Year 2 and AIRC certification (for US institutions) in Year 3.
+- **Agent standards:** UK universities must now follow the Agent Quality Framework, so every counsellor should complete British Council agent training in the first 90 days. Plan for ICEF agency accreditation in Year 2.
 - **Data protection:** Under India's DPDP Rules 2025, notice, consent and data-fiduciary duties apply from 13 May 2027 ([S.S. Rana](https://ssrana.in/articles/meity-notifies-final-digital-personal-data-protection-rules-2025/)). Build consent capture, data-retention rules and deletion requests into the portal from day one.
 - **Document integrity:** Zero tolerance for fake documents. Check marksheets through DigiLocker and university verification portals, and refuse to submit anything that cannot be verified.
 - **Quality KPIs:** Visa success rate, offer-to-enrolment rate, average response time, complaint closure within 7 days, and Net Promoter Score (target 60+).
@@ -203,7 +202,7 @@ The portal is a planned web application that will run every student's journey fr
 | --- | --- |
 | Student (and linked parent) | Profile, documents, shortlist approval, application and visa status, messages, payments, invoices |
 | Counsellor | Own caseload, notes, tasks, shortlisting, application tracking, follow-ups, messaging |
-| Application/visa officer | Document verification, application submission records, CAS/I-20 and visa tracking |
+| Application/visa officer | Document verification, application submission records, CAS and visa tracking |
 | Administrator | Users and permissions, university and course catalogue, packages and pricing, commission tracking, reports, settings |
 | Partner (later) | Sub-agents, loan and accommodation partners, each seeing only the students they are assigned |
 
@@ -215,7 +214,7 @@ The portal is a planned web application that will run every student's journey fr
 | Student profile | Academics, test scores, work experience, budget, preferences, profile-completeness score | 1 (MVP) |
 | Counselling | Session booking (Google Calendar/Zoom), notes, tasks, counselling history | 1 (MVP) |
 | Document vault | Checklists by country and course, uploads, verification status, expiry alerts (passport, test scores), version history | 1 (MVP) |
-| Application tracker | One record per application: university, course, intake, status, deadlines, offer conditions, deposit, CAS/I-20 | 1 (MVP) |
+| Application tracker | One record per application: university, course, intake, status, deadlines, offer conditions, deposit, CAS or admission letter | 1 (MVP) |
 | Payments and invoicing | Razorpay links (UPI, cards, net banking), instalments, GST invoices, receipts, refunds | 1 (MVP) |
 | Notifications | Email and WhatsApp Business API alerts for status changes, missing documents and deadlines | 1 (MVP) |
 | Admin dashboard | Funnel, conversion, revenue, counsellor workload | 1 (MVP) |
@@ -346,7 +345,7 @@ The biggest risks are visa and immigration policy changes and slow commission pa
 
 | Risk | Likelihood | Impact | Mitigation |
 | --- | --- | --- | --- |
-| Destination policy tightens further (UK Graduate Route already cut to 18 months; US visa scrutiny; new caps) | High | High | Spread across the UK, Ireland, Germany and France. Track policy weekly and brief students honestly. Keep no more than 60% of enrolments in one country by Year 3. |
+| Destination policy tightens further (UK Graduate Route already cut to 18 months; new caps) | High | High | Spread across the UK, Ireland, Germany and France. Track policy weekly and brief students honestly. Keep no more than 60% of enrolments in one country by Year 3. |
 | Commission delays, clawbacks or rate cuts (including UK levy pressure on university budgets from 2028) | Medium | High | Hold 3 months' working capital. Track receivables in the portal. Grow fee and referral income to 30% or more of revenue. |
 | Visa refusals damage reputation | Medium | High | Financial-document checks before filing, mock interviews, verified documents only, and no applications for weak cases |
 | Market downturn and price competition | High | Medium | Compete on conversion, service and transparency, not on price. Specialise in the UK and Europe for master's students. |
@@ -364,7 +363,7 @@ AHatIn should scale in three stages: become the trusted specialist in one city, 
 | --- | --- | --- | --- |
 | 1. Prove the model | FY27-28 | One office. UK and Ireland lead, Germany and France second. Portal MVP. 15 direct UK partners. | 60+ enrolments, 90%+ visa success, 4.6+ Google rating |
 | 2. Deepen and digitise | FY28-29 | Direct contracts with the top 30 universities. ICEF accreditation. Online counselling across India. Parent access and course finder. Webinars and virtual fairs. | 150+ enrolments, EBITDA margin above 20%, CAC under ₹25,000 |
-| 3. Expand reach | FY29-30 | Second branch in a nearby tier-2 city. Sub-agent and franchise network on the partner portal. School partnerships for undergraduate pipelines. AIRC certification for US partners. | 300 enrolments, partners producing 20%+ of volume |
+| 3. Expand reach | FY29-30 | Second branch in a nearby tier-2 city. Sub-agent and franchise network on the partner portal. School partnerships for undergraduate pipelines. | 300 enrolments, partners producing 20%+ of volume |
 
 ### Further revenue options (evaluate from Year 2)
 
@@ -410,7 +409,6 @@ Market and policy figures come from the pages below, checked in October 2026. Pr
 - [ICEF Monitor: UK white paper, Graduate Route to 18 months, BCA and Agent Quality Framework](https://monitor.icef.com/2025/05/uk-sets-out-new-immigration-strategy-will-reduce-graduate-route-work-term-to-18-months/)
 - [Home Office: Graduate route caseworker guidance](https://assets.publishing.service.gov.uk/media/68f62f24f5d433238a14c7df/Graduate+route.pdf)
 - [ICEF Monitor: UK confirms £925 international student levy from August 2028](https://monitor.icef.com/2025/11/uk-confirms-international-fee-levy-of-925-per-student-starting-august-2028)
-- [Careers360: Open Doors 2025, India top source of US international students](https://news.careers360.com/india-retains-top-position-source-of-international-students-in-us-amid-17-dip-in-college-admissions-report)
 - [The Boar: UK agent commissions of £2,000 to £8,000 per student](https://theboar.org/2025/05/international-students-looking-to-study-in-uk-fed-false-promises-by-recruitment-agents)
 - [Grant Thornton: GST on intermediary services after the Finance Act 2026](https://www.grantthornton.in/insights/articles/gst-on-intermediary-services/)
 - [S.S. Rana: DPDP Rules 2025 notified, with the compliance timeline](https://ssrana.in/articles/meity-notifies-final-digital-personal-data-protection-rules-2025/)

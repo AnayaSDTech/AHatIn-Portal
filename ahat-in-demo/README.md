@@ -1,6 +1,6 @@
-# AHatIn — Demo Website & Student Portal
+# AHat — Demo Website & Student Portal
 
-A demo of the AHatIn International Educational Consultancy website and student portal, built with **React, TypeScript, Vite and PWA** support.
+A demo of the AHat International Educational Consultancy website and student portal, built with **React, TypeScript, Vite and PWA** support.
 
 > **Demo only.** Student names, stories, figures, contact details, partner agencies and dashboard data are fictional and labelled "Demo" in the app. The university list is illustrative and is not a claim of partnership. Login is mocked in the browser and is **not secure**. Never enter real personal data.
 
@@ -23,10 +23,13 @@ A demo of the AHatIn International Educational Consultancy website and student p
 | **Temporary access (cover)** | In **Staff users**, an admin can let one counsellor cover another's students and leads for up to 30 days, with a reason; access ends on the date set or when revoked |
 | **Admin area** | **Overview:** enquiries, conversion, visa success, overdue follow-ups, student funnel, enquiries by source, counsellor workload, agency agreement expiry warning. **Staff users:** add (with validation), deactivate or reactivate (not yourself). **Partner agencies:** commission share, agreement dates, status. **Settings:** working hours, quiet hours, staff security, follow-up rules (read-only). Admins can also use the counsellor pages |
 | **Student dashboard** (login required) | Greeting and overall progress ring; 7-service application progress tracker; applications with status, deadlines and expandable details; document checklist with filters and (simulated) uploads with file type and size checks; profile and counsellor card. All changes are saved in the browser |
-| **Needs your attention** | Automatic card at the top of the dashboard listing only what's waiting on the student: documents to upload or re-upload, offers to reply to, the next session within a week, and missing profile details. Urgent items come first; each item jumps to its section; items disappear when done. No manual or staff tasks |
+| **Notifications** | Short one-line box (with a count on the bell) at the top of the right column, first on phones. Lists only what's waiting on the student: re-uploads, offers to reply to, shortlist to review, documents to upload (grouped), funding plan, travel checklist, arrival, the next session within a week, missing profile details. Urgent items are marked red; each item jumps to its section; items disappear when done |
+| **Profile and account menu** | The profile card shows name, email and counsellor; clicking it opens the full profile details. The avatar in the top bar opens a menu with My dashboard, **My profile** (opens the details) and Log out |
 | **Edit profile** | Dialog with validation (date of birth, test scores checked against each test's range, required fields). Name and email can't be edited; passport number locks once an application is submitted |
 | **Sessions** | Book a session with your assigned counsellor: dates and time slots come from that counsellor's availability and time off (taken slots disabled), online or office where the slot allows it, notes. Up to 3 upcoming sessions; cancel with confirmation |
-| **Shared demo data** | Leads, students, sessions, availability, time off and cover access are shared by all demo logins in the same browser, so a student's booking appears in the counsellor's schedule straight away. **Admin → Settings → Reset demo data** restores the original data |
+| **Application progress (linked)** | Each of the 7 services moves automatically from real events in one shared student record, the same on the student dashboard and the staff record: first session booked / career plan shared (when completing a Career counselling session or from the Journey panel) → shortlist shared and **approved by the student** (choose, remove with reason, ask questions; approval creates draft applications) → application submitted / **offer accepted** → funding plan, scholarships and **proof of funds verified** → visa stages recorded by staff up to granted or refused → student ticks the **pre-departure checklist**, counsellor confirms → student taps **"I've arrived"**, counsellor records the final check-in. Progress never moves back by itself; counsellors can override a service with a reason (e.g. **Not needed**, which is left out of the percentage). Documents (with proof-of-funds and visa categories) and applications are shared too, and every event is logged in the student's history |
+| **Messages** | Chat between each student and their counsellor (or whoever is covering). Students use the Messages box on the dashboard; staff use the Messages section of the student record and see an **Unread messages** list on Today. Enter sends, Shift+Enter adds a line; messages show “Read” once seen (only when the chat is on screen); unread replies appear in the student's Notifications. Counsellors only see their own (or covered) students' messages |
+| **Shared demo data** | Leads, students (with their documents, applications and journey), sessions, availability, time off and cover access are shared by all demo logins in the same browser, so a student's booking appears in the counsellor's schedule straight away. **Admin → Settings → Reset demo data** restores the original data |
 | **Applications** | Read-only for students (staff submit applications and update status). Students can view offer conditions and **accept or decline** an offer (one acceptance per intake); accepting updates the progress tracker |
 | **PWA** | Installable app, offline app shell, cached fonts and images, "new version available" prompt |
 | **Quality** | Responsive from 360 px, keyboard accessible, skip link, reduced-motion support, scroll-reveal animations, image fallbacks when offline |
@@ -35,7 +38,8 @@ A demo of the AHatIn International Educational Consultancy website and student p
 
 | Role | Where to log in | Email | Password | Second step |
 | --- | --- | --- | --- | --- |
-| Student | **Student Login** (`/login`) | `demo.student@ahatin.example` | none | 6-digit code shown on screen |
+| Student (journey under way) | **Student Login** (`/login`) | `demo.student@ahatin.example` | none | 6-digit code shown on screen |
+| Student (nothing started; counsellor Priya) | **Student Login** (`/login`) | `new.student@ahatin.example` | none | 6-digit code shown on screen |
 | Counsellor | **Staff sign in** (`/staff/login`) | `demo.counsellor@ahatin.example` | `Staff@1234` | Code from the on-screen demo authenticator |
 | Admin | **Staff sign in** (`/staff/login`) | `demo.admin@ahatin.example` | `Admin@1234` | Code from the on-screen demo authenticator |
 

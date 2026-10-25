@@ -7,7 +7,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * changes, in this tab and in other tabs. The real portal uses the FastAPI backend instead.
  */
 
-const PREFIX = 'ahatin-demo-db-v2:';
+const PREFIX = 'ahatin-demo-db-v3:';
 type Listener = () => void;
 
 const cache = new Map<string, unknown>();

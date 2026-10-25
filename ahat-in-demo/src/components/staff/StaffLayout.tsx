@@ -82,7 +82,7 @@ export function StaffLayout() {
               <Logo />
             </div>
             <p className="hidden text-sm text-navy-500 lg:block">
-              AHatIn staff portal · <span className="font-semibold text-navy-800">{roleLabel[user.role as keyof typeof roleLabel] ?? user.role}</span>
+              AHat staff portal · <span className="font-semibold text-navy-800">{roleLabel[user.role as keyof typeof roleLabel] ?? user.role}</span>
             </p>
             <div className="flex items-center gap-3">
               <span className="hidden text-right sm:block">

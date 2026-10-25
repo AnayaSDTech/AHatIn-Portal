@@ -7,14 +7,14 @@ import { cn, daysUntil, formatDate } from '../../lib/utils';
 export function AgenciesPage() {
   return (
     <>
-      <PageHeader title="Partner agencies" description="AHatIn applies to universities through these agencies. Agency logins are never stored in the portal." />
+      <PageHeader title="Partner agencies" description="AHat applies to universities through these agencies. Agency logins are never stored in the portal." />
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-navy-50/60 text-xs uppercase tracking-wider text-navy-500">
             <tr>
               <th className="px-5 py-3 font-semibold">Agency</th>
               <th className="px-5 py-3 font-semibold">Countries</th>
-              <th className="px-5 py-3 font-semibold">AHatIn's commission share</th>
+              <th className="px-5 py-3 font-semibold">AHat's commission share</th>
               <th className="px-5 py-3 font-semibold">Agreement ends</th>
               <th className="px-5 py-3 font-semibold">Applications</th>
               <th className="px-5 py-3 font-semibold">Status</th>

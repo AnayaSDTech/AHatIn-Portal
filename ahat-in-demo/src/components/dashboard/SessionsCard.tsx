@@ -8,6 +8,7 @@ import { Panel, Pill } from './Panel';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { BookSessionModal } from './BookSessionModal';
+import { canJoin } from '../scheduling/SessionManage';
 
 interface Props {
   studentId: string;
@@ -67,21 +68,22 @@ export function SessionsCard({ studentId, studentName, counsellor }: Props) {
                     {d <= 1 && <p className="mt-1 text-xs font-semibold text-emerald-700">{d === 0 ? 'Today' : 'Tomorrow'}</p>}
                   </div>
                 </div>
-                <div className="mt-3 flex gap-2">
-                  {s.mode === 'online' && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {canJoin(s) && (
                     <a
                       href={counsellor.meetingLink}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => {
                         e.preventDefault();
-                        alert(`Demo: on the day, this opens ${counsellor.name.split(' ')[0]}'s meeting link.`);
+                        alert(`Demo: this opens ${counsellor.name.split(' ')[0]}'s meeting link.`);
                       }}
-                      className="rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
                     >
-                      Join link
+                      <Video className="h-3.5 w-3.5" aria-hidden /> Join meeting
                     </a>
                   )}
+                  {s.mode === 'office' && <span className="text-xs text-navy-500">Meet at the AHat office</span>}
                   <button
                     type="button"
                     onClick={() => setToCancel(s)}

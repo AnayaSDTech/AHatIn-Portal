@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useShared } from '../lib/demoStore';
+import { readShared, useShared, writeShared } from '../lib/demoStore';
 import { useAuth } from '../context/AuthContext';
 import {
   counsellors,
@@ -7,13 +7,26 @@ import {
   demoFollowUps,
   demoGrants,
   demoLeads,
+  demoMessages,
   demoSessions,
   demoStudents,
   demoTimeOff,
   isGrantActive,
   type AccessGrant,
+  type Message,
   type StaffStudent,
 } from '../data/staff';
+
+// Demo records added in a later version (e.g. the "nothing started" student and his first session) are
+// added to data a browser has already saved, without changing any existing record.
+function addMissingSeeds<T extends { id: string }>(key: string, seeds: T[]) {
+  const saved = readShared(key, seeds);
+  const ids = new Set(saved.map((s) => s.id));
+  const missing = seeds.filter((s) => !ids.has(s.id));
+  if (missing.length) writeShared(key, [...saved, ...missing]);
+}
+addMissingSeeds('students', demoStudents);
+addMissingSeeds('sessions', demoSessions);
 
 /* Shared demo collections, used by every role. */
 export const useLeads = () => useShared('leads', demoLeads);
@@ -23,6 +36,7 @@ export const useSessions = () => useShared('sessions', demoSessions);
 export const useAvailability = () => useShared('availability', demoAvailability);
 export const useTimeOff = () => useShared('timeoff', demoTimeOff);
 export const useGrants = () => useShared<AccessGrant[]>('grants', demoGrants);
+export const useMessages = () => useShared<Message[]>('messages', demoMessages);
 
 /**
  * What the signed-in staff member may see.

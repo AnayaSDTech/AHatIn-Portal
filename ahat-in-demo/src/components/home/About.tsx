@@ -20,7 +20,7 @@ export function About() {
             <p className="mt-3 font-display text-lg leading-snug text-navy-900">
               “We measure success by where our students end up, not by how many we sign up.”
             </p>
-            <p className="mt-3 text-xs font-medium uppercase tracking-wider text-navy-400">AHatIn founding principle</p>
+            <p className="mt-3 text-xs font-medium uppercase tracking-wider text-navy-400">AHat founding principle</p>
           </div>
           <div className="absolute -left-6 -top-6 -z-10 h-40 w-40 rounded-3xl bg-gold-200/60" aria-hidden />
         </Reveal>
@@ -28,9 +28,9 @@ export function About() {
         <div>
           <SectionHeading
             align="left"
-            eyebrow="About AHatIn"
+            eyebrow="About AHat"
             title={<>Advice you can trust, <span className="italic text-gold-600">people who care</span></>}
-            description="AHatIn International Educational Consultancy helps Indian students make one of the biggest decisions of their lives with clarity and confidence. We combine experienced counsellors with a modern student portal, so nothing falls through the cracks."
+            description="AHat International Educational Consultancy helps Indian students make one of the biggest decisions of their lives with clarity and confidence. We combine experienced counsellors with a modern student portal, so nothing falls through the cracks."
           />
           <div className="mt-10 grid gap-6 sm:grid-cols-2">
             {aboutPoints.map((p, i) => (

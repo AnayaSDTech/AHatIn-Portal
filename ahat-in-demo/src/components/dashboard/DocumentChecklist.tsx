@@ -1,38 +1,41 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, FileUp, FolderCheck, Upload } from 'lucide-react';
-import type { DocStatus, demoDocuments } from '../../data/dashboard';
-import { cn } from '../../lib/utils';
+import { useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Clock, FileUp, FolderCheck, Trash2, Upload } from 'lucide-react';
+import type { DocCategory, DocState, StudentDocument } from '../../data/staff';
+import { cn, relativeTime } from '../../lib/utils';
 import { Panel, Pill } from './Panel';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
-const meta: Record<DocStatus, { label: string; tone: 'green' | 'amber' | 'red' | 'grey'; icon: typeof CheckCircle2 }> = {
+const meta: Record<DocState, { label: string; tone: 'green' | 'amber' | 'red' | 'grey'; icon: typeof CheckCircle2 }> = {
   verified: { label: 'Verified', tone: 'green', icon: CheckCircle2 },
   pending: { label: 'In review', tone: 'amber', icon: Clock },
   rejected: { label: 'Needs action', tone: 'red', icon: AlertTriangle },
   missing: { label: 'To upload', tone: 'grey', icon: FileUp },
 };
 
+export const categoryLabel: Record<DocCategory, string | null> = { general: null, funds: 'Proof of funds', visa: 'Visa' };
+
 const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_BYTES = 10 * 1024 * 1024;
 
 type Filter = 'all' | 'action' | 'verified';
 
-type Doc = (typeof demoDocuments)[number];
-
 interface Props {
-  documents: Doc[];
-  onChange: Dispatch<SetStateAction<Doc[]>>;
+  documents: StudentDocument[];
+  onUpload: (docId: string, fileName: string) => void;
+  /** Take back a file that is still waiting for review. */
+  onRemove: (docId: string, name: string) => void;
 }
 
-export function DocumentChecklist({ documents: docs, onChange: setDocs }: Props) {
+export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [removing, setRemoving] = useState<StudentDocument | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const targetId = useRef<string | null>(null);
 
-  const verified = docs.filter((d) => d.status === 'verified').length;
-  const visible = docs.filter((d) =>
-    filter === 'all' ? true : filter === 'verified' ? d.status === 'verified' : d.status === 'missing' || d.status === 'rejected',
-  );
+  const verified = docs.filter((d) => d.state === 'verified').length;
+  const visible = docs.filter((d) => (filter === 'all' ? true : filter === 'verified' ? d.state === 'verified' : d.state === 'missing' || d.state === 'rejected'));
 
   const pick = (id: string) => {
     targetId.current = id;
@@ -48,21 +51,16 @@ export function DocumentChecklist({ documents: docs, onChange: setDocs }: Props)
       setMessage({ tone: 'error', text: 'Files must be 10 MB or smaller.' });
     } else {
       // Demo: no file leaves the browser. The real portal uploads to secure storage and scans for viruses.
-      setDocs((all) => all.map((d) => (d.id === id ? { ...d, status: 'pending' as const, note: `Uploaded “${file.name}” · waiting for review` } : d)));
+      onUpload(id, file.name);
       setMessage({ tone: 'ok', text: `“${file.name}” uploaded (demo). Your counsellor will review it.` });
     }
     if (inputRef.current) inputRef.current.value = '';
   };
 
   return (
-    <Panel
-      id="documents"
-      title="Document checklist"
-      icon={<FolderCheck className="h-4 w-4" aria-hidden />}
-      action={<span className="text-sm font-semibold text-navy-700">{verified}/{docs.length} verified</span>}
-    >
+    <Panel id="documents" title="Document checklist" icon={<FolderCheck className="h-4 w-4" aria-hidden />} action={<span className="text-sm font-semibold text-navy-700">{verified}/{docs.length} verified</span>}>
       <div className="h-2 overflow-hidden rounded-full bg-navy-50">
-        <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-700" style={{ width: `${(verified / docs.length) * 100}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-700" style={{ width: `${docs.length ? (verified / docs.length) * 100 : 0}%` }} />
       </div>
 
       <div className="mt-5 flex gap-2" role="tablist" aria-label="Filter documents">
@@ -96,41 +94,88 @@ export function DocumentChecklist({ documents: docs, onChange: setDocs }: Props)
 
       <ul className="mt-4 divide-y divide-navy-100">
         {visible.map((d) => {
-          const m = meta[d.status];
+          const m = meta[d.state];
           const Icon = m.icon;
-          const canUpload = d.status === 'missing' || d.status === 'rejected';
+          const canUpload = d.state === 'missing' || d.state === 'rejected';
+          const note = d.state === 'rejected' ? d.reason : d.state === 'pending' ? `${d.fileName ? `“${d.fileName}” · ` : ''}uploaded ${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}` : undefined;
+          const tag = categoryLabel[d.category];
           return (
-            <li key={d.id} className="flex items-center gap-3 py-3.5">
+            <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5" data-doc={d.name}>
               <Icon
                 className={cn(
                   'h-5 w-5 shrink-0',
-                  d.status === 'verified' && 'text-emerald-500',
-                  d.status === 'pending' && 'text-amber-500',
-                  d.status === 'rejected' && 'text-red-500',
-                  d.status === 'missing' && 'text-navy-300',
+                  d.state === 'verified' && 'text-emerald-500',
+                  d.state === 'pending' && 'text-amber-500',
+                  d.state === 'rejected' && 'text-red-500',
+                  d.state === 'missing' && 'text-navy-300',
                 )}
                 aria-hidden
               />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-navy-900">{d.name}</p>
-                {d.note && <p className="truncate text-xs text-navy-500">{d.note}</p>}
+                <p className="text-sm font-medium text-navy-900">
+                  {d.name}
+                  {tag && <span className="ml-2 rounded-full bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">{tag}</span>}
+                </p>
+                {note && <p className={cn('truncate text-xs', d.state === 'rejected' ? 'text-red-600' : 'text-navy-500')}>{note}</p>}
               </div>
               {canUpload ? (
                 <button
                   type="button"
                   onClick={() => pick(d.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
                 >
-                  <Upload className="h-3.5 w-3.5" aria-hidden /> Upload
+                  <Upload className="h-3.5 w-3.5" aria-hidden /> {d.state === 'rejected' ? 'Re-upload' : 'Upload'}
                 </button>
+              ) : d.state === 'pending' ? (
+                // Still waiting for review: the student can take back the file and upload the right one.
+                <div className="flex shrink-0 items-center gap-1">
+                  <Pill tone={m.tone}>{m.label}</Pill>
+                  <button
+                    type="button"
+                    onClick={() => setRemoving(d)}
+                    className="grid h-7 w-7 place-items-center rounded-full text-navy-300 transition hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Remove ${d.name}`}
+                    title="Remove this file"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
               ) : (
-                <Pill tone={m.tone}>{m.label}</Pill>
+                <span className="shrink-0" title="Verified documents can't be changed. Ask your counsellor if something is wrong.">
+                  <Pill tone={m.tone}>{m.label}</Pill>
+                </span>
               )}
             </li>
           );
         })}
-        {visible.length === 0 && <li className="py-6 text-center text-sm text-navy-400">Nothing here. Well done!</li>}
+        {visible.length === 0 && <li className="py-6 text-center text-sm text-navy-400">{docs.length ? 'Nothing here. Well done!' : 'Your counsellor will list the documents you need.'}</li>}
       </ul>
+      <p className="mt-4 text-xs text-navy-400">Uploaded the wrong file? Remove it and upload the right one, until your counsellor has checked it. Verified documents are locked; ask your counsellor if one needs changing.</p>
+
+      <Modal
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        title="Remove this file?"
+        description={removing ? `${removing.name}${removing.fileName ? ` · ${removing.fileName}` : ''}` : undefined}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setRemoving(null)}>Keep it</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (!removing) return;
+                onRemove(removing.id, removing.name);
+                setMessage({ tone: 'ok', text: `File removed. ${removing.name} is back on your list to upload.` });
+                setRemoving(null);
+              }}
+            >
+              Remove file
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-navy-600">Your counsellor won't review it. You can upload the right file at any time.</p>
+      </Modal>
     </Panel>
   );
 }

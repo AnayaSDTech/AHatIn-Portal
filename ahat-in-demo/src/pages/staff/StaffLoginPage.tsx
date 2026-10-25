@@ -124,7 +124,7 @@ export function StaffLoginPage() {
           <p className="mt-2 text-sm text-navy-600">
             {challenge
               ? 'Enter the 6-digit code from your authenticator app.'
-              : 'For AHatIn counsellors, officers and administrators. Accounts are created by an administrator.'}
+              : 'For AHat counsellors, officers and administrators. Accounts are created by an administrator.'}
           </p>
 
           {error && (

@@ -70,15 +70,25 @@ export function LoginPage() {
       ) : (
         <>
           <div className="mb-6">
-            <DemoHint title="Try the demo student account">
-              <p className="break-all">{DEMO_ACCOUNTS.student.email}</p>
-              <button
-                type="button"
-                onClick={() => setValue('email', DEMO_ACCOUNTS.student.email, { shouldValidate: true })}
-                className="font-semibold underline underline-offset-4 hover:text-amber-700"
-              >
-                Fill in demo email
-              </button>
+            <DemoHint title="Try a demo student account">
+              {[
+                { account: DEMO_ACCOUNTS.student, note: 'Journey under way' },
+                { account: DEMO_ACCOUNTS.freshStudent, note: 'Nothing started yet' },
+              ].map(({ account, note }) => (
+                <div key={account.email} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-1">
+                  <span className="min-w-0">
+                    <span className="block break-all">{account.email}</span>
+                    <span className="text-xs opacity-75">{note}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setValue('email', account.email, { shouldValidate: true })}
+                    className="shrink-0 font-semibold underline underline-offset-4 hover:text-amber-700"
+                  >
+                    {account === DEMO_ACCOUNTS.student ? 'Fill in demo email' : 'Fill in'}
+                  </button>
+                </div>
+              ))}
             </DemoHint>
           </div>
 
@@ -109,7 +119,7 @@ export function LoginPage() {
               state={{ email: getValues('email') }}
               className="flex items-center justify-center gap-2 text-sm font-medium text-navy-500 transition hover:text-navy-900"
             >
-              <Briefcase className="h-4 w-4" aria-hidden /> AHatIn staff? Staff sign in
+              <Briefcase className="h-4 w-4" aria-hidden /> AHat staff? Staff sign in
             </Link>
           </div>
         </>

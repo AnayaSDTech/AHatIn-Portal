@@ -50,9 +50,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 });
 
-export function ButtonLink({ to, variant, size, className, children }: CommonProps & { to: string }) {
+export function ButtonLink({ to, state, variant, size, className, children }: CommonProps & { to: string; state?: unknown }) {
   return (
-    <Link to={to} className={buttonClasses(variant, size, className)}>
+    <Link to={to} state={state} className={buttonClasses(variant, size, className)}>
       {children}
     </Link>
   );

@@ -73,7 +73,7 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <Container className="flex flex-col items-center justify-between gap-3 py-6 text-xs text-navy-400 sm:flex-row">
-          <p>© {year} AHatIn International Educational Consultancy. Demo build: names, figures and contact details are fictional.</p>
+          <p>© {year} AHat International Educational Consultancy. Demo build: names, figures and contact details are fictional.</p>
           <p className="flex gap-5">
             <a href="#" className="hover:text-gold-300">Privacy notice</a>
             <a href="#" className="hover:text-gold-300">Terms of use</a>

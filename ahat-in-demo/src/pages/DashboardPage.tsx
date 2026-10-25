@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, PartyPopper, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalState } from '../hooks/useLocalState';
 import { Container } from '../components/ui/Container';
 import { DemoBadge } from '../components/ui/DemoBadge';
-import { ProfileCard } from '../components/dashboard/ProfileCard';
-import { ServiceTracker, overallProgress } from '../components/dashboard/ServiceTracker';
+import { ProfileModal } from '../components/dashboard/ProfileModal';
+import { ServiceTracker } from '../components/dashboard/ServiceTracker';
 import { ApplicationsCard } from '../components/dashboard/ApplicationsCard';
 import { DocumentChecklist } from '../components/dashboard/DocumentChecklist';
 import { SessionsCard } from '../components/dashboard/SessionsCard';
-import { AttentionCard } from '../components/dashboard/AttentionCard';
-import { demoApplications, demoDocuments, demoProfile, demoServices } from '../data/dashboard';
+import { NotificationsCard, buildNotifications } from '../components/dashboard/NotificationsCard';
+import { DepartureCard, FundingCard, ShortlistCard, VisaCard } from '../components/dashboard/JourneyCards';
+import { blankProfile, demoProfile } from '../data/dashboard';
 import { counsellors, newStudentRecord } from '../data/staff';
-import { useSessions, useStaffStudents } from '../hooks/useStaffData';
+import { useMessages, useSessions, useStaffStudents } from '../hooks/useStaffData';
+import { MessagesCard } from '../components/dashboard/MessagesCard';
+import { CounsellorCard } from '../components/dashboard/CounsellorCard';
+import { BalancedColumns } from '../components/dashboard/BalancedColumns';
+import { useStudentActions } from '../hooks/useJourney';
+import { computeServices, overallProgress } from '../lib/journey';
 
 function greeting() {
   const h = new Date().getHours();
@@ -53,12 +59,24 @@ function ProgressRing({ value }: { value: number }) {
 export function DashboardPage() {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [showWelcome, setShowWelcome] = useState(Boolean((location.state as { welcome?: boolean } | null)?.welcome));
 
+  // "My profile" in the account menu opens the profile modal (passed as navigation state, so the page doesn't jump).
+  const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    if ((location.state as { openProfile?: boolean } | null)?.openProfile) {
+      setProfileOpen(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.key, location.state, location.pathname, navigate]);
+
   const prefix = `ahatin-demo-${user?.id ?? 'guest'}`;
-  const [profile, setProfile] = useLocalState(`${prefix}-profile`, demoProfile);
+  // Only the main demo student comes with sample profile details; everyone else starts blank.
+  const [profile, setProfile] = useLocalState(`${prefix}-profile`, user?.id === 'demo-student-1' ? demoProfile : blankProfile);
   const [staffStudents, setStaffStudents] = useStaffStudents();
   const [allSessions] = useSessions();
+  const [messages] = useMessages();
   const record = staffStudents.find((s) => s.userId === user?.id);
   const counsellor = counsellors.find((c) => c.id === record?.counsellorId) ?? counsellors[0]!;
   const sessions = useMemo(() => allSessions.filter((s) => s.studentId === record?.id), [allSessions, record?.id]);
@@ -67,25 +85,18 @@ export function DashboardPage() {
   useEffect(() => {
     if (user && !record) setStaffStudents((all) => (all.some((s) => s.userId === user.id) ? all : [...all, newStudentRecord(user, {}, all)]));
   }, [user, record, setStaffStudents]);
-  const [applications, setApplications] = useLocalState(`${prefix}-applications`, demoApplications);
-  const [documents, setDocuments] = useLocalState(`${prefix}-documents`, demoDocuments);
+  const actions = useStudentActions(record?.id);
 
-  // The tracker reacts to decisions the student makes, e.g. accepting an offer.
-  const services = useMemo(() => {
-    const accepted = applications.find((a) => a.status === 'accepted');
-    if (!accepted) return demoServices;
-    return demoServices.map((s) => {
-      if (s.code === 'S3') return { ...s, status: 'completed' as const, summary: `Offer accepted · ${accepted.university}`, next: undefined };
-      if (s.code === 'S5') return { ...s, status: 'in_progress' as const, summary: 'Visa checklist being prepared', next: 'Your counsellor will share your visa checklist' };
-      return s;
-    });
-  }, [applications]);
+  // Progress comes from real events in the shared record (the same record staff work on).
+  const services = useMemo(() => (record ? computeServices(record, allSessions) : []), [record, allSessions]);
 
-  if (!user) return null;
+  if (!user || !record) return null;
+  const { applications, documents } = record;
   const firstName = user.name.split(' ')[0];
   const progress = overallProgress(services);
   const completed = services.filter((s) => s.status === 'completed').length;
-  const offers = applications.filter((a) => a.status.includes('offer') || a.status === 'accepted').length;
+  const counted = services.filter((s) => s.status !== 'not_needed').length;
+  const offers = applications.filter((a) => a.state.includes('offer') || a.state === 'accepted').length;
 
   return (
     <div className="bg-[#F4F1EA] pb-20 pt-24">
@@ -99,8 +110,14 @@ export function DashboardPage() {
                 {greeting()}, {firstName}
               </h1>
               <p className="mt-2 max-w-xl text-navy-200">
-                You're working towards a <span className="font-semibold text-white">{profile.courseInterest}</span> in{' '}
-                {profile.destination} for {profile.intake}.
+                {profile.courseInterest ? (
+                  <>
+                    You're working towards a <span className="font-semibold text-white">{profile.courseInterest}</span> in {profile.destination || record.destination} for{' '}
+                    {profile.intake || record.intake}.
+                  </>
+                ) : (
+                  <>Planning to study in {record.destination} for {record.intake}. Your counsellor will help you choose a course.</>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-6 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
@@ -108,7 +125,7 @@ export function DashboardPage() {
               <dl className="space-y-2 text-sm">
                 <div className="flex gap-2 text-navy-200">
                   <dt>Services completed:</dt>
-                  <dd className="font-semibold text-white">{completed} of 7</dd>
+                  <dd className="font-semibold text-white">{completed} of {counted}</dd>
                 </div>
                 <div className="flex gap-2 text-navy-200">
                   <dt>Applications:</dt>
@@ -129,7 +146,7 @@ export function DashboardPage() {
           <div role="status" className="mb-6 flex animate-fade-up items-start gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-soft">
             <PartyPopper className="h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
             <div className="flex-1 text-sm text-emerald-900">
-              <p className="font-semibold">Welcome to AHatIn, {firstName}!</p>
+              <p className="font-semibold">Welcome to AHat, {firstName}!</p>
               <p className="mt-1">Your account is ready. In the real portal, your counsellor would now contact you. The data below is a demo example.</p>
             </div>
             <button type="button" onClick={() => setShowWelcome(false)} className="text-emerald-700 hover:text-emerald-900" aria-label="Dismiss">
@@ -138,35 +155,60 @@ export function DashboardPage() {
           </div>
         )}
 
-        <div className="mb-6">
-          <AttentionCard documents={documents} applications={applications} sessions={sessions} profile={profile} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="min-w-0 space-y-6 lg:col-span-8">
-            <ServiceTracker services={services} />
-            <ApplicationsCard applications={applications} onChange={setApplications} />
-            <DocumentChecklist documents={documents} onChange={setDocuments} />
-          </div>
-          <div className="min-w-0 space-y-6 lg:col-span-4">
-            <ProfileCard
-              user={user}
-              profile={profile}
-              onSave={setProfile}
-              passportLocked={applications.some((a) => a.status !== 'draft')}
-              counsellor={counsellor}
-            />
-            {record && <SessionsCard studentId={record.id} studentName={user.name} counsellor={counsellor} />}
-            <div className="card flex items-start gap-3 p-5 text-sm text-navy-600">
-              <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-              <p>
-                Deadlines and data on this page are demo content. In the real portal, they come from your counsellor and
-                applications.
-              </p>
+        {/* Progress (left) and notifications, counsellor, sessions, messages (right) stay at the top;
+            the other cards go to whichever column is shorter, so both columns end at about the same place. */}
+        <BalancedColumns
+          left={
+            <div className="order-2 min-w-0">
+              <ServiceTracker services={services} />
             </div>
-          </div>
-        </div>
+          }
+          right={
+            <>
+              <div className="order-1 min-w-0">
+                <NotificationsCard items={buildNotifications(record, services, sessions, profile, messages)} onOpenProfile={() => setProfileOpen(true)} />
+              </div>
+              <div className="order-3 min-w-0">
+                <CounsellorCard counsellor={counsellor} />
+              </div>
+              <div className="order-4 min-w-0">
+                <SessionsCard studentId={record.id} studentName={user.name} counsellor={counsellor} />
+              </div>
+              <div className="order-5 min-w-0">
+                <MessagesCard studentId={record.id} counsellor={counsellor} unread={messages.filter((m) => m.studentId === record.id && m.from === 'staff' && !m.readAt).length} />
+              </div>
+            </>
+          }
+          flow={[
+            { key: 'shortlist', order: 'order-6', wide: true, wideOnly: true, node: <ShortlistCard student={record} actions={actions} /> },
+            { key: 'applications', order: 'order-7', wide: true, node: <ApplicationsCard applications={applications} onDecide={actions.decideOffer} /> },
+            { key: 'funding', order: 'order-8', node: <FundingCard student={record} actions={actions} notNeeded={services.find((s) => s.code === 'S4')?.status === 'not_needed'} /> },
+            { key: 'visa', order: 'order-9', node: <VisaCard student={record} /> },
+            { key: 'departure', order: 'order-10', node: <DepartureCard student={record} actions={actions} /> },
+            { key: 'documents', order: 'order-11', wide: true, node: <DocumentChecklist documents={documents} onUpload={actions.uploadDocument} onRemove={actions.removeUpload} /> },
+            {
+              key: 'note',
+              order: 'order-12',
+              node: (
+                <div className="card flex items-start gap-3 p-5 text-sm text-navy-600">
+                  <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
+                  <p>Demo data. Everything you do here appears straight away in your counsellor's view of your record, and their updates appear here.</p>
+                </div>
+              ),
+            },
+          ]}
+        />
       </Container>
+
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        user={user}
+        profile={profile}
+        onSave={setProfile}
+        passportLocked={applications.some((a) => a.state !== 'draft')}
+        counsellor={counsellor}
+      />
     </div>
   );
 }

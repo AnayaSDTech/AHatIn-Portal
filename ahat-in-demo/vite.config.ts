@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
-        name: 'AHatIn International Educational Consultancy',
-        short_name: 'AHatIn',
+        name: 'AHat International Educational Consultancy',
+        short_name: 'AHat',
         description:
           'Free study-abroad guidance for Indian students: UK and Europe. Demo website and student portal.',
         theme_color: '#0B1F3A',

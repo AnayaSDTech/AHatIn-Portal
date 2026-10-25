@@ -145,7 +145,7 @@ This SRS defines how the portal software must behave: features, validations, use
 | FR-APP-03 | "Submitted" needs a date, a reference and all required documents verified | Must |
 | FR-APP-04 | Offers record conditions (pending, met, waived), scholarship, and expiry | Must |
 | FR-APP-05 | Only one offer per intake can be accepted; staff are prompted to close the others | Must |
-| FR-APP-06 | Deposits and CAS / I-20 / admission letters are recorded with documents | Must |
+| FR-APP-06 | Deposits and CAS / admission letters are recorded with documents | Must |
 | FR-APP-07 | SOP, LOR and CV drafts keep versions, comments and an "approved" flag | Must |
 | FR-APP-08 | Every status change notifies the student and parents | Must |
 | FR-APP-09 | Side-by-side offer comparison | Should |

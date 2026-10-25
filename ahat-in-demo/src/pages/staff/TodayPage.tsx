@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, CalendarDays, CheckCircle2, ClipboardCheck, FileSearch, MessageCircle, Phone, PlaneLanding, ShieldCheck, UserPlus } from 'lucide-react';
+import { AlarmClock, CalendarDays, CheckCircle2, ClipboardCheck, FileSearch, MessageCircle, MessageSquare, Phone, PlaneLanding, ShieldCheck, UserPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useFollowUps, useLeads, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
+import { useFollowUps, useLeads, useMessages, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
 import { SessionRow } from '../../components/scheduling/SessionManage';
 import { counsellorName } from '../../data/staff';
 import { isoDate } from '../../lib/scheduling';
 import { PageHeader, StatCard } from '../../components/staff/StaffUi';
 import { Panel } from '../../components/dashboard/Panel';
 import type { FollowUpType } from '../../data/staff';
-import { cn, formatDate, relativeTime } from '../../lib/utils';
+import { cn, formatDate, initials, relativeTime } from '../../lib/utils';
 
 const typeIcon: Record<FollowUpType, LucideIcon> = {
   call: Phone,
@@ -39,6 +39,16 @@ export function TodayPage() {
     .sort((a, b) => a.time.localeCompare(b.time));
   const nameOf = (id: string) => allStudents.find((s) => s.id === id)?.name ?? 'Student';
 
+  // Students (that this person may see) with messages waiting for a reply, newest first.
+  const [messages] = useMessages();
+  const unreadThreads = students
+    .map((s) => {
+      const unread = messages.filter((m) => m.studentId === s.id && m.from === 'student' && !m.readAt).sort((a, b) => a.at.localeCompare(b.at));
+      return { studentId: s.id, name: s.name, count: unread.length, last: unread[unread.length - 1] };
+    })
+    .filter((t): t is typeof t & { last: NonNullable<typeof t.last> } => t.count > 0)
+    .sort((a, b) => b.last.at.localeCompare(a.last.at));
+
   const now = Date.now();
   const open = followUps.filter((f) => !f.done).sort((a, b) => a.dueAt.localeCompare(b.dueAt));
   const done = followUps.filter((f) => f.done);
@@ -54,7 +64,7 @@ export function TodayPage() {
 
   return (
     <>
-      <PageHeader title={`Today, ${user?.name.split(' ')[0] ?? ''}`} description="Your follow-ups, ordered by urgency. Time limits come from AHatIn's follow-up rules." />
+      <PageHeader title={`Today, ${user?.name.split(' ')[0] ?? ''}`} description="Your follow-ups, ordered by urgency. Time limits come from AHat's follow-up rules." />
 
       {scope.covering.map((g) => (
         <div key={g.id} role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
@@ -72,6 +82,30 @@ export function TodayPage() {
         <StatCard label="New leads" value={newLeads} icon={UserPlus} tone="blue" note="Waiting for first contact" />
         <StatCard label="Documents to verify" value={docsToVerify} icon={FileSearch} tone="navy" />
       </div>
+
+      <Panel title={`Unread messages (${unreadThreads.length})`} icon={<MessageSquare className="h-4 w-4" aria-hidden />} className="mt-6">
+        {unreadThreads.length === 0 ? (
+          <p className="text-sm text-navy-400">No unread messages from students.</p>
+        ) : (
+          <ul className="divide-y divide-navy-100" aria-label="Unread messages">
+            {unreadThreads.map((t) => (
+              <li key={t.studentId}>
+                <Link to={`/staff/students/${t.studentId}#messages`} className="flex items-center gap-3 py-3 transition hover:bg-ivory/60" data-unread-thread={t.studentId}>
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">{initials(t.name)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-navy-900">{t.name}</span>
+                    <span className="block truncate text-sm text-navy-600">{t.last.text}</span>
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-xs text-navy-400">{relativeTime(t.last.at)}</span>
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">{t.count}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
       <Panel
         title={`Today's sessions (${todaysSessions.length})`}

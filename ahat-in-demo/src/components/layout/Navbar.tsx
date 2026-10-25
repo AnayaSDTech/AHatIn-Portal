@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ChevronDown, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
 import { ButtonLink, Button } from '../ui/Button';
@@ -11,11 +11,27 @@ import { homeFor } from '../auth/RouteGuards';
 import { isStaff } from '../../lib/api/types';
 
 export function Navbar() {
-  const { pathname } = useLocation();
+  const { pathname, key } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Account menu: closes on navigation, outside click and Escape.
+  useEffect(() => setMenu(false), [key]);
+  useEffect(() => {
+    if (!menu) return;
+    const onClick = (e: MouseEvent) => !menuRef.current?.contains(e.target as Node) && setMenu(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false);
+    document.addEventListener('mousedown', onClick);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menu]);
 
   const isHome = pathname === '/';
   const transparent = isHome && !scrolled && !open;
@@ -28,7 +44,7 @@ export function Navbar() {
   }, []);
 
   // Close the mobile menu on navigation and with the Escape key; lock page scroll while open.
-  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => setOpen(false), [key]);
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
@@ -73,23 +89,44 @@ export function Navbar() {
 
         <div className="hidden items-center gap-3 lg:flex">
           {user ? (
-            <>
-              <NavLink
-                to={homeFor(user.role)}
+            <div ref={menuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMenu((m) => !m)}
+                aria-expanded={menu}
+                aria-haspopup="menu"
+                aria-label="Account menu"
                 className={cn(
-                  'flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-sm font-semibold transition',
+                  'flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-sm font-semibold transition',
                   transparent ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-navy-50 text-navy-900 hover:bg-navy-100',
                 )}
               >
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">
-                  {initials(user.name)}
-                </span>
-                {isStaff(user.role) ? 'Staff portal' : 'Dashboard'}
-              </NavLink>
-              <Button variant={transparent ? 'light' : 'outline'} size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" aria-hidden /> Log out
-              </Button>
-            </>
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">{initials(user.name)}</span>
+                {user.name.split(' ')[0]}
+                <ChevronDown className={cn('h-4 w-4 transition-transform', menu && 'rotate-180')} aria-hidden />
+              </button>
+              {menu && (
+                <div role="menu" className="absolute right-0 top-full mt-2 w-64 animate-fade-up overflow-hidden rounded-2xl border border-navy-100 bg-white text-navy-900 shadow-lift">
+                  <div className="border-b border-navy-100 px-4 py-3">
+                    <p className="truncate text-sm font-semibold">{user.name}</p>
+                    <p className="truncate text-xs text-navy-500">{user.email}</p>
+                  </div>
+                  <div className="p-1.5">
+                    <Link role="menuitem" to={homeFor(user.role)} onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
+                      <LayoutDashboard className="h-4 w-4 text-navy-500" aria-hidden /> {isStaff(user.role) ? 'Staff portal' : 'My dashboard'}
+                    </Link>
+                    {!isStaff(user.role) && (
+                      <Link role="menuitem" to="/dashboard" state={{ openProfile: true }} onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
+                        <UserRound className="h-4 w-4 text-navy-500" aria-hidden /> My profile
+                      </Link>
+                    )}
+                    <button role="menuitem" type="button" onClick={handleLogout} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium hover:bg-ivory">
+                      <LogOut className="h-4 w-4 text-navy-500" aria-hidden /> Log out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <ButtonLink to="/login" variant={transparent ? 'light' : 'ghost'} size="sm">
@@ -140,6 +177,11 @@ export function Navbar() {
                 <ButtonLink to={homeFor(user.role)} size="lg">
                   <LayoutDashboard className="h-5 w-5" aria-hidden /> {isStaff(user.role) ? 'Staff portal' : 'My dashboard'}
                 </ButtonLink>
+                {!isStaff(user.role) && (
+                  <ButtonLink to="/dashboard" state={{ openProfile: true }} variant="outline" size="lg">
+                    <UserRound className="h-5 w-5" aria-hidden /> My profile
+                  </ButtonLink>
+                )}
                 <Button variant="outline" size="lg" onClick={handleLogout}>
                   <LogOut className="h-5 w-5" aria-hidden /> Log out
                 </Button>

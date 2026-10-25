@@ -52,6 +52,8 @@ interface StoredSession {
 
 export const DEMO_ACCOUNTS = {
   student: { email: 'demo.student@ahatin.example', label: 'Student' },
+  /** A second student with nothing started yet, for trying the whole journey by hand. */
+  freshStudent: { email: 'new.student@ahatin.example', label: 'New student (nothing started)' },
   counsellor: { email: 'demo.counsellor@ahatin.example', password: 'Staff@1234', label: 'Counsellor' },
   admin: { email: 'demo.admin@ahatin.example', password: 'Admin@1234', label: 'Admin' },
 } as const;
@@ -125,6 +127,17 @@ async function seedDemoAccounts() {
       mobile: '+919800022222',
       passwordHash: await sha256Hex(DEMO_ACCOUNTS.admin.password),
       totpSecret: 'demo-admin-secret',
+    });
+    changed = true;
+  }
+  if (!has(DEMO_ACCOUNTS.freshStudent.email)) {
+    users.push({
+      id: 'demo-student-2',
+      role: 'student',
+      name: 'Aarav Patel',
+      email: DEMO_ACCOUNTS.freshStudent.email,
+      mobile: '+919800033333',
+      studentReference: 'AH-2026-00090',
     });
     changed = true;
   }

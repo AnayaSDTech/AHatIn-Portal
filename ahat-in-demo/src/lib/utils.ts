@@ -4,8 +4,10 @@ export function cn(...classes: Array<string | false | null | undefined>) {
 }
 
 /** Format a YYYY-MM-DD date as "21 Oct 2026". */
+/** "24 Oct 2026" for a YYYY-MM-DD date or a full ISO date-time. */
 export function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /** Whole days from today until a YYYY-MM-DD date (negative if past). */

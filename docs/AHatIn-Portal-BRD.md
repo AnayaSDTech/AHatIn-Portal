@@ -22,7 +22,7 @@ This document explains how AHatIn works with students and what the portal must d
 | Aspect | How AHatIn works |
 | --- | --- |
 | Students | Mainly postgraduate aspirants; also undergraduates (with parents) and working professionals |
-| Destinations | UK, USA and Europe (mainly Germany, Ireland, France) |
+| Destinations | UK and Europe (mainly Germany, Ireland, France) |
 | Price | **Free** to students |
 | Universities | Reached through **partner agencies** (aggregators and master agents); no direct university contracts at launch |
 | Income | A share of university commission, paid by the partner agency after enrolment; referral income from loan, forex and accommodation partners |
@@ -199,7 +199,7 @@ Students, parents and staff see progress as the seven services:
 | BR-APP-02 | Track application status from draft to offer, rejection or withdrawal | Must |
 | BR-APP-03 | Track deadlines and offer conditions | Must |
 | BR-APP-04 | Track SOP, LOR and CV drafts, feedback and final approval | Must |
-| BR-APP-05 | Record deposits and CAS / I-20 / admission letters | Must |
+| BR-APP-05 | Record deposits and CAS / admission letters | Must |
 | BR-APP-06 | Tell the student whenever an application status changes | Must |
 | BR-APP-07 | Let students compare offers side by side | Should |
 | BR-VISA-01 | Create a visa checklist by country and visa type | Must |
@@ -278,9 +278,7 @@ Working hours default to Monday–Saturday, 10:00–19:00 IST. Administrators ca
 | --- | --- |
 | Commission share | The part of the university's commission that the partner agency pays AHatIn |
 | CAS | Confirmation of Acceptance for Studies: from a UK university, needed for a UK student visa |
-| I-20 | Form from a US university, needed for an F-1 student visa |
 | IHS | Immigration Health Surcharge, paid with a UK visa application |
-| SEVIS fee | US fee paid before an F-1 visa interview |
 | APS | Academic Evaluation Centre certificate, needed by many Indian students applying to Germany |
 | Census date | The date a university confirms a student is enrolled; commission usually depends on it |
 | Clawback | Commission taken back if a student withdraws |

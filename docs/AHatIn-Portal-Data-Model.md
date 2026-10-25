@@ -485,7 +485,7 @@ No credential fields are allowed (rejected by the schema).
 | deadlines | object[] | | `{ type: application \| acceptance \| deposit \| cas_request, date }` |
 | offer | object | | `{ type, conditions: [{ text, status: pending \| met \| waived }], scholarship: Money, expires_on }` |
 | deposit | object | | `{ amount: Money, due_on, paid_on, document_id }` |
-| confirmation | object | | `{ kind: cas \| i20 \| admission_letter, number, issued_on, document_id }` |
+| confirmation | object | | `{ kind: cas \| admission_letter, number, issued_on, document_id }` |
 | writing | object[] | | `{ kind: sop \| lor \| cv, document_id, comments[], approved }` |
 | enrolment | object | | `{ confirmed_on, census_date }` |
 
