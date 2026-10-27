@@ -16,7 +16,7 @@ from app.config import get_settings
 from app.core import errors
 from app.core.auth import csrf_middleware
 from app.db import client, ensure_indexes
-from app.routers import admin, auth, files, messages, public, schedule, staff, students
+from app.routers import admin, auth, messages, public, schedule, staff, students
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -24,6 +24,7 @@ logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings.check_production()
     await ensure_indexes()
     tasks: list[asyncio.Task] = []
     if settings.run_background_jobs:
@@ -52,7 +53,7 @@ class SecurityHeaders(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/v1/files/"):
+        if request.url.path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
         if settings.cookie_secure:
             response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
@@ -73,7 +74,7 @@ if settings.allowed_origins:
     )
 
 api = APIRouter(prefix="/api/v1")
-for r in (auth.router, public.router, students.router, schedule.router, messages.router, staff.router, admin.router, files.router):
+for r in (auth.router, public.router, students.router, schedule.router, messages.router, staff.router, admin.router):
     api.include_router(r)
 app.include_router(api)
 

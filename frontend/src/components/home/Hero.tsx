@@ -6,13 +6,17 @@ import { SmartImage } from '../ui/SmartImage';
 import { images, stats } from '../../data/site';
 import { cn } from '../../lib/utils';
 
-/** Demo journey shown in the hero card (a preview of the student portal). */
-const heroSteps: { title: string; note: string; state: 'done' | 'now' | 'next' }[] = [
+/**
+ * Demo journey shown in the hero card (a preview of the student portal). The seven services don't all fit, so the
+ * steps between funding and the last one are shown as a row of dots ("gap").
+ */
+const heroSteps: { title: string; note: string; state: 'done' | 'now' | 'next' | 'gap' }[] = [
   { title: 'Career counselling', note: 'Plan shared: Data Science, UK', state: 'done' },
   { title: 'University shortlist', note: '4 universities approved', state: 'done' },
   { title: 'Applications', note: '3 submitted · 1 offer received', state: 'now' },
   { title: 'Scholarships & funding', note: '1 scholarship applied', state: 'now' },
-  { title: 'Visa', note: 'Starts after you accept an offer', state: 'next' },
+  { title: '2 more steps', note: 'Visa · Pre-departure', state: 'gap' },
+  { title: 'Post-arrival support', note: 'Settling in after you land', state: 'next' },
 ];
 
 function ProgressRing({ value }: { value: number }) {
@@ -95,9 +99,22 @@ export function Hero() {
 
               {/* Steps, like the student portal */}
               <ol className="space-y-0 px-5 pt-4">
-                {heroSteps.map((s, i) => (
+                {heroSteps.map((s, i) =>
+                  s.state === 'gap' ? (
+                    // The steps in between, as a dotted continuation of the line.
+                    <li key={s.title} className="relative flex items-center gap-3 pb-3.5" data-hero-gap>
+                      <span className="relative z-10 flex h-6 w-6 shrink-0 flex-col items-center justify-center gap-[3px]" aria-hidden>
+                        <span className="h-1 w-1 rounded-full bg-white/40" />
+                        <span className="h-1 w-1 rounded-full bg-white/40" />
+                        <span className="h-1 w-1 rounded-full bg-white/40" />
+                      </span>
+                      <p className="text-xs text-navy-300">
+                        <span className="font-medium text-navy-200">{s.title}</span> · {s.note}
+                      </p>
+                    </li>
+                  ) : (
                   <li key={s.title} className="relative flex gap-3 pb-3.5 last:pb-0">
-                    {i < heroSteps.length - 1 && (
+                    {i < heroSteps.length - 1 && heroSteps[i + 1]!.state !== 'gap' && (
                       <span className={cn('absolute left-[11px] top-6 h-[calc(100%-1rem)] w-px', s.state === 'done' ? 'bg-emerald-400/60' : 'bg-white/15')} aria-hidden />
                     )}
                     <span className="relative z-10 mt-0.5 grid h-6 w-6 shrink-0 place-items-center">
@@ -119,7 +136,8 @@ export function Hero() {
                       <p className="text-xs text-navy-300">{s.note}</p>
                     </div>
                   </li>
-                ))}
+                  ),
+                )}
               </ol>
 
               {/* Next step */}

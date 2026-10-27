@@ -9,6 +9,7 @@ from datetime import timedelta
 from fastapi import APIRouter
 
 from app import career, universities
+from app.config import get_settings
 from app.core.audit import audit
 from app.core.auth import Admin, CurrentUser, Staff, is_staff
 from app.core.clock import iso, now, now_iso
@@ -676,10 +677,10 @@ async def document_upload_url(sid: str, doc_id: str, body: UploadUrlBody, user: 
         raise ApiError(400, "This document is already uploaded.")
     if body.contentType not in storage.ALLOWED_TYPES:
         raise ApiError(400, "Please upload a PDF, JPG or PNG file.")
-    from app.config import get_settings
-
-    if body.size > get_settings().max_upload_bytes:
-        raise ApiError(400, "Files must be 10 MB or smaller.")
+    s = get_settings()
+    if not s.min_upload_bytes <= body.size <= s.max_upload_bytes:
+        msg = f"Files must be between {s.min_upload_bytes // 1024} KB and {s.max_upload_bytes // 1024} KB. This one is {round(body.size / 1024)} KB."
+        raise ApiError(400, msg, {"size": msg})
     upload_id = new_id()
     key = storage.object_key(sid, doc_id, upload_id, body.contentType)
     await get_db().uploads.insert_one(

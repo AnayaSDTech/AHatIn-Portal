@@ -17,7 +17,9 @@ const meta: Record<DocState, { label: string; tone: 'green' | 'amber' | 'red' | 
 export const categoryLabel: Record<DocCategory, string | null> = { general: null, funds: 'Proof of funds', visa: 'Visa' };
 
 const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png'];
-const MAX_BYTES = 10 * 1024 * 1024;
+/** Each document must be 50 KB to 200 KB (the server checks the same). */
+const MIN_BYTES = 50 * 1024;
+const MAX_BYTES = 200 * 1024;
 
 type Filter = 'all' | 'action' | 'verified';
 
@@ -49,8 +51,11 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
     if (!file || !id) return;
     if (!ALLOWED.includes(file.type)) {
       setMessage({ tone: 'error', text: 'Please upload a PDF, JPG or PNG file.' });
-    } else if (file.size > MAX_BYTES) {
-      setMessage({ tone: 'error', text: 'Files must be 10 MB or smaller.' });
+    } else if (file.size < MIN_BYTES || file.size > MAX_BYTES) {
+      setMessage({
+        tone: 'error',
+        text: `Files must be between 50 KB and 200 KB. “${file.name}” is ${Math.round(file.size / 1024)} KB${file.size > MAX_BYTES ? ': try compressing it or scanning at a lower resolution.' : '.'}`,
+      });
     } else {
       // Uploaded to secure storage and checked (file type and virus scan) before the counsellor sees it.
       setMessage({ tone: 'ok', text: `Uploading “${file.name}”…` });
@@ -93,6 +98,8 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
           {message.text}
         </p>
       )}
+
+      <p className="mt-4 text-xs text-navy-500">PDF, JPG or PNG, between 50 KB and 200 KB each.</p>
 
       <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
 

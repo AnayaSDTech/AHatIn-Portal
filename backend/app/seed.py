@@ -35,7 +35,6 @@ MATCHING = {
     "c2": {"countries": [{"country": "Ireland", "years": 4}, {"country": "France", "years": 3}], "universities": ["University College Dublin"], "subjects": ["health", "business"], "languages": ["English", "Hindi", "French"], "capacity": 35},
     "c3": {"countries": [{"country": "Germany", "years": 5}, {"country": "United Kingdom", "years": 3}], "universities": ["Technical University of Munich"], "subjects": ["finance", "business", "engineering"], "languages": ["English", "Hindi", "German"], "capacity": 30},
 }
-DEMO_PASSWORDS = {"demo.admin@ahatin.example": "Admin@1234"}
 DEFAULT_STAFF_PASSWORD = "Staff@1234"
 
 
@@ -360,7 +359,10 @@ def students() -> list[dict]:
 
 async def seed_students() -> None:
     db = get_db()
-    local = get_settings().storage_backend == "local"
+    # The demo documents' sample PDFs go into the document bucket (skipped if storage isn't set up yet).
+    upload = storage.is_configured()
+    if not upload:
+        print("Document storage isn't configured (S3_* settings): demo documents are listed but their files won't open.")
     for i, s in enumerate(students()):
         documents = s.pop("documents")
         applications = s.pop("applications")
@@ -372,8 +374,8 @@ async def seed_students() -> None:
         )
         for d in documents:
             await db.documents.insert_one({**d, "studentId": s["_id"], "createdAt": t, "deletedAt": None})
-            if d.get("fileKey") and local:
-                storage.write_local(d["fileKey"], sample_pdf(d["name"]))
+            if d.get("fileKey") and upload:
+                await storage.put(d["fileKey"], sample_pdf(d["name"]), "application/pdf")
         for a in applications:
             await db.applications.insert_one({**a, "deadline": a.get("deadline"), "studentId": s["_id"], "createdAt": t})
         for days, by, text in notes:

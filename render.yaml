@@ -1,0 +1,72 @@
+# Render Blueprint for the AHat backend (FastAPI). Deploy: Render dashboard → New → Blueprint → this repository.
+# Values marked "sync: false" are secrets: Render asks for them when the Blueprint is created (copy them from backend/.env).
+# The frontend stays on Vercel and forwards /api/* here (frontend/vercel.json), so the site and the API share one origin.
+services:
+  - type: web
+    name: ahat-backend
+    runtime: python
+    region: singapore          # closest Render region to India
+    plan: free                 # free instances sleep after 15 minutes idle; use "starter" so emails and reminders run on time
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers: read the visitor's real IP (for rate limits) from Render's and Vercel's forwarding headers.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.1
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RUN_BACKGROUND_JOBS
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: BUSINESS_TIMEZONE
+        value: Asia/Kolkata
+      # Demo accounts (…@ahatin.example) see their sign-in codes on screen; real users get codes by email only.
+      - key: DEMO_LOGINS
+        value: "true"
+      - key: MEETING_LINK
+        value: https://meet.google.com/juz-bodt-wbd
+
+      # The live website address (the Vercel domain), used in email links.
+      - key: APP_BASE_URL
+        sync: false
+
+      # Database (MongoDB Atlas). Atlas → Network Access must allow Render (0.0.0.0/0 on the free plan).
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: ahat
+
+      # Secrets. FIELD_ENCRYPTION_KEY must be exactly the value in backend/.env: it decrypts the staff authenticator
+      # secrets and passport numbers already in the database.
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: OTP_PEPPER
+        generateValue: true
+
+      # Document storage (Backblaze B2). Add the live website address to the bucket's CORS rules.
+      - key: S3_ENDPOINT
+        value: https://s3.eu-central-003.backblazeb2.com
+      - key: S3_REGION
+        value: eu-central-003
+      - key: S3_BUCKET
+        value: ahat-documents
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+      # Email (Resend, verified domain ahat.in).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        value: AHat <no-reply@ahat.in>
+      - key: ADMIN_ALERT_EMAILS
+        sync: false

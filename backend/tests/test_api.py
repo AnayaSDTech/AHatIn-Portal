@@ -94,16 +94,15 @@ async def test_student_cannot_use_staff_actions(make_api):
     assert r.status_code == 403
 
 
-async def test_document_upload_review_cycle(make_api):
+async def test_document_upload_review_cycle(make_api, bucket):
     student = await make_api()
     await student.student_login()
-    r = await student.post("/students/s1/documents/d8/upload-url", {"fileName": "cv.pdf", "contentType": "application/pdf", "size": 20})
+    pdf = b"%PDF-1.4 sample cv" + b"." * (60 * 1024)  # within 50-200 KB
+    r = await student.post("/students/s1/documents/d8/upload-url", {"fileName": "cv.pdf", "contentType": "application/pdf", "size": len(pdf)})
     assert r.status_code == 200, r.text
     up = r.json()
-    pdf = b"%PDF-1.4 sample cv.."
-    assert len(pdf) == 20
-    put = await student.c.put(up["url"], content=pdf, headers={"Content-Type": "application/pdf"})
-    assert put.status_code == 204, put.text
+    assert up["method"] == "PUT" and up["headers"]["Content-Type"] == "application/pdf"
+    bucket.put_url(up["url"], pdf)  # the browser uploads straight to the bucket
     r = await student.post("/students/s1/documents/d8/upload-complete", {"uploadId": up["uploadId"]})
     assert r.status_code == 200, r.text
     d8 = next(d for d in r.json()["documents"] if d["id"] == "d8")
@@ -114,20 +113,21 @@ async def test_document_upload_review_cycle(make_api):
     staff = await make_api()
     await staff.staff_login()
     url = (await staff.get("/students/s1/documents/d8/download-url")).json()["url"]
-    got = await staff.c.get(url)
-    assert got.status_code == 200 and got.content == pdf
+    assert bucket.get_url(url) == pdf
     r = await staff.post("/students/s1/documents/d8/reject", {"reason": "Please add your latest job"})
     assert r.status_code == 200
     assert not await get_db().follow_ups.find_one({"personId": "s1", "action": "Verify uploaded document: Updated CV", "done": False})
 
 
-async def test_upload_rejects_fake_pdf(make_api):
+async def test_upload_rejects_fake_pdf(make_api, bucket):
     api = await make_api()
     await api.student_login()
-    up = (await api.post("/students/s1/documents/d8/upload-url", {"fileName": "x.pdf", "contentType": "application/pdf", "size": 5})).json()
-    await api.c.put(up["url"], content=b"MZ\x90\x00\x03", headers={"Content-Type": "application/pdf"})
+    fake = b"MZ\x90\x00\x03" + bytes(60 * 1024)
+    up = (await api.post("/students/s1/documents/d8/upload-url", {"fileName": "x.pdf", "contentType": "application/pdf", "size": len(fake)})).json()
+    bucket.put_url(up["url"], fake)
     r = await api.post("/students/s1/documents/d8/upload-complete", {"uploadId": up["uploadId"]})
     assert r.status_code == 400
+    assert bucket.key(up["url"]) not in bucket.objects  # the fake file is deleted
 
 
 async def test_shortlist_approval_creates_applications(make_api):
@@ -528,3 +528,38 @@ async def test_officer_handovers_and_access(make_api):
     d, slot = await _free_slot("u6")
     r = await student.post("/sessions", {"type": "Scholarship & funding", "date": d, "time": slot["time"], "mode": slot["modes"][0]})
     assert r.status_code == 400 and "Financial Aid Officer" in r.json()["detail"]  # Ananya has none yet
+
+
+async def test_seeded_documents_are_in_the_bucket(make_api, bucket):
+    """Demo documents that have a file can be opened (their sample PDFs are in the bucket)."""
+    staff = await make_api()
+    await staff.staff_login()
+    url = (await staff.get("/students/s1/documents/d1/download-url")).json()["url"]
+    assert bucket.get_url(url).startswith(b"%PDF")
+
+
+async def test_upload_size_limits(make_api):
+    """Documents must be between 50 KB and 200 KB."""
+    api = await make_api()
+    await api.student_login()
+    for size, ok in ((20, False), (50 * 1024 - 1, False), (50 * 1024, True), (200 * 1024, True), (200 * 1024 + 1, False), (5 * 1024 * 1024, False)):
+        r = await api.post("/students/s1/documents/d8/upload-url", {"fileName": "f.pdf", "contentType": "application/pdf", "size": size})
+        assert (r.status_code == 200) == ok, (size, r.text)
+        if not ok:
+            assert "between 50 KB and 200 KB" in r.json()["detail"]
+
+
+def test_demo_codes_and_production_checks():
+    from app.config import Settings
+
+    prod = dict(app_env="production", session_secret="x" * 40, otp_pepper="y" * 40, field_encryption_key="k", cookie_secure=True, s3_bucket="b")
+    s = Settings(**prod, demo_logins=True)
+    s.check_production()  # complete production settings start fine
+    assert s.show_demo_codes("demo.student@ahatin.example") and s.show_demo_codes("Kavya.I@AHATIN.example")
+    assert not s.show_demo_codes("real.student@gmail.com")  # real people get codes by email only
+    assert not Settings(**prod).show_demo_codes("demo.student@ahatin.example")  # DEMO_LOGINS off
+    assert Settings(app_env="development").show_demo_codes("anyone@gmail.com")
+    import pytest
+
+    with pytest.raises(RuntimeError, match="SESSION_SECRET.*COOKIE_SECURE"):
+        Settings(**{**prod, "session_secret": "dev-session-secret-change-me", "cookie_secure": False}).check_production()

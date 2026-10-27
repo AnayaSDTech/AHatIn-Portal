@@ -122,8 +122,7 @@ def csrf_middleware(app) -> None:
         if request.method in UNSAFE and request.cookies.get(s.session_cookie_name):
             cookie = request.cookies.get(s.csrf_cookie_name)
             header = request.headers.get("x-csrf-token")
-            # Uploads to the file endpoint are authorised by their signed URL instead.
-            if not request.url.path.startswith("/api/v1/files/") and (not cookie or cookie != header):
+            if not cookie or cookie != header:
                 from fastapi.responses import JSONResponse
 
                 return JSONResponse({"detail": "Your session has expired. Please refresh the page.", "errors": [], "trace_id": ""}, status_code=403)

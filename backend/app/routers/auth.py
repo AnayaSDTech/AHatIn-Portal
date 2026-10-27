@@ -61,7 +61,7 @@ async def _issue_otp(email: str, user: dict | None, note: str | None = None) -> 
         "If you didn't ask for this code, you can ignore this email.\n\nAHat",
         urgent=True,
     )
-    if s.expose_dev_codes:
+    if s.show_demo_codes(email):
         result["demoCode"] = code
     return result
 
@@ -154,7 +154,7 @@ async def staff_login(body: StaffLoginBody, request: Request):
     challenge_id = random_token(24)
     await db.staff_challenges.insert_one({"_id": sha256(challenge_id), "userId": user["_id"], "attempts": 0, "expiresAt": now() + timedelta(minutes=5)})
     result = {"challengeId": challenge_id}
-    if get_settings().expose_dev_codes:
+    if get_settings().show_demo_codes(user["email"]):
         result["demoSecret"] = decrypt(user["totpSecretEnc"])
     return result
 

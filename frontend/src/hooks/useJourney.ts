@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { api } from '../lib/api/client';
 import { act, mutate } from '../lib/api/store';
 import { ApiError } from '../lib/api/types';
-import { env } from '../config/env';
 import type { CareerPlanInput, ScholarshipStatus, ServiceCode, ServiceStatus, ShortlistItem, VisaStage } from '../lib/journey';
 import type { AppState, DocCategory } from '../data/staff';
 
@@ -14,13 +13,8 @@ async function uploadFile(studentId: string, docId: string, file: File) {
     contentType: file.type,
     size: file.size,
   });
-  const sameOrigin = target.url.startsWith('/');
-  const res = await fetch(sameOrigin ? `${env.apiBaseUrl}${target.url}` : target.url, {
-    method: target.method,
-    headers: target.headers,
-    body: file,
-    credentials: sameOrigin ? 'include' : 'omit',
-  });
+  // Straight to the document bucket with a short-lived presigned URL (no cookies).
+  const res = await fetch(target.url, { method: target.method, headers: target.headers, body: file, credentials: 'omit' });
   if (!res.ok) throw new ApiError(res.status, 'The upload failed. Please check your connection and try again.');
   await api.post(`${base}/upload-complete`, { uploadId: target.uploadId });
 }
