@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets (.env.example is kept as a template)
+.env
+.env.*
+!.env.example
+
+# Uploaded files in development (local storage)
+var/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
