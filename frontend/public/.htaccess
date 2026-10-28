@@ -13,6 +13,9 @@
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
+  # A missing script or stylesheet is a real "404 Not Found", never the app's page: browsers would otherwise store
+  # the page as if it were the script and show a white screen.
+  RewriteRule ^(assets/|sw\.js$|workbox-) - [R=404,L]
   RewriteRule ^ index.html [L]
 </IfModule>
 

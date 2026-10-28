@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // A new upload replaces the old version straight away (no "Refresh" click needed), so a broken or old
+      // cached copy can't keep showing.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
         name: 'AHat International Educational Consultancy',
@@ -30,6 +32,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/images\.unsplash\.com\//,
@@ -50,6 +53,17 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // 10-character hashes: every built file got a new name once, so browsers that cached a broken first upload of
+  // ahat.in (HTML stored under a script's name) download fresh copies.
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash:10].js',
+        chunkFileNames: 'assets/[name]-[hash:10].js',
+        assetFileNames: 'assets/[name]-[hash:10][extname]',
+      },
+    },
+  },
   // Requests to /api go to the FastAPI backend, so the app and the API share one origin
   // (cookies stay first-party). In production the web server or host does the same.
   server: {

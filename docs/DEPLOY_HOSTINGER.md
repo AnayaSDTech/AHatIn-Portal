@@ -65,7 +65,7 @@ On https://ahat.in:
 
 1. Make the changes, then `npm run build:hostinger` in `frontend`.
 2. In `public_html`, delete all the files, then upload and extract the new `ahat-frontend.zip`.
-3. Visitors get the new version the next time they open the site (the app also shows an "update available" prompt).
+3. Visitors get the new version automatically the next time they open or refresh the site.
 
 ## If something doesn't work
 
