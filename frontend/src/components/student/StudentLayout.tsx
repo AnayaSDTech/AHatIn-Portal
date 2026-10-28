@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { CalendarDays, FolderCheck, LayoutDashboard, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
+import { CalendarDays, FolderCheck, LayoutDashboard, Menu, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Container } from '../ui/Container';
-import { DemoBadge } from '../ui/DemoBadge';
 import { ProfileModal } from '../dashboard/ProfileModal';
 import { BookSessionModal } from '../dashboard/BookSessionModal';
 import { Modal } from '../ui/Modal';
@@ -76,6 +75,8 @@ interface Section {
   badge?: number;
   urgent?: boolean;
   hidden?: boolean;
+  /** Label in the phone's bottom bar. */
+  short?: string;
 }
 
 function greeting() {
@@ -87,7 +88,7 @@ function ProgressRing({ value }: { value: number }) {
   const r = 52;
   const c = 2 * Math.PI * r;
   return (
-    <div className="relative h-32 w-32 shrink-0">
+    <div className="relative h-20 w-20 shrink-0 sm:h-32 sm:w-32">
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden>
         <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="10" />
         <circle
@@ -105,8 +106,8 @@ function ProgressRing({ value }: { value: number }) {
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <div>
-          <p className="font-display text-3xl text-white">{value}%</p>
-          <p className="text-[10px] uppercase tracking-wider text-navy-200">overall</p>
+          <p className="font-display text-xl text-white sm:text-3xl">{value}%</p>
+          <p className="text-[9px] uppercase tracking-wider text-navy-200 sm:text-[10px]">overall</p>
         </div>
       </div>
     </div>
@@ -196,11 +197,11 @@ export function StudentLayout() {
   const appsToDo = offersToReply + (journey.shortlist?.status === 'shared' ? 1 : 0) + appUpdates.filter((u) => !(u.to === 'conditional_offer' || u.to === 'unconditional_offer')).length;
 
   const sections: Section[] = [
-    { to: '/dashboard', label: 'Overview', title: '', description: '', icon: LayoutDashboard },
-    { to: '/dashboard/applications', label: 'Applications', title: 'Applications', description: 'Your university shortlist and the applications your counsellor submits for you.', icon: School, badge: appsToDo },
-    { to: '/dashboard/documents', label: 'Documents', title: 'Documents', description: 'Upload what your counsellor asks for; you can see when each one is checked.', icon: FolderCheck, badge: docsToDo, urgent: documents.some((d) => d.state === 'rejected') },
+    { to: '/dashboard', label: 'Overview', short: 'Home', title: '', description: '', icon: LayoutDashboard },
+    { to: '/dashboard/applications', label: 'Applications', short: 'Applications', title: 'Applications', description: 'Your university shortlist and the applications your counsellor submits for you.', icon: School, badge: appsToDo },
+    { to: '/dashboard/documents', label: 'Documents', short: 'Documents', title: 'Documents', description: 'Upload what your counsellor asks for; you can see when each one is checked.', icon: FolderCheck, badge: docsToDo, urgent: documents.some((d) => d.state === 'rejected') },
     { to: '/dashboard/sessions', label: 'Sessions', title: 'My sessions', description: team.finance || team.visa ? 'Book and manage sessions with your counsellor and officers.' : `Book and manage sessions with ${counsellor?.name ?? 'your counsellor'}.`, icon: CalendarDays },
-    { to: '/dashboard/messages', label: 'Messages', title: 'Messages', description: team.finance || team.visa ? 'Your chats with the people looking after you.' : `Your chat with ${counsellor?.name ?? 'your counsellor'}.`, icon: MessageSquare, badge: unread, urgent: unread > 0 },
+    { to: '/dashboard/messages', label: 'Messages', short: 'Messages', title: 'Messages', description: team.finance || team.visa ? 'Your chats with the people looking after you.' : `Your chat with ${counsellor?.name ?? 'your counsellor'}.`, icon: MessageSquare, badge: unread, urgent: unread > 0 },
     { to: '/dashboard/funding', label: 'Funding & visa', title: 'Funding & visa', description: 'Your funding plan, scholarships and visa progress.', icon: PiggyBank, hidden: !showFunding },
     { to: '/dashboard/travel', label: 'Travel', title: 'Travel & arrival', description: 'Get ready to travel, then tell us when you have arrived.', icon: Plane, hidden: !showTravel },
   ];
@@ -243,40 +244,43 @@ export function StudentLayout() {
   };
 
   return (
-    <div className="bg-[#F4F1EA] pb-20 pt-24">
-      {/* Header band with the student navigation */}
-      <div className="bg-navy-950 pt-10">
+    <div className="bg-[#F4F1EA] pb-28 pt-24 sm:pb-20">
+      {/* Header band with the student navigation (on phones the navigation is the bar at the bottom) */}
+      <div className="bg-navy-950 pb-6 pt-6 sm:pb-0 sm:pt-10">
         <Container>
-          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-center">
+          <div className="flex flex-col justify-between gap-5 sm:gap-8 md:flex-row md:items-center">
             {isOverview ? (
               <div>
-                <DemoBadge light label="Demo dashboard · sample data" />
-                <h1 className="mt-4 text-3xl text-white sm:text-4xl">
+                <h1 className="text-2xl text-white sm:text-4xl">
                   {greeting()}, {firstName}
                 </h1>
-                <p className="mt-2 max-w-xl text-navy-200">
-                  {profile.courseInterest ? (
-                    <>
-                      You're working towards a <span className="font-semibold text-white">{profile.courseInterest}</span> in {profile.destination || record.destination} for{' '}
-                      {profile.intake || record.intake}.
-                    </>
-                  ) : record.destination !== 'Not decided' && record.intake !== 'To be decided' ? (
-                    `Planning to study in ${record.destination} for ${record.intake}. Your counsellor will help you choose a course.`
-                  ) : (
-                    'Your counsellor will help you choose a course, a destination and an intake.'
-                  )}
-                </p>
+                {(() => {
+                  // The study plan at a glance, from the profile (or the record) once known.
+                  const plan = [
+                    profile.courseInterest,
+                    profile.destination || (record.destination !== 'Not decided' ? record.destination : ''),
+                    profile.intake || (record.intake !== 'To be decided' ? record.intake : ''),
+                  ].filter(Boolean);
+                  return plan.length ? (
+                    <div className="mt-4 flex flex-wrap gap-2" data-study-plan>
+                      {plan.map((p, i) => (
+                        <span key={p} className={cn('rounded-full px-3 py-1 text-sm', i === 0 && profile.courseInterest ? 'bg-gold-500 font-semibold text-navy-950' : 'bg-white/10 text-navy-100 ring-1 ring-white/15')}>
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             ) : (
               <div>
-                <h1 className="text-3xl text-white sm:text-4xl">{current.title}</h1>
-                <p className="mt-2 max-w-xl text-navy-200">{current.description}</p>
+                <h1 className="text-2xl text-white sm:text-4xl">{current.title}</h1>
               </div>
             )}
             {/* Progress summary: the same on every tab. */}
-            <div className="flex items-center gap-6 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur" data-progress-summary>
+            <div className="flex items-center gap-4 rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:gap-6 sm:p-5" data-progress-summary>
               <ProgressRing value={progress} />
-              <dl className="space-y-2 text-sm">
+              <dl className="space-y-1.5 whitespace-nowrap text-sm sm:space-y-2">
                 <div className="flex gap-2 text-navy-200">
                   <dt>Services completed:</dt>
                   <dd className="font-semibold text-white">{completed} of {counted}</dd>
@@ -294,7 +298,7 @@ export function StudentLayout() {
           </div>
 
           {/* Student navigation: scrolls sideways on small screens */}
-          <nav ref={navRef} className="-mx-1 mt-8 flex gap-1 overflow-x-auto px-1" aria-label="My dashboard">
+          <nav ref={navRef} className="-mx-1 mt-8 hidden gap-1 overflow-x-auto px-1 sm:flex" aria-label="My dashboard">
             {sections
               .filter((s) => !s.hidden)
               .map((s) => (
@@ -332,7 +336,9 @@ export function StudentLayout() {
         </Container>
       </div>
 
-      <Container className="mt-8">
+      <MobileNav sections={sections.filter((sec) => !sec.hidden)} onProfile={() => setProfileOpen('view')} />
+
+      <Container className="mt-6 sm:mt-8">
         {showWelcome && isOverview && (
           <div role="status" className="mb-6 flex animate-fade-up items-start gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-soft">
             <PartyPopper className="h-6 w-6 shrink-0 text-emerald-600" aria-hidden />
@@ -418,5 +424,102 @@ export function StudentLayout() {
         counsellor={counsellor}
       />
     </div>
+  );
+}
+
+/* ------------------------------ Phones: bottom navigation ------------------------------ */
+
+/**
+ * On phones the sections are a bar fixed to the bottom of the screen, like an app: Home, Applications, Documents and
+ * Messages, with "More" for Sessions, Funding & visa, Travel (once they apply) and My profile.
+ */
+function MobileNav({ sections, onProfile }: { sections: Section[]; onProfile: () => void }) {
+  const location = useLocation();
+  const [more, setMore] = useState(false);
+  const main = sections.filter((s) => s.short);
+  const extra = sections.filter((s) => !s.short);
+  const moreActive = extra.some((s) => location.pathname.startsWith(s.to));
+  const moreBadge = extra.reduce((n, s) => n + (s.badge ?? 0), 0);
+
+  // Close "More" when the page changes.
+  useEffect(() => setMore(false), [location.pathname]);
+
+  // Keep the bottom of the page (the site footer) clear of the bar.
+  useEffect(() => {
+    document.body.classList.add('pb-16', 'sm:pb-0');
+    return () => document.body.classList.remove('pb-16', 'sm:pb-0');
+  }, []);
+
+  return (
+    <>
+      {more && <button type="button" className="fixed inset-0 z-40 bg-navy-950/30 sm:hidden" aria-label="Close menu" onClick={() => setMore(false)} />}
+      {/* Hidden while the site menu is open, so it never covers the menu (e.g. Log out). */}
+      <div className="fixed inset-x-0 bottom-0 z-50 sm:hidden [.site-menu-open_&]:hidden">
+        {more && (
+          <div className="mx-3 mb-2 overflow-hidden rounded-2xl bg-white shadow-lift ring-1 ring-navy-100" role="menu" aria-label="More">
+            {extra.map((s) => (
+              <NavLink
+                key={s.to}
+                to={s.to}
+                role="menuitem"
+                className={({ isActive }) => cn('flex items-center gap-3 border-b border-navy-100 px-4 py-3.5 text-sm font-semibold', isActive ? 'text-navy-900' : 'text-navy-700')}
+              >
+                <s.icon className="h-5 w-5 text-navy-400" aria-hidden /> {s.label}
+              </NavLink>
+            ))}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMore(false);
+                onProfile();
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-semibold text-navy-700"
+              data-open-profile-mobile
+            >
+              <UserRound className="h-5 w-5 text-navy-400" aria-hidden /> My profile
+            </button>
+          </div>
+        )}
+        <nav className="grid grid-cols-5 border-t border-navy-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur" aria-label="Dashboard sections" data-mobile-nav>
+          {main.map((s) => (
+            <NavLink
+              key={s.to}
+              to={s.to}
+              end={s.to === '/dashboard'}
+              className={({ isActive }) => cn('relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition', isActive ? 'text-navy-900' : 'text-navy-400')}
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={cn('absolute inset-x-3 top-0 h-0.5 rounded-full', isActive ? 'bg-gold-500' : 'bg-transparent')} aria-hidden />
+                  <span className="relative">
+                    <s.icon className="h-5 w-5" aria-hidden />
+                    {!!s.badge && (
+                      <span className={cn('absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
+                        {s.badge}
+                      </span>
+                    )}
+                  </span>
+                  {s.short}
+                </>
+              )}
+            </NavLink>
+          ))}
+          <button
+            type="button"
+            onClick={() => setMore((v) => !v)}
+            aria-expanded={more}
+            className={cn('relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition', more || moreActive ? 'text-navy-900' : 'text-navy-400')}
+          >
+            <span className={cn('absolute inset-x-3 top-0 h-0.5 rounded-full', moreActive ? 'bg-gold-500' : 'bg-transparent')} aria-hidden />
+            <span className="relative">
+              <Menu className="h-5 w-5" aria-hidden />
+              {!!moreBadge && <span className="absolute -right-2 -top-1.5 h-2.5 w-2.5 rounded-full bg-gold-500" aria-hidden />}
+            </span>
+            More
+          </button>
+        </nav>
+      </div>
+    </>
   );
 }

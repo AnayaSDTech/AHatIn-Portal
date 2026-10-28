@@ -1,18 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BellRing, Pencil, PiggyBank, Plane, UserCheck, UserRoundCog, UsersRound } from 'lucide-react';
-import { PageHeader, EmptyState } from '../../components/staff/StaffUi';
-import { Panel, Pill } from '../../components/dashboard/Panel';
+import type { LucideIcon } from 'lucide-react';
+import {
+  BellRing,
+  BookOpen,
+  ChevronDown,
+  Clock,
+  GraduationCap,
+  Languages,
+  Mail,
+  MapPin,
+  Phone,
+  PiggyBank,
+  Plane,
+  Search,
+  Sparkles,
+  UserCheck,
+  UserRoundX,
+  Wallet,
+} from 'lucide-react';
+import { PageHeader } from '../../components/staff/StaffUi';
+import { Pill } from '../../components/dashboard/Panel';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { TextField } from '../../components/ui/FormField';
 import { api } from '../../lib/api/client';
 import { mutate, useApi } from '../../lib/api/store';
 import { ApiError } from '../../lib/api/types';
-import { cn, relativeTime } from '../../lib/utils';
+import { cn, initials, relativeTime } from '../../lib/utils';
 import { counsellorName } from '../../data/staff';
 
-/* ------------------------------ Types (GET /admin/assignments, /admin/counsellors/matching) ------------------------------ */
+/* ------------------------------ Types (GET /admin/assignments) ------------------------------ */
 
 interface Match {
   counsellorId: string;
@@ -41,26 +59,6 @@ interface QueueStudent {
   matches?: Match[];
 }
 
-interface MatchingProfile {
-  countries: { country: string; years: number }[];
-  universities: string[];
-  subjects: string[];
-  languages: string[];
-  capacity: number;
-}
-
-interface CounsellorMatching {
-  id: string;
-  name: string;
-  activeStudents: number;
-  matchingProfile: MatchingProfile;
-}
-
-interface CareerOptions {
-  directions: { key: string; label: string }[];
-  destinations: string[];
-}
-
 /** A student ready for a Financial Aid Officer or a Visa Officer. */
 interface OfficerQueueStudent {
   id: string;
@@ -81,6 +79,7 @@ interface Officer {
 }
 
 type OfficerKind = 'finance' | 'visa';
+type View = 'counsellor' | OfficerKind | 'incomplete';
 
 const NO_QUEUE = {
   waiting: [] as QueueStudent[],
@@ -89,121 +88,296 @@ const NO_QUEUE = {
   waitingVisa: [] as OfficerQueueStudent[],
   officers: { finance: [] as Officer[], visa: [] as Officer[] },
 };
-const NO_COUNSELLORS: CounsellorMatching[] = [];
-const NO_OPTIONS: CareerOptions = { directions: [], destinations: [] };
 
 /** How many suggestions show before "Show all counsellors". */
 const SHOWN = 3;
 
+/* ------------------------------ Small building blocks ------------------------------ */
+
+const DAY = 86_400_000;
+const daysSince = (iso: string | null | undefined) => (iso ? Math.floor((Date.now() - new Date(iso).getTime()) / DAY) : 0);
+
+/** How long a student has been waiting: grey today, amber after a day, red after three. */
+function WaitingBadge({ since, label = 'Waiting' }: { since: string | null | undefined; label?: string }) {
+  if (!since) return null;
+  const d = daysSince(since);
+  const tone = d >= 3 ? 'bg-red-50 text-red-700 ring-red-200' : d >= 1 ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-navy-50 text-navy-600 ring-navy-100';
+  return (
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1', tone)} title={new Date(since).toLocaleString('en-GB')}>
+      <Clock className="h-3 w-3" aria-hidden />
+      {label} {d === 0 ? 'since today' : `${d} ${d === 1 ? 'day' : 'days'}`}
+    </span>
+  );
+}
+
+function Avatar({ name, tone = 'navy' }: { name: string; tone?: 'navy' | 'gold' }) {
+  return (
+    <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl font-display text-base', tone === 'gold' ? 'bg-gold-500 text-navy-950' : 'bg-navy-900 text-gold-300')} aria-hidden>
+      {initials(name)}
+    </span>
+  );
+}
+
+function Chip({ icon: Icon, children }: { icon?: LucideIcon; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-ivory px-2.5 py-1 text-xs font-medium text-navy-700 ring-1 ring-navy-100">
+      {Icon && <Icon className="h-3.5 w-3.5 text-navy-400" aria-hidden />}
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Students' load. Against a capacity (counsellors): green, amber from 80%, red when full. Officers have no capacity, so
+ * their bars are only compared with each other (neutral colour).
+ */
+function LoadBar({ value, max, label, neutral = false }: { value: number; max: number; label: string; neutral?: boolean }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div className="min-w-[7rem]" title={label}>
+      <div className="h-1.5 overflow-hidden rounded-full bg-navy-100">
+        <div className={cn('h-full rounded-full', neutral ? 'bg-navy-400' : pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${Math.max(pct, 4)}%` }} />
+      </div>
+      <p className="mt-1 text-[11px] text-navy-500">{label}</p>
+    </div>
+  );
+}
+
+/** The match score split into its parts: country (out of 50), subject (30) and spare capacity (20). */
+function ScoreBar({ m }: { m: Match }) {
+  const parts = [
+    { key: 'country', label: 'Country', value: m.points.country, max: 50, cls: 'bg-navy-800' },
+    { key: 'subject', label: 'Subject', value: m.points.subject, max: 30, cls: 'bg-gold-500' },
+    { key: 'capacity', label: 'Capacity', value: m.points.capacity, max: 20, cls: 'bg-emerald-500' },
+  ];
+  return (
+    <div>
+      <div className="flex h-2 overflow-hidden rounded-full bg-navy-100" role="img" aria-label={parts.map((p) => `${p.label} ${p.value} of ${p.max}`).join(', ')}>
+        {parts.map((p) => (
+          <span key={p.key} className={p.cls} style={{ width: `${p.value}%` }} />
+        ))}
+      </div>
+      <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-navy-500">
+        {parts.map((p) => (
+          <span key={p.key} className="inline-flex items-center gap-1">
+            <span className={cn('h-2 w-2 rounded-full', p.cls)} aria-hidden />
+            {p.label} {p.value}/{p.max}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
+function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
+  return (
+    <div className="card flex flex-col items-center px-6 py-14 text-center">
+      <span className="grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+        <Icon className="h-7 w-7" aria-hidden />
+      </span>
+      <p className="mt-4 font-semibold text-navy-900">{title}</p>
+      <p className="mt-1 max-w-md text-sm text-navy-500">{children}</p>
+    </div>
+  );
+}
+
 /* ------------------------------ Page ------------------------------ */
 
 /**
- * The admin assigns every student's counsellor, based only on the student's profile, once it is complete.
- * The portal ranks the counsellors (country 50%, subject 30%, spare capacity 20%); the admin decides.
+ * The admin chooses who looks after each student at each handover: the counsellor once the profile is complete (ranked
+ * on the profile: country 50%, subject 30%, spare capacity 20%), the Financial Aid Officer once Application Assistance is
+ * complete, and the Visa Officer once Scholarship & Financial Guidance is complete. The portal suggests; the admin decides.
  */
 export function AssignCounsellorsPage() {
-  const [queue] = useApi('/admin/assignments', NO_QUEUE, { pollMs: 60_000 });
-  const [counsellorProfiles] = useApi('/admin/counsellors/matching', NO_COUNSELLORS);
-  const [options] = useApi<CareerOptions>('/career-options', NO_OPTIONS);
+  const [queue, loaded] = useApi('/admin/assignments', NO_QUEUE, { pollMs: 60_000 });
   const [message, setMessage] = useState<string | null>(null);
-  const [editing, setEditing] = useState<CounsellorMatching | null>(null);
+  const [view, setView] = useState<View>('counsellor');
+  const [query, setQuery] = useState('');
   const { hash } = useLocation();
 
-  // Links from a student's record (#student-<id>) jump to that student.
+  // Links from a student's record (#student-<id>) open the right list and jump to that student.
   useEffect(() => {
-    if (hash) requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-  }, [hash, queue]);
+    if (!hash || !loaded) return;
+    const id = hash.replace(/^#(student|finance|visa)-/, '');
+    if (queue.incomplete.some((s) => s.id === id)) setView('incomplete');
+    else if (queue.waitingFinance.some((s) => s.id === id)) setView('finance');
+    else if (queue.waitingVisa.some((s) => s.id === id)) setView('visa');
+    else setView('counsellor');
+    requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, [hash, loaded, queue]);
 
-  const subjectLabel = (key: string) => options.directions.find((d) => d.key === key)?.label ?? key;
+  const q = query.trim().toLowerCase();
+  const matchesQuery = (...fields: (string | null | undefined)[]) => !q || fields.some((f) => f?.toLowerCase().includes(q));
+
+  const oldest = (dates: (string | null)[]) => dates.filter(Boolean).sort()[0] ?? null;
+  const tabs: { key: View; label: string; hint: string; count: number; since: string | null; icon: LucideIcon; tone: string }[] = [
+    { key: 'counsellor', label: 'Counsellor', hint: 'Profile complete', count: queue.waiting.length, since: oldest(queue.waiting.map((s) => s.profileCompletedAt)), icon: UserCheck, tone: 'bg-navy-900 text-gold-300' },
+    { key: 'finance', label: 'Financial Aid Officer', hint: 'Offer accepted', count: queue.waitingFinance.length, since: oldest(queue.waitingFinance.map((s) => s.readySince)), icon: PiggyBank, tone: 'bg-gold-500 text-navy-950' },
+    { key: 'visa', label: 'Visa Officer', hint: 'Funding complete', count: queue.waitingVisa.length, since: oldest(queue.waitingVisa.map((s) => s.readySince)), icon: Plane, tone: 'bg-sky-600 text-white' },
+    { key: 'incomplete', label: 'Profile incomplete', hint: "Can't be assigned yet", count: queue.incomplete.length, since: null, icon: UserRoundX, tone: 'bg-navy-100 text-navy-700' },
+  ];
+  const waitingTotal = queue.waiting.length + queue.waitingFinance.length + queue.waitingVisa.length;
 
   return (
     <>
       <PageHeader
         title="Assignments"
-        description="Choose each student's counsellor once their profile is complete, their Financial Aid Officer once Application Assistance is complete, and their Visa Officer once Scholarship & Financial Guidance is complete."
+        description={
+          loaded
+            ? waitingTotal
+              ? `${waitingTotal} ${waitingTotal === 1 ? 'student is' : 'students are'} waiting for you to choose who looks after them.`
+              : 'Everyone is assigned. New students appear here at each handover.'
+            : 'Choose who looks after each student at each handover.'
+        }
       />
-      {message && <p role="status" className="mb-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
+      {message && (
+        <p role="status" className="mb-6 flex items-start gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+          <UserCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {message}
+        </p>
+      )}
 
-      <p className="mb-3 text-sm text-navy-600">Counsellor suggestions are ranked on the student's profile: country 50%, subject 30%, spare capacity 20%. You decide.</p>
-      <Panel title={`Waiting for a counsellor (${queue.waiting.length})`} icon={<UserCheck className="h-4 w-4" aria-hidden />}>
-        {queue.waiting.length === 0 ? (
-          <EmptyState>No students are waiting. Students appear here as soon as they complete their profile.</EmptyState>
-        ) : (
-          <ul className="space-y-4">
-            {queue.waiting.map((s) => (
-              <WaitingStudent key={s.id} student={s} onAssigned={setMessage} />
+      {/* The four queues: each card opens its list. */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="tablist" aria-label="Assignment queues">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={view === t.key}
+                onClick={() => setView(t.key)}
+                data-queue-tab={t.key}
+                className={cn(
+                  'card flex items-start gap-3 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lift',
+                  view === t.key ? 'ring-2 ring-navy-900' : 'ring-1 ring-transparent',
+                )}
+              >
+                <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', t.tone)}>
+                  <t.icon className="h-5 w-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="font-display text-3xl leading-none text-navy-900">{t.count}</span>
+                    {t.count > 0 && t.since && daysSince(t.since) >= 1 && (
+                      <span className={cn('text-[11px] font-semibold', daysSince(t.since) >= 3 ? 'text-red-600' : 'text-amber-700')}>oldest {daysSince(t.since)}d</span>
+                    )}
+                  </span>
+                  <span className="mt-1.5 block text-sm font-semibold text-navy-900">{t.key === 'incomplete' ? t.label : `Waiting for ${t.label === 'Counsellor' ? 'a counsellor' : `a ${t.label}`}`}</span>
+                  <span className="block text-xs text-navy-500">{t.hint}</span>
+                </span>
+              </button>
             ))}
-          </ul>
-        )}
-      </Panel>
+          </div>
 
-      <OfficerQueue kind="finance" students={queue.waitingFinance} officers={queue.officers.finance} onAssigned={setMessage} />
-      <OfficerQueue kind="visa" students={queue.waitingVisa} officers={queue.officers.visa} onAssigned={setMessage} />
+          <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-navy-600">
+              {view === 'counsellor' && 'Suggestions are ranked on the student’s profile: country 50%, subject 30%, spare capacity 20%. You decide.'}
+              {view === 'finance' && 'Students who have accepted an offer. The Financial Aid Officer looks after scholarships, the funding plan and proof of funds.'}
+              {view === 'visa' && 'Students whose funding is complete. The Visa Officer looks after the visa, pre-departure and post-arrival support.'}
+              {view === 'incomplete' && 'Registered, but the profile isn’t complete, so they can’t be assigned yet. The profile form opens each time they sign in.'}
+            </p>
+            <label className="relative block w-full shrink-0 sm:w-72">
+              <span className="sr-only">Search students</span>
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" aria-hidden />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, reference or email" className="input py-2.5 pl-10" type="search" />
+            </label>
+          </div>
 
-      <Panel title={`Profile incomplete (${queue.incomplete.length})`} icon={<BellRing className="h-4 w-4" aria-hidden />} className="mt-6">
-        <p className="mb-4 text-sm text-navy-600">Registered, but their profile isn't complete yet, so they can't be assigned. The profile form opens each time they sign in.</p>
-        {queue.incomplete.length === 0 ? (
-          <p className="text-sm text-navy-400">Nobody is waiting on their profile.</p>
+      {view === 'counsellor' &&
+        (queue.waiting.length === 0 ? (
+          <Empty icon={UserCheck} title="No one is waiting for a counsellor">Students appear here as soon as they complete their profile.</Empty>
         ) : (
-          <ul className="divide-y divide-navy-100">
-            {queue.incomplete.map((s) => (
-              <IncompleteStudent key={s.id} student={s} onSent={setMessage} />
-            ))}
+          <ul className="space-y-5">
+            {queue.waiting
+              .filter((s) => matchesQuery(s.name, s.reference, s.email))
+              .map((s) => (
+                <WaitingStudent key={s.id} student={s} onAssigned={setMessage} />
+              ))}
           </ul>
-        )}
-      </Panel>
+        ))}
 
-      <Panel title="Counsellor profiles for matching" icon={<UsersRound className="h-4 w-4" aria-hidden />} className="mt-6">
-        <p className="mb-4 text-sm text-navy-600">Used only for suggestions; students don't see them. Keep countries, subjects and capacity up to date.</p>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {counsellorProfiles.map((c) => {
-            const m = c.matchingProfile;
-            return (
-              <div key={c.id} className="rounded-2xl border border-navy-100 p-4" data-counsellor-profile={c.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-navy-900">{c.name}</p>
-                    <p className={cn('text-xs', c.activeStudents >= m.capacity ? 'font-semibold text-red-600' : 'text-navy-500')}>
-                      {c.activeStudents} of {m.capacity} students
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setEditing(c)} className="inline-flex items-center gap-1 rounded-full border border-navy-100 px-3 py-1.5 text-xs font-semibold text-navy-700 hover:border-navy-900">
-                    <Pencil className="h-3 w-3" aria-hidden /> Edit
-                  </button>
-                </div>
-                <dl className="mt-3 space-y-1.5 text-xs">
-                  <Row label="Countries" value={m.countries.map((x) => `${x.country} (${x.years} yr${x.years === 1 ? '' : 's'})`).join(', ')} />
-                  <Row label="Subjects" value={m.subjects.map(subjectLabel).join(', ')} />
-                  <Row label="Studied at" value={m.universities.join(', ')} />
-                  <Row label="Languages" value={m.languages.join(', ')} />
-                </dl>
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
-
-      {editing && (
-        <MatchingProfileModal
-          counsellor={editing}
-          options={options}
-          onClose={() => setEditing(null)}
-          onSaved={(name) => {
-            setEditing(null);
-            setMessage(`${name}'s matching profile was saved. Suggestions use it straight away.`);
-          }}
+      {(view === 'finance' || view === 'visa') && (
+        <OfficerQueue
+          kind={view}
+          students={(view === 'finance' ? queue.waitingFinance : queue.waitingVisa).filter((s) => matchesQuery(s.name, s.reference))}
+          total={(view === 'finance' ? queue.waitingFinance : queue.waitingVisa).length}
+          officers={queue.officers[view]}
+          onAssigned={setMessage}
         />
       )}
+
+      {view === 'incomplete' &&
+        (queue.incomplete.length === 0 ? (
+          <Empty icon={UserCheck} title="Every student has completed their profile">Students who register appear here until their profile is complete.</Empty>
+        ) : (
+          <div className="card overflow-hidden">
+            <ul className="divide-y divide-navy-100">
+              {queue.incomplete
+                .filter((s) => matchesQuery(s.name, s.reference, s.email))
+                .map((s) => (
+                  <IncompleteStudent key={s.id} student={s} onSent={setMessage} />
+                ))}
+            </ul>
+          </div>
+        ))}
+
     </>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+/* ------------------------------ One suggested counsellor ------------------------------ */
+
+/** Score, name and Assign at a glance; the reasons, score breakdown, capacity and background open on click. */
+function SuggestedCounsellor({ m, best, onAssign }: { m: Match; best: boolean; onAssign: () => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex gap-2">
-      <dt className="w-20 shrink-0 text-navy-400">{label}</dt>
-      <dd className={value ? 'text-navy-800' : 'text-navy-300'}>{value || 'Not set'}</dd>
-    </div>
+    <li className={cn('rounded-2xl ring-1 transition', best ? 'bg-gold-50/60 ring-gold-300' : 'bg-white ring-navy-100 hover:ring-navy-200')} data-match={m.counsellorId}>
+      <div className="flex items-center gap-3 p-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left"
+          data-match-toggle
+        >
+          <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold', best ? 'bg-gold-500 text-navy-950' : 'bg-navy-50 text-navy-800')} title="Match score out of 100">
+            {m.score}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-navy-900">{m.name}</span>
+              {best && <Pill tone="gold">Best match</Pill>}
+              {m.atCapacity && <Pill tone="red">At capacity</Pill>}
+            </span>
+            <span className="text-xs text-navy-500">{open ? 'Hide details' : 'View details'}</span>
+          </span>
+          <ChevronDown className={cn('h-4 w-4 shrink-0 text-navy-400 transition', open && 'rotate-180')} aria-hidden />
+        </button>
+        <Button size="sm" variant={best ? 'primary' : 'outline'} className="shrink-0" onClick={onAssign}>
+          Assign
+        </Button>
+      </div>
+      {open && (
+        <div className="space-y-3 border-t border-navy-100 px-3 pb-3.5 pt-3 sm:pl-16" data-match-details>
+          <ul className="space-y-1 text-xs text-navy-700">
+            {m.reasons.map((r) => (
+              <li key={r} className="flex gap-1.5">
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-navy-300" aria-hidden />
+                {r}
+              </li>
+            ))}
+          </ul>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+            <ScoreBar m={m} />
+            <LoadBar value={m.activeStudents} max={m.capacity} label={`${m.activeStudents}/${m.capacity} students`} />
+          </div>
+          {(m.universities.length > 0 || m.languages.length > 0) && (
+            <p className="text-xs text-navy-500">
+              {[m.universities.length ? `Studied at ${m.universities.join(', ')}` : '', m.languages.length ? `Speaks ${m.languages.join(', ')}` : ''].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -218,6 +392,15 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
   const p = s.profile;
   const matches = s.matches ?? [];
   const shown = showAll ? matches : matches.slice(0, SHOWN);
+  const facts = useMemo(
+    () => [
+      { icon: GraduationCap, label: 'Education', value: [p.degree, p.institution].filter(Boolean).join(', ') + (p.grade ? ` · ${p.grade}` : '') },
+      { icon: Languages, label: 'English', value: p.englishTest === 'Not taken yet' ? 'Not taken yet' : `${p.englishTest} ${p.englishScore}` },
+      { icon: Wallet, label: 'Budget', value: p.budget },
+      { icon: Sparkles, label: 'Experience', value: p.workExperience || 'None given' },
+    ],
+    [p],
+  );
 
   const assign = async () => {
     if (!choice) return;
@@ -235,62 +418,73 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
   };
 
   return (
-    <li id={`student-${s.id}`} className="scroll-mt-28 rounded-2xl border border-navy-100 p-4" data-waiting={s.id}>
-      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-        <div className="min-w-0">
-          <Link to={`/staff/students/${s.id}`} className="font-semibold text-navy-900 hover:underline">{s.name}</Link>
-          <span className="ml-2 text-xs text-navy-400">{s.reference}</span>
-          <p className="mt-1 text-sm text-navy-700">
-            <span className="font-medium">{p.courseInterest}</span> · {p.destination} · {p.intake}
-            {s.subject && <span className="ml-2"><Pill tone="grey">{s.subject}</Pill></span>}
-          </p>
-          <p className="mt-1 text-xs text-navy-500">
-            {[p.degree && `${p.degree}${p.grade ? ` (${p.grade})` : ''}`, p.englishTest === 'Not taken yet' ? 'No English test yet' : `${p.englishTest} ${p.englishScore}`, `Budget ${p.budget}`, p.workExperience, p.city]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        </div>
-        <div className="shrink-0 text-xs text-navy-500 sm:text-right">
-          <p>Profile completed {s.profileCompletedAt ? relativeTime(s.profileCompletedAt) : ''}</p>
-          {s.fromEnquiry && <p className="mt-1 font-semibold text-sky-700">Came from a website enquiry</p>}
-        </div>
-      </div>
-
-      <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-navy-400">Suggested counsellors</p>
-      {matches.length === 0 ? (
-        <p className="text-sm text-navy-500">No active counsellors. Add one in Staff users.</p>
-      ) : (
-        <ul className="space-y-2">
-          {shown.map((m, i) => (
-            <li key={m.counsellorId} className="flex flex-col gap-3 rounded-xl bg-ivory px-4 py-3 sm:flex-row sm:items-center" data-match={m.counsellorId}>
-              <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold', i === 0 && !m.atCapacity ? 'bg-gold-500 text-navy-950' : 'bg-white text-navy-700 ring-1 ring-navy-100')} title="Match score out of 100">
-                {m.score}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-navy-900">
-                  {m.name}
-                  {i === 0 && !m.atCapacity && <span className="ml-2 text-xs font-semibold text-gold-700">Best match</span>}
-                  {m.atCapacity && <span className="ml-2"><Pill tone="red">At capacity</Pill></span>}
-                </p>
-                <p className="text-xs text-navy-600">{m.reasons.join(' · ')}</p>
-                {(m.universities.length > 0 || m.languages.length > 0) && (
-                  <p className="text-xs text-navy-400">
-                    {[m.universities.length ? `Studied at ${m.universities.join(', ')}` : '', m.languages.length ? `Speaks ${m.languages.join(', ')}` : ''].filter(Boolean).join(' · ')}
-                  </p>
-                )}
+    <li id={`student-${s.id}`} className="card scroll-mt-28 overflow-hidden" data-waiting={s.id}>
+      <div className="grid lg:grid-cols-12">
+        {/* The student */}
+        <section className="border-b border-navy-100 p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
+          <div className="flex items-start gap-3">
+            <Avatar name={s.name} />
+            <div className="min-w-0 flex-1">
+              <Link to={`/staff/students/${s.id}`} className="font-semibold text-navy-900 hover:underline">
+                {s.name}
+              </Link>
+              <p className="text-xs text-navy-400">{s.reference}{p.city ? ` · ${p.city}` : ''}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <WaitingBadge since={s.profileCompletedAt} />
+            {s.fromEnquiry && <Pill tone="blue">From website enquiry</Pill>}
+          </div>
+          <div className="mt-4 rounded-2xl bg-ivory p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-400">Wants to study</p>
+            <p className="mt-0.5 font-semibold text-navy-900">{p.courseInterest}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Chip icon={MapPin}>{p.destination}</Chip>
+              <Chip icon={Clock}>{p.intake}</Chip>
+              {s.subject && <Chip icon={BookOpen}>{s.subject}</Chip>}
+            </div>
+          </div>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            {facts.map((f) => (
+              <div key={f.label} className="flex gap-2.5">
+                <f.icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-300" aria-hidden />
+                <div className="min-w-0">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wider text-navy-400">{f.label}</dt>
+                  <dd className="text-sm text-navy-800">{f.value}</dd>
+                </div>
               </div>
-              <Button size="sm" variant={i === 0 && !m.atCapacity ? 'primary' : 'outline'} onClick={() => { setChoice(m); setReason(''); setError(null); }}>
-                Assign
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {matches.length > SHOWN && (
-        <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-xs font-semibold text-navy-600 underline underline-offset-2 hover:text-navy-900">
-          {showAll ? 'Show top suggestions only' : `Show all ${matches.length} counsellors`}
-        </button>
-      )}
+            ))}
+          </dl>
+        </section>
+
+        {/* Suggested counsellors */}
+        <section className="p-5 lg:col-span-7">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-navy-400">Suggested counsellors</p>
+          {matches.length === 0 ? (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">No active counsellors. Add one in Staff users.</p>
+          ) : (
+            <ol className="space-y-2">
+              {shown.map((m, i) => (
+                <SuggestedCounsellor
+                  key={m.counsellorId}
+                  m={m}
+                  best={i === 0 && !m.atCapacity}
+                  onAssign={() => {
+                    setChoice(m);
+                    setReason('');
+                    setError(null);
+                  }}
+                />
+              ))}
+            </ol>
+          )}
+          {matches.length > SHOWN && (
+            <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-3 text-xs font-semibold text-navy-600 underline underline-offset-2 hover:text-navy-900">
+              {showAll ? 'Show top suggestions only' : `Show all ${matches.length} counsellors`}
+            </button>
+          )}
+        </section>
+      </div>
 
       <Modal
         open={!!choice}
@@ -324,25 +518,27 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
 const OFFICER = {
   finance: {
     title: 'Financial Aid Officer',
-    list: 'Waiting for a Financial Aid Officer',
-    ready: 'Application Assistance complete',
-    empty: 'Nobody is waiting. Students appear here when they accept an offer.',
+    ready: 'Offer accepted',
+    empty: 'No one is waiting for a Financial Aid Officer',
+    emptyText: 'Students appear here when they accept an offer.',
     icon: PiggyBank,
   },
   visa: {
     title: 'Visa Officer',
-    list: 'Waiting for a Visa Officer',
-    ready: 'Scholarship & Financial Guidance complete',
-    empty: 'Nobody is waiting. Students appear here when their proof of funds is verified (or funding is marked "Not needed").',
+    ready: 'Funding complete',
+    empty: 'No one is waiting for a Visa Officer',
+    emptyText: 'Students appear here when their proof of funds is verified (or funding is marked "Not needed").',
     icon: Plane,
   },
 } as const;
 
-function OfficerQueue({ kind, students, officers, onAssigned }: { kind: OfficerKind; students: OfficerQueueStudent[]; officers: Officer[]; onAssigned: (message: string) => void }) {
+function OfficerQueue({ kind, students, total, officers, onAssigned }: { kind: OfficerKind; students: OfficerQueueStudent[]; total: number; officers: Officer[]; onAssigned: (message: string) => void }) {
   const o = OFFICER[kind];
   const [choice, setChoice] = useState<{ student: OfficerQueueStudent; officer: Officer } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Officers come lightest workload first; bars are scaled to the busiest one.
+  const busiest = Math.max(1, ...officers.map((x) => x.activeStudents));
 
   const assign = async () => {
     if (!choice) return;
@@ -359,54 +555,86 @@ function OfficerQueue({ kind, students, officers, onAssigned }: { kind: OfficerK
     }
   };
 
+  if (total === 0) return <Empty icon={o.icon} title={o.empty}>{o.emptyText}</Empty>;
+
   return (
-    <Panel title={`${o.list} (${students.length})`} icon={<o.icon className="h-4 w-4" aria-hidden />} className="mt-6">
-      {students.length === 0 ? (
-        <p className="text-sm text-navy-400">{o.empty}</p>
-      ) : officers.length === 0 ? (
-        <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">No active {o.title}s. Add one in Staff users.</p>
-      ) : null}
-      {students.length > 0 && (
-        <ul className="space-y-3">
-          {students.map((st) => (
-            <li key={st.id} id={`${kind}-${st.id}`} className="scroll-mt-28 rounded-2xl border border-navy-100 p-4" data-officer-queue={kind} data-student={st.id}>
-              <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-start">
-                <div className="min-w-0">
-                  <Link to={`/staff/students/${st.id}`} className="font-semibold text-navy-900 hover:underline">{st.name}</Link>
-                  <span className="ml-2 text-xs text-navy-400">{st.reference}</span>
-                  <p className="text-sm text-navy-600">{st.goal} · {st.destination} · {st.intake}</p>
-                  <p className="text-xs text-navy-500">
-                    Counsellor: {counsellorName(st.counsellorId)}
-                    {kind === 'visa' && ` · Financial Aid Officer: ${st.financeOfficerId ? counsellorName(st.financeOfficerId) : 'none (not needed)'}`}
-                  </p>
+    <>
+      {officers.length === 0 && <p className="mb-5 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">No active {o.title}s yet. Add one in Staff users to assign these students.</p>}
+      <ul className="space-y-5">
+        {students.map((st) => (
+          <li key={st.id} id={`${kind}-${st.id}`} className="card scroll-mt-28 overflow-hidden" data-officer-queue={kind} data-student={st.id}>
+            <div className="grid lg:grid-cols-12">
+              <section className="border-b border-navy-100 p-5 lg:col-span-5 lg:border-b-0 lg:border-r">
+                <div className="flex items-start gap-3">
+                  <Avatar name={st.name} />
+                  <div className="min-w-0 flex-1">
+                    <Link to={`/staff/students/${st.id}`} className="font-semibold text-navy-900 hover:underline">
+                      {st.name}
+                    </Link>
+                    <p className="text-xs text-navy-400">{st.reference}</p>
+                  </div>
                 </div>
-                <p className="shrink-0 text-xs text-navy-500">{o.ready}{st.readySince ? ` ${relativeTime(st.readySince)}` : ''}</p>
-              </div>
-              {officers.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {officers.map((off, i) => (
-                    <button
-                      key={off.id}
-                      type="button"
-                      onClick={() => {
-                        setChoice({ student: st, officer: off });
-                        setError(null);
-                      }}
-                      className={cn(
-                        'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                        i === 0 ? 'bg-navy-900 text-white hover:bg-navy-800' : 'bg-white text-navy-700 ring-1 ring-navy-100 hover:bg-navy-50',
-                      )}
-                      data-assign-officer={off.id}
-                    >
-                      Assign {off.name} · {off.activeStudents} {off.activeStudents === 1 ? 'student' : 'students'}
-                    </button>
-                  ))}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <WaitingBadge since={st.readySince} label={`${o.ready} ·`} />
                 </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                <div className="mt-4 rounded-2xl bg-ivory p-3.5">
+                  <p className="font-semibold text-navy-900">{st.goal}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <Chip icon={MapPin}>{st.destination}</Chip>
+                    <Chip icon={Clock}>{st.intake}</Chip>
+                  </div>
+                </div>
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-navy-500">Counsellor</dt>
+                    <dd className="font-medium text-navy-900">{counsellorName(st.counsellorId)}</dd>
+                  </div>
+                  {kind === 'visa' && (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-navy-500">Financial Aid Officer</dt>
+                      <dd className="font-medium text-navy-900">{st.financeOfficerId ? counsellorName(st.financeOfficerId) : 'None (not needed)'}</dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
+
+              <section className="p-5 lg:col-span-7">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-navy-400">Choose a {o.title}</p>
+                {officers.length === 0 ? (
+                  <p className="text-sm text-navy-400">No one to choose from yet.</p>
+                ) : (
+                  <ol className="space-y-2.5">
+                    {officers.map((off, i) => (
+                      <li key={off.id} className={cn('flex items-center gap-3 rounded-2xl p-3.5 ring-1', i === 0 ? 'bg-gold-50/60 ring-gold-300' : 'bg-white ring-navy-100')}>
+                        <Avatar name={off.name} tone={i === 0 ? 'gold' : 'navy'} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-navy-900">{off.name}</p>
+                            {i === 0 && officers.length > 1 && <Pill tone="gold">Lightest workload</Pill>}
+                          </div>
+                          <LoadBar neutral value={off.activeStudents} max={busiest} label={`${off.activeStudents} active ${off.activeStudents === 1 ? 'student' : 'students'}`} />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={i === 0 ? 'primary' : 'outline'}
+                          className="shrink-0"
+                          onClick={() => {
+                            setChoice({ student: st, officer: off });
+                            setError(null);
+                          }}
+                          data-assign-officer={off.id}
+                        >
+                          Assign
+                        </Button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
+          </li>
+        ))}
+      </ul>
 
       <Modal
         open={!!choice}
@@ -427,7 +655,7 @@ function OfficerQueue({ kind, students, officers, onAssigned }: { kind: OfficerK
         <p className="text-sm text-navy-600">The student, the officer and the counsellor are emailed, and the student can then message the officer and book sessions with them.</p>
         {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
       </Modal>
-    </Panel>
+    </>
   );
 }
 
@@ -447,134 +675,31 @@ function IncompleteStudent({ student: s, onSent }: { student: QueueStudent; onSe
     }
   };
   return (
-    <li id={`student-${s.id}`} className="flex scroll-mt-28 flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between" data-incomplete={s.id}>
-      <div className="text-sm">
-        <Link to={`/staff/students/${s.id}`} className="font-semibold text-navy-900 hover:underline">{s.name}</Link>
-        <span className="ml-2 text-xs text-navy-400">{s.reference}</span>
-        <p className="text-xs text-navy-500">
-          Registered {relativeTime(s.registeredAt)} · {s.email} · {s.mobile}
-          {s.fromEnquiry && ' · came from a website enquiry'}
-        </p>
+    <li id={`student-${s.id}`} className="flex scroll-mt-28 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5" data-incomplete={s.id}>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Avatar name={s.name} />
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2">
+            <Link to={`/staff/students/${s.id}`} className="font-semibold text-navy-900 hover:underline">
+              {s.name}
+            </Link>
+            <span className="text-xs text-navy-400">{s.reference}</span>
+            {s.fromEnquiry && <Pill tone="blue">From website enquiry</Pill>}
+          </p>
+          <p className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-navy-500">
+            <span className="inline-flex items-center gap-1">
+              <Mail className="h-3.5 w-3.5" aria-hidden /> {s.email}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Phone className="h-3.5 w-3.5" aria-hidden /> {s.mobile}
+            </span>
+          </p>
+        </div>
       </div>
-      <Button size="sm" variant="outline" onClick={() => void remind()} loading={sending}>
+      <span className="text-xs text-navy-500 sm:w-36 sm:text-right">Registered {relativeTime(s.registeredAt)}</span>
+      <Button size="sm" variant="outline" onClick={() => void remind()} loading={sending} className="shrink-0">
         <BellRing className="h-4 w-4" aria-hidden /> Send reminder
       </Button>
     </li>
-  );
-}
-
-/* ------------------------------ Editing a counsellor's matching profile ------------------------------ */
-
-const splitList = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean);
-
-function MatchingProfileModal({ counsellor, options, onClose, onSaved }: { counsellor: CounsellorMatching; options: CareerOptions; onClose: () => void; onSaved: (name: string) => void }) {
-  const m = counsellor.matchingProfile;
-  // Years per country; empty = no experience there.
-  const [years, setYears] = useState<Record<string, string>>(() => Object.fromEntries(m.countries.map((c) => [c.country, String(c.years)])));
-  const [subjects, setSubjects] = useState<string[]>(m.subjects);
-  const [universities, setUniversities] = useState(m.universities.join(', '));
-  const [languages, setLanguages] = useState(m.languages.join(', '));
-  const [capacity, setCapacity] = useState(String(m.capacity));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const countries = Array.from(new Set([...options.destinations, ...m.countries.map((c) => c.country)]));
-
-  const save = async () => {
-    const cap = Number(capacity);
-    if (!Number.isInteger(cap) || cap < 1 || cap > 500) return setError('Capacity must be a whole number between 1 and 500.');
-    const list = Object.entries(years).filter(([, y]) => y.trim() !== '');
-    if (list.some(([, y]) => !/^\d{1,2}$/.test(y.trim()))) return setError('Years must be a whole number (0–50).');
-    setSaving(true);
-    setError(null);
-    try {
-      await mutate(
-        () =>
-          api.put(`/admin/staff/${counsellor.id}/matching-profile`, {
-            countries: list.map(([country, y]) => ({ country, years: Number(y) })),
-            subjects,
-            universities: splitList(universities),
-            languages: splitList(languages),
-            capacity: cap,
-          }),
-        { silent: true },
-      );
-      onSaved(counsellor.name);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="lg"
-      title={`Matching profile: ${counsellor.name}`}
-      description="Used only to suggest counsellors for new students. Students don't see it."
-      footer={
-        <>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => void save()} loading={saving}>Save profile</Button>
-        </>
-      }
-    >
-      <div className="space-y-6">
-        <fieldset>
-          <legend className="mb-2 flex items-center gap-2 text-sm font-semibold text-navy-900">
-            <UserRoundCog className="h-4 w-4" aria-hidden /> Countries with experience
-          </legend>
-          <p className="mb-3 text-xs text-navy-500">Years working with each country's universities. Leave empty for none.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {countries.map((c) => (
-              <label key={c} className="flex items-center justify-between gap-3 rounded-xl border border-navy-100 px-3 py-2 text-sm text-navy-800">
-                {c}
-                <span className="flex items-center gap-1.5 text-xs text-navy-500">
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    inputMode="numeric"
-                    value={years[c] ?? ''}
-                    onChange={(e) => setYears({ ...years, [c]: e.target.value })}
-                    className="input w-20 py-1.5 text-right"
-                    aria-label={`Years with ${c}`}
-                  />
-                  years
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend className="mb-2 text-sm font-semibold text-navy-900">Subject areas</legend>
-          <div className="flex flex-wrap gap-2">
-            {options.directions.map((d) => {
-              const on = subjects.includes(d.key);
-              return (
-                <button
-                  key={d.key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setSubjects(on ? subjects.filter((x) => x !== d.key) : [...subjects, d.key])}
-                  className={cn('rounded-full px-3.5 py-1.5 text-xs font-semibold transition', on ? 'bg-navy-900 text-white' : 'bg-white text-navy-600 ring-1 ring-navy-100 hover:bg-navy-50')}
-                >
-                  {d.label}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Universities studied at" placeholder="e.g. University of Leeds" hint="Separate with commas" value={universities} onChange={(e) => setUniversities(e.target.value)} />
-          <TextField label="Languages" placeholder="e.g. English, Hindi, Marathi" hint="Separate with commas" value={languages} onChange={(e) => setLanguages(e.target.value)} />
-          <TextField label="Capacity (active students)" type="number" inputMode="numeric" min={1} max={500} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
-        </div>
-        {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
-      </div>
-    </Modal>
   );
 }

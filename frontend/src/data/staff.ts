@@ -261,6 +261,9 @@ export interface StaffUser {
   email: string;
   role: StaffRole;
   status: 'active' | 'deactivated';
+  /** Created, but hasn't set a password and authenticator yet. */
+  invited?: boolean;
+  phone?: string;
   lastLogin: string;
 }
 

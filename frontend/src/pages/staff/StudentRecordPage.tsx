@@ -14,7 +14,6 @@ import { JourneyPanel } from '../../components/staff/JourneyPanel';
 import { categoryLabel } from '../../components/dashboard/DocumentChecklist';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-import { DemoBadge } from '../../components/ui/DemoBadge';
 import { NotFoundPage } from '../NotFoundPage';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -196,8 +195,7 @@ export function StudentRecordPage() {
       <div className="card mb-6 p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <DemoBadge label="Demo data" />
-            <h1 className="mt-3 text-3xl">{student.name}</h1>
+            <h1 className="text-3xl">{student.name}</h1>
             <p className="mt-1 text-navy-600">{student.goal} · {student.destination} · {student.intake}</p>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-navy-500">
               <span>{student.reference}</span>

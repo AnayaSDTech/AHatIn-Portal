@@ -2,7 +2,6 @@ import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
 import { useAgencies } from '../../hooks/useStaffData';
-import { showDemoHints } from '../../lib/demoAccounts';
 import { cn, daysUntil, formatDate } from '../../lib/utils';
 
 export function AgenciesPage() {
@@ -50,7 +49,7 @@ export function AgenciesPage() {
         </table>
       </div>
       <p className="mt-4 text-xs text-navy-400">
-        {showDemoHints ? 'Commission shares and agency names are demo data.' : 'Agency logins are never stored here.'} Admins are warned 30 days before an agreement ends.
+        Agency logins are never stored here. Admins are warned 30 days before an agreement ends.
       </p>
     </>
   );

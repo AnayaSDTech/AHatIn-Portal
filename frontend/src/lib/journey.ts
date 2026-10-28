@@ -188,6 +188,8 @@ const lakh = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(1)} lakh`;
 function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<ServiceView, 'code' | 'title' | 'autoStatus' | 'override'> {
   const j = s.journey;
   const apps = s.applications;
+  // Visa, pre-departure and arrival are looked after by the Visa Officer once assigned.
+  const visaLead = s.visaOfficerId ? 'Your Visa Officer' : 'Your counsellor';
   switch (code) {
     case 'S1': {
       if (j.careerPlan) return { status: 'completed', summary: `Career plan shared · ${j.careerPlan.summary}` };
@@ -264,7 +266,7 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       const v = j.visa;
       if (!v) return { status: 'not_started', summary: apps.some((a) => a.state === 'accepted') ? 'Starts when your CAS or admission letter arrives' : 'Starts after you accept an offer' };
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
-      if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: 'Your counsellor will talk you through the next steps' };
+      if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };
       const i = VISA_PATH.indexOf(v.stage);
       return { status: 'in_progress', summary: visaStageLabel[v.stage], next: i < VISA_PATH.length - 1 ? `Next: ${visaStageLabel[VISA_PATH[i + 1]!].toLowerCase()}` : 'Waiting for the visa decision' };
     }
@@ -277,13 +279,13 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       return {
         status: 'in_progress',
         summary: `${done} of ${DEPARTURE_TASKS.length} pre-departure tasks done`,
-        next: nextTask ? nextTask.label : 'Your counsellor will confirm you are ready to travel',
+        next: nextTask ? nextTask.label : `${visaLead} will confirm you are ready to travel`,
       };
     }
     case 'S7': {
       const a = j.arrival;
       if (a.finalCheckInAt) return { status: 'completed', summary: 'Settled in · final check-in done' };
-      if (a.arrivedAt) return { status: 'in_progress', summary: `Arrived on ${new Date(a.arrivedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`, next: 'Your counsellor will check in with you during your first months' };
+      if (a.arrivedAt) return { status: 'in_progress', summary: `Arrived on ${new Date(a.arrivedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`, next: `${visaLead} will check in with you during your first months` };
       return { status: 'not_started', summary: 'Starts when you arrive', next: j.departure.confirmedAt ? 'Tell us when you have arrived' : undefined };
     }
   }

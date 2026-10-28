@@ -6,14 +6,15 @@ from fastapi import APIRouter
 
 from app.config import get_settings
 from app.core.audit import audit
-from app.core.auth import Admin, CurrentUser, Staff, is_staff
+from app.core.auth import Admin, CurrentUser, Staff, is_staff, public_user
 from app.core.clock import iso, now
 from app.core.errors import ApiError, not_found
 from app.core.scope import active_grant_filter, scope_for, visible_lead
+from app import matching
 from app.db import get_db
 from app.domain import FOLLOW_UP_RULES, LEAD_STAGES, STAGE_LABELS, stage_index
 from app.records import serialize_counsellor, serialize_follow_up, serialize_grant, serialize_lead
-from app.schemas import ContactBody, LeadStageBody, ReassignBody
+from app.schemas import ContactBody, LeadStageBody, MatchingProfileBody, OwnNameBody, ReassignBody
 from app.services import notify
 from app.services.students import own_record
 from app.services.team import team_of
@@ -45,6 +46,43 @@ async def list_counsellors(user: CurrentUser):
         return [p for p in (await team_of(await own_record(user))).values() if p]
     found = await get_db().users.find({"role": {"$in": ["counsellor", "finance_officer", "visa_officer"]}}).sort("_id", 1).to_list(None)
     return [{**serialize_counsellor(c), "active": c.get("status") == "active"} for c in found]
+
+
+# ---------------------------------------------------------------- staff members' own details
+
+
+@router.put("/staff/me/name")
+async def change_my_name(body: OwnNameBody, user: Staff):
+    """Staff can correct their own name (shown to students and in records from now on; earlier history keeps the old one)."""
+    await get_db().users.update_one({"_id": user["_id"]}, {"$set": {"name": body.name, "updatedAt": now()}})
+    await audit(user, "staff.name_changed", "users", user["_id"], {"from": user["name"], "to": body.name})
+    return public_user({**user, "name": body.name})
+
+
+# ---------------------------------------------------------------- the counsellor's own matching profile
+
+
+def _counsellor_only(user: dict) -> None:
+    if user["role"] != "counsellor":
+        raise ApiError(403, "Only counsellors have a matching profile.")
+
+
+@router.get("/staff/me/matching-profile")
+async def my_matching_profile(user: Staff):
+    """What the counsellor tells AHat about themselves, used to suggest them for new students. Students don't see it."""
+    _counsellor_only(user)
+    active = await get_db().students.count_documents({"counsellorId": user["_id"], "stage": {"$ne": "settled"}})
+    return {"matchingProfile": {**matching.blank_matching_profile(), **(user.get("matchingProfile") or {})}, "activeStudents": active}
+
+
+@router.put("/staff/me/matching-profile")
+async def save_my_matching_profile(body: MatchingProfileBody, user: Staff):
+    """Each counsellor keeps their own matching profile up to date; the admin only invites staff."""
+    _counsellor_only(user)
+    profile = body.model_dump()
+    await get_db().users.update_one({"_id": user["_id"]}, {"$set": {"matchingProfile": profile, "updatedAt": now()}})
+    await audit(user, "staff.matching_profile", "users", user["_id"])
+    return profile
 
 
 # ---------------------------------------------------------------- leads

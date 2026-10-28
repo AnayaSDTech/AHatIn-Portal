@@ -46,7 +46,7 @@ export function MessagesCard({ studentId, team, messages, initial = 'counsellor'
         </div>
       )}
       <p className="-mt-2 mb-3 text-xs text-navy-500">
-        Chat with {person.name}, your {teamTitle[open].toLowerCase()}. Replies usually within one working day.
+        {person.name} · {teamTitle[open]} · replies within 1 working day
       </p>
       <ChatThread
         key={open}

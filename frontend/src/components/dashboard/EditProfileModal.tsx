@@ -88,12 +88,15 @@ export function EditProfileModal({ open, onClose, profile, name, email, passport
     >
       <form id="profile-form" onSubmit={submit} noValidate className="space-y-6">
         {formError && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</p>}
+        <p className="text-xs text-navy-500" data-required-note>
+          Fields marked <span className="font-semibold text-red-600">*</span> are required.
+        </p>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-navy-400">Personal</legend>
           <TextField label="Full name" value={name} disabled readOnly hint="Contact your counsellor to change your name" />
           <TextField label="Email" value={email} disabled readOnly hint="Your login email" />
-          <TextField label="Date of birth" type="date" error={errors.dateOfBirth?.message} {...register('dateOfBirth')} />
-          <TextField label="City" autoComplete="address-level2" error={errors.city?.message} {...register('city')} />
+          <TextField label="Date of birth" type="date" required error={errors.dateOfBirth?.message} {...register('dateOfBirth')} />
+          <TextField label="City" required autoComplete="address-level2" error={errors.city?.message} {...register('city')} />
           <div className="sm:col-span-2">
             <TextField
               label="Passport number"
@@ -112,13 +115,14 @@ export function EditProfileModal({ open, onClose, profile, name, email, passport
 
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-navy-400">Education and tests</legend>
-          <TextField label="Highest qualification" error={errors.degree?.message} {...register('degree')} />
-          <TextField label="College or university" error={errors.institution?.message} {...register('institution')} />
-          <TextField label="Grade" placeholder="e.g. 8.4 CGPA or 72%" error={errors.grade?.message} {...register('grade')} />
-          <TextField label="Work experience" placeholder="e.g. 2 years · Data Analyst" error={errors.workExperience?.message} {...register('workExperience')} />
-          <SelectField label="English test" options={englishTests} error={errors.englishTest?.message} {...register('englishTest')} />
+          <TextField label="Highest qualification" required error={errors.degree?.message} {...register('degree')} />
+          <TextField label="College or university" required error={errors.institution?.message} {...register('institution')} />
+          <TextField label="Grade" required placeholder="e.g. 8.4 CGPA or 72%" error={errors.grade?.message} {...register('grade')} />
+          <TextField label="Work experience (optional)" placeholder="e.g. 2 years · Data Analyst" error={errors.workExperience?.message} {...register('workExperience')} />
+          <SelectField label="English test" required options={englishTests} error={errors.englishTest?.message} {...register('englishTest')} />
           <TextField
             label="English score"
+            required={test !== 'Not taken yet'}
             inputMode="decimal"
             placeholder={test === 'Not taken yet' ? 'Not needed yet' : 'Overall score'}
             readOnly={test === 'Not taken yet'}
@@ -129,10 +133,10 @@ export function EditProfileModal({ open, onClose, profile, name, email, passport
 
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-navy-400">Study plans</legend>
-          <TextField label="Course of interest" error={errors.courseInterest?.message} {...register('courseInterest')} />
-          <SelectField label="Preferred destination" options={destinations} error={errors.destination?.message} {...register('destination')} />
-          <SelectField label="Preferred intake" options={intakes} error={errors.intake?.message} {...register('intake')} />
-          <SelectField label="Budget (total)" options={budgets} error={errors.budget?.message} {...register('budget')} />
+          <TextField label="Course of interest" required placeholder="e.g. MSc Data Science" error={errors.courseInterest?.message} {...register('courseInterest')} />
+          <SelectField label="Preferred destination" required placeholder="Choose a destination" options={destinations} error={errors.destination?.message} {...register('destination')} />
+          <SelectField label="Preferred intake" required placeholder="Choose an intake" options={intakes} error={errors.intake?.message} {...register('intake')} />
+          <SelectField label="Budget (total)" required placeholder="Choose a budget" options={budgets} error={errors.budget?.message} {...register('budget')} />
         </fieldset>
       </form>
     </Modal>

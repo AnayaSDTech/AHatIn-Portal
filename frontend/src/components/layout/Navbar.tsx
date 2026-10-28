@@ -47,10 +47,13 @@ export function Navbar() {
   useEffect(() => setOpen(false), [key]);
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
+    // Lets other fixed bars (the student's bottom navigation) step aside while the menu is open.
+    document.body.classList.toggle('site-menu-open', open);
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     window.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = '';
+      document.body.classList.remove('site-menu-open');
       window.removeEventListener('keydown', onKey);
     };
   }, [open]);

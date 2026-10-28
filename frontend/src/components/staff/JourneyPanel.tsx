@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { CheckCircle2, Circle, Plus, Route, Send, Trash2 } from 'lucide-react';
+import { ApiError } from '../../lib/api/types';
 import { Panel, Pill } from '../dashboard/Panel';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -373,6 +374,19 @@ function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Ac
 function FundingTab({ student, actions }: { student: StaffStudent; actions: Actions }) {
   const f = student.journey.funding;
   const [cost, setCost] = useState(f.estimatedCost ? String(f.estimatedCost) : '');
+  const [costState, setCostState] = useState<{ saving?: boolean; saved?: number; error?: string }>({});
+  const costValue = Math.round(Number(cost) * 10) / 10;
+  const saveCost = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!(costValue > 0 && costValue < 500)) return setCostState({ error: 'Enter an amount between 0.1 and 499 lakh.' });
+    setCostState({ saving: true });
+    try {
+      await actions.setEstimatedCost(costValue);
+      setCostState({ saved: costValue });
+    } catch (err) {
+      setCostState({ error: err instanceof ApiError ? err.message : 'Not saved. Please try again.' });
+    }
+  };
   const [sch, setSch] = useState({ name: '', amount: '', deadline: '' });
   const [docName, setDocName] = useState('');
   const funds = student.documents.filter((d) => d.category === 'funds');
@@ -380,16 +394,33 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
 
   return (
     <div className="space-y-5">
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const n = Number(cost);
-          if (n > 0 && n < 500) actions.setEstimatedCost(Math.round(n * 10) / 10);
-        }}
-      >
-        <Field label="Estimated total cost of study (₹ lakh)" id="fd-cost"><input id="fd-cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} className="input w-40 py-2" /></Field>
-        <Button type="submit" size="sm" variant="outline">Save cost</Button>
+      <form className="flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={saveCost} noValidate data-cost-form>
+        <Field label="Estimated total cost of study (₹ lakh)" id="fd-cost">
+          <input
+            id="fd-cost"
+            inputMode="decimal"
+            value={cost}
+            onChange={(e) => {
+              setCost(e.target.value);
+              setCostState({});
+            }}
+            className="input w-40 py-2"
+            aria-invalid={!!costState.error}
+          />
+        </Field>
+        <Button type="submit" size="sm" variant="outline" loading={costState.saving} disabled={costValue === f.estimatedCost && !costState.error}>
+          Save cost
+        </Button>
+        {costState.saved !== undefined && (
+          <p role="status" className="flex items-center gap-1.5 pb-2 text-sm font-medium text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" aria-hidden /> Saved: ₹{costState.saved} lakh
+          </p>
+        )}
+        {costState.error && (
+          <p role="alert" className="w-full text-sm font-medium text-red-600">
+            {costState.error}
+          </p>
+        )}
       </form>
 
       <div>
@@ -605,7 +636,13 @@ export function JourneyPanel({ student, services, actions, role }: { student: St
   // Officers start on their own part of the journey.
   const editable = (code: ServiceCode) => canEditArea(role, student, SERVICE_AREA[code]!);
   const open = (s: ServiceView) => s.status === 'in_progress' || s.status === 'not_started';
-  const firstOpen = services.find((s) => editable(s.code) && open(s))?.code ?? services.find((s) => s.status === 'in_progress')?.code ?? services.find((s) => s.status === 'not_started')?.code ?? 'S1';
+  // Start on the first open step this person looks after; when everything is done, on the last part that is theirs.
+  const firstOpen =
+    services.find((s) => editable(s.code) && open(s))?.code ??
+    services.find((s) => s.status === 'in_progress')?.code ??
+    services.find((s) => s.status === 'not_started')?.code ??
+    [...services].reverse().find((s) => editable(s.code))?.code ??
+    'S1';
   const [tab, setTab] = useState<ServiceCode>(firstOpen);
   const [overriding, setOverriding] = useState(false);
   const view = services.find((s) => s.code === tab)!;

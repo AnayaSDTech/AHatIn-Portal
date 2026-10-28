@@ -102,6 +102,7 @@ export function ChatThread({ studentId, viewer, emptyText, thread: chat = 'couns
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
           className="input max-h-32 min-h-[44px] resize-none py-2.5 text-sm"
+          title="Enter to send · Shift+Enter for a new line"
           placeholder={placeholder ?? (viewer === 'student' ? 'Ask your counsellor…' : 'Reply to the student…')}
         />
         <button
@@ -113,7 +114,6 @@ export function ChatThread({ studentId, viewer, emptyText, thread: chat = 'couns
           <Send className="h-4 w-4" aria-hidden />
         </button>
       </form>
-      <p className="mt-2 text-[11px] text-navy-400">Enter to send · Shift+Enter for a new line</p>
     </div>
   );
 }

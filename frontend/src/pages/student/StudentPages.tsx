@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CalendarDays, Inbox } from 'lucide-react';
+import { CalendarPlus, Clock, Inbox, MessageSquare, PiggyBank } from 'lucide-react';
+import { Panel } from '../../components/dashboard/Panel';
 import { Button } from '../../components/ui/Button';
 import { useStudent } from '../../components/student/StudentLayout';
 import { ServiceTracker, type TrackerAction } from '../../components/dashboard/ServiceTracker';
@@ -13,10 +14,11 @@ import { SessionsCard } from '../../components/dashboard/SessionsCard';
 import { MessagesCard } from '../../components/dashboard/MessagesCard';
 import { DepartureCard, FundingCard, ShortlistCard, VisaCard } from '../../components/dashboard/JourneyCards';
 import { DEPARTURE_TASKS, type ServiceCode } from '../../lib/journey';
-import { showDemoHints } from '../../lib/demoAccounts';
+import { cn } from '../../lib/utils';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
-import type { AppState } from '../../data/staff';
+import type { AppState, TeamArea } from '../../data/staff';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 /** Shown on a section page that has nothing in it yet. */
 function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
@@ -41,10 +43,26 @@ function NotStartedYet({ what }: { what: string }) {
   );
 }
 
+/**
+ * Contact cards for everyone looking after the student (counsellor, Financial Aid Officer, Visa Officer): message, email
+ * or call. "Message" opens that person's chat.
+ */
+function TeamContacts({ onMessage }: { onMessage: (chat: TeamArea) => void }) {
+  const { counsellor, team, profileComplete } = useStudent();
+  return (
+    <>
+      <CounsellorCard counsellor={counsellor} profileComplete={profileComplete} onMessage={() => onMessage('counsellor')} />
+      {team.finance && <CounsellorCard counsellor={team.finance} title="Your Financial Aid Officer" onMessage={() => onMessage('finance')} />}
+      {team.visa && <CounsellorCard counsellor={team.visa} title="Your Visa Officer" onMessage={() => onMessage('visa')} />}
+    </>
+  );
+}
+
 /* ------------------------------ Overview ------------------------------ */
 
 export function StudentOverviewPage() {
-  const { record, services, sessions, profile, profileComplete, messages, counsellor, team, appUpdates, go, openBooking, openProfile } = useStudent();
+  const { record, services, sessions, profile, profileComplete, messages, counsellor, appUpdates, go, openBooking, openProfile } = useStudent();
+  const openChat = useOpenChat();
   // The journey starts once the profile is complete and the admin has assigned a counsellor.
   const started = profileComplete && !!counsellor;
 
@@ -93,15 +111,7 @@ export function StudentOverviewPage() {
       </div>
       <div className="order-1 min-w-0 space-y-6 lg:order-2 lg:col-span-5">
         <NotificationsCard items={buildNotifications(record, services, sessions, profile, messages, appUpdates)} onOpenProfile={openProfile} onGo={go} />
-        <CounsellorCard counsellor={counsellor} profileComplete={profileComplete} onMessage={() => go('messages')} />
-        {team.finance && <CounsellorCard counsellor={team.finance} title="Your Financial Aid Officer" onMessage={() => go('messages')} />}
-        {team.visa && <CounsellorCard counsellor={team.visa} title="Your Visa Officer" onMessage={() => go('messages')} />}
-        {showDemoHints && (
-          <div className="card flex items-start gap-3 p-5 text-sm text-navy-600">
-            <CalendarDays className="mt-0.5 h-5 w-5 shrink-0 text-gold-600" aria-hidden />
-            <p>Demo data. Everything you do here appears straight away in your counsellor's view of your record, and their updates appear here.</p>
-          </div>
-        )}
+        <TeamContacts onMessage={openChat} />
       </div>
     </div>
   );
@@ -131,16 +141,23 @@ export function StudentDocumentsPage() {
   return <DocumentChecklist documents={record.documents} onUpload={actions.uploadDocument} onRemove={actions.removeUpload} />;
 }
 
+/** Opens the Messages page on one person's chat. */
+function useOpenChat() {
+  const navigate = useNavigate();
+  return (chat: TeamArea) => navigate(`/dashboard/messages${chat === 'counsellor' ? '' : `?chat=${chat}`}#messages`);
+}
+
 export function StudentSessionsPage() {
-  const { record, user, counsellor, team, profileComplete, go } = useStudent();
+  const { record, user, counsellor, team, profileComplete } = useStudent();
+  const openChat = useOpenChat();
   if (!counsellor || !profileComplete) return <NotStartedYet what="book sessions" />;
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       <div className="min-w-0 lg:col-span-7">
         <SessionsCard studentId={record.id} studentName={user.name} team={team} />
       </div>
-      <div className="min-w-0 lg:col-span-5">
-        <CounsellorCard counsellor={counsellor} onMessage={() => go('messages')} />
+      <div className="min-w-0 space-y-6 lg:col-span-5">
+        <TeamContacts onMessage={openChat} />
       </div>
     </div>
   );
@@ -148,26 +165,83 @@ export function StudentSessionsPage() {
 
 export function StudentMessagesPage() {
   const { record, counsellor, team, messages } = useStudent();
+  // Which chat is open: ?chat=finance or ?chat=visa from links elsewhere, otherwise the counsellor's.
+  const [params, setParams] = useSearchParams();
+  const chat: TeamArea = params.get('chat') === 'finance' && team.finance ? 'finance' : params.get('chat') === 'visa' && team.visa ? 'visa' : 'counsellor';
   if (!counsellor) return <NotStartedYet what="message your counsellor" />;
+  const switchTo = (c: TeamArea) => {
+    setParams(c === 'counsellor' ? {} : { chat: c }, { replace: true });
+    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('#messages textarea')?.focus());
+  };
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       <div className="min-w-0 lg:col-span-8">
-        <MessagesCard studentId={record.id} team={team} messages={messages} />
+        <MessagesCard key={chat} studentId={record.id} team={team} messages={messages} initial={chat} />
       </div>
-      <div className="min-w-0 lg:col-span-4">
-        <CounsellorCard counsellor={counsellor} onMessage={() => document.querySelector<HTMLTextAreaElement>('#messages textarea')?.focus()} />
+      <div className="min-w-0 space-y-6 lg:col-span-4">
+        <TeamContacts onMessage={switchTo} />
       </div>
     </div>
   );
 }
 
+/** Scholarship & Financial Guidance before anything has been set up: who will start it, or that it isn't needed. */
+function FundingNotStarted() {
+  const { team, services, go, openBooking } = useStudent();
+  const view = services.find((s) => s.code === 'S4');
+  const officer = team.finance;
+  let body: ReactNode;
+  if (view?.status === 'not_needed') {
+    body = (
+      <>
+        <p className="font-semibold text-navy-900">Not needed</p>
+        <p className="mt-1 text-sm text-navy-500">{view.override?.reason}</p>
+      </>
+    );
+  } else if (officer) {
+    body = (
+      <>
+        <p className="font-semibold text-navy-900">Not started yet</p>
+        <p className="mt-1 text-sm text-navy-500">{officer.name}, your Financial Aid Officer, will set your estimated cost and suggest scholarships.</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Button size="sm" onClick={() => go('messages')}>
+            <MessageSquare className="h-4 w-4" aria-hidden /> Message {officer.name.split(' ')[0]}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openBooking('Scholarship & funding')}>
+            <CalendarPlus className="h-4 w-4" aria-hidden /> Book a funding session
+          </Button>
+        </div>
+      </>
+    );
+  } else {
+    body = (
+      <>
+        <p className="flex items-center justify-center gap-1.5 font-semibold text-navy-900">
+          <Clock className="h-4 w-4 text-sky-600" aria-hidden /> We're assigning your Financial Aid Officer
+        </p>
+        <p className="mt-1 text-sm text-navy-500">We'll email you when they are.</p>
+      </>
+    );
+  }
+  return (
+    <Panel id="funding" title="Funding plan" icon={<PiggyBank className="h-4 w-4" aria-hidden />}>
+      <div className="py-6 text-center" data-funding-not-started>
+        {body}
+      </div>
+    </Panel>
+  );
+}
+
 export function StudentFundingPage() {
   const { record, actions, services, showFunding } = useStudent();
+  const f = record.journey.funding;
+  const notNeeded = services.find((s) => s.code === 'S4')?.status === 'not_needed';
+  const started = !notNeeded && (!!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || record.documents.some((d) => d.category === 'funds'));
   if (!showFunding) return <Empty>Your funding plan starts after you accept an offer: we assign you a Financial Aid Officer, who sets your estimated cost and helps with scholarships and proof of funds. Your visa progress appears here later.</Empty>;
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div className={cn('grid grid-cols-1 gap-6', record.journey.visa && 'lg:grid-cols-2')}>
       <div className="min-w-0">
-        <FundingCard student={record} actions={actions} notNeeded={services.find((s) => s.code === 'S4')?.status === 'not_needed'} />
+        {started ? <FundingCard student={record} actions={actions} notNeeded={notNeeded} /> : <FundingNotStarted />}
       </div>
       <div className="min-w-0">
         <VisaCard student={record} />

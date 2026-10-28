@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, Circle, Info, School } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Circle, School } from 'lucide-react';
 import type { AppState, StudentApplication } from '../../data/staff';
 import { cn, daysUntil, formatDate } from '../../lib/utils';
 import { Panel, Pill } from './Panel';
@@ -59,13 +59,8 @@ export function ApplicationsCard({ applications, onDecide, updated }: Props) {
 
   return (
     <Panel id="applications" title="My applications" icon={<School className="h-4 w-4" aria-hidden />}>
-      <p className="mb-4 flex items-start gap-2 rounded-xl bg-navy-50/70 px-4 py-3 text-xs text-navy-600">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        Your counsellor submits applications and updates their status. You can follow progress here and accept or decline offers.
-      </p>
-
       {applications.length === 0 ? (
-        <p className="py-4 text-center text-sm text-navy-400">No applications yet. They are created when you approve your shortlist.</p>
+        <p className="py-4 text-center text-sm text-navy-400">No applications yet.</p>
       ) : (
         <ul className="divide-y divide-navy-100">
           {applications.map((a) => {

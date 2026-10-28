@@ -12,6 +12,8 @@ interface AuthContextValue {
   staffLogin: (email: string, password: string) => Promise<StaffChallenge>;
   staffVerify: (challengeId: string, code: string) => Promise<User>;
   logout: () => Promise<void>;
+  /** After the user changes their own details (e.g. their name). */
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       staffLogin: authService.staffLogin,
       staffVerify,
       logout,
+      updateUser: setUser,
     }),
     [user, loading, verifyOtp, staffVerify, logout],
   );

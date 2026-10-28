@@ -534,6 +534,30 @@ class StaffUserBody(EmailBody):
 
 
 
+class StaffUpdateBody(EmailBody):
+    """The admin's changes to a staff member's details."""
+
+    name: Name
+    phone: str = Field(default="", max_length=30)
+
+
+class StaffPasswordBody(Body):
+    """A new password, set by the admin."""
+
+    password: str = Field(min_length=10, max_length=200)
+
+    @field_validator("password")
+    @classmethod
+    def strong(cls, v: str) -> str:
+        if not (re.search(r"[A-Za-z]", v) and re.search(r"\d", v)):
+            raise ValueError("Use at least 10 characters, with letters and numbers.")
+        return v
+
+
+class OwnNameBody(Body):
+    name: Name
+
+
 class GrantBody(Body):
     granteeId: str = Field(min_length=1)
     ownerId: str = Field(min_length=1)

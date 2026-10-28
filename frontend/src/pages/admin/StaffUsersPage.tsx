@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { ShieldCheck, UserPlus } from 'lucide-react';
+import { KeyRound, Pencil, ShieldCheck, UserPlus } from 'lucide-react';
 import { useGrants } from '../../hooks/useStaffData';
 import { Panel } from '../../components/dashboard/Panel';
-import { activeCounsellors, counsellorName, isGrantActive } from '../../data/staff';
+import { activeCounsellors, counsellorName, isGrantActive, staffRoleLabel } from '../../data/staff';
 import { isoDate } from '../../lib/scheduling';
 import { useAuth } from '../../context/AuthContext';
 import { PageHeader } from '../../components/staff/StaffUi';
@@ -26,6 +26,7 @@ export function StaffUsersPage() {
   const [form, setForm] = useState({ name: '', email: '', role: 'counsellor' as StaffRole });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState<StaffUser | null>(null);
+  const [editing, setEditing] = useState<StaffUser | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [grants] = useGrants();
   const [granting, setGranting] = useState(false);
@@ -126,9 +127,19 @@ export function StaffUsersPage() {
                     <p className="text-xs text-navy-500">{u.email}</p>
                   </td>
                   <td className="px-5 py-4 text-navy-700">{roleLabel[u.role]}</td>
-                  <td className="px-5 py-4"><Pill tone={u.status === 'active' ? 'green' : 'grey'}>{u.status === 'active' ? 'Active' : 'Deactivated'}</Pill></td>
-                  <td className="px-5 py-4 text-navy-500">{u.lastLogin ? relativeTime(u.lastLogin) : 'Invited'}</td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-5 py-4">
+                    <Pill tone={u.status !== 'active' ? 'grey' : u.invited ? 'amber' : 'green'}>{u.status !== 'active' ? 'Deactivated' : u.invited ? 'Invited' : 'Active'}</Pill>
+                  </td>
+                  <td className="px-5 py-4 text-navy-500">{u.lastLogin ? relativeTime(u.lastLogin) : 'Never'}</td>
+                  <td className="space-x-2 whitespace-nowrap px-5 py-4 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setEditing(u)}
+                      className="inline-flex items-center gap-1 rounded-full border border-navy-100 px-3 py-1.5 text-xs font-semibold text-navy-700 transition hover:border-navy-900"
+                      data-edit-staff={u.email}
+                    >
+                      <Pencil className="h-3 w-3" aria-hidden /> Edit
+                    </button>
                     {!self && (
                       <button
                         type="button"
@@ -235,6 +246,8 @@ export function StaffUsersPage() {
         </form>
       </Modal>
 
+      {editing && <EditStaffModal key={editing.id} staff={editing} onClose={() => setEditing(null)} onDone={setMessage} />}
+
       <Modal
         open={!!confirm}
         onClose={() => setConfirm(null)}
@@ -255,5 +268,137 @@ export function StaffUsersPage() {
         </p>
       </Modal>
     </>
+  );
+}
+
+/* ------------------------------ Editing a staff member ------------------------------ */
+
+/**
+ * Name, email and phone, and a new password. Someone who never finished their invitation also gets an authenticator key
+ * when their password is set, shown once here for the admin to pass on.
+ */
+function EditStaffModal({ staff, onClose, onDone }: { staff: StaffUser; onClose: () => void; onDone: (message: string) => void }) {
+  const [form, setForm] = useState({ name: staff.name, email: staff.email, phone: staff.phone ?? '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<'details' | 'password' | null>(null);
+  const [key, setKey] = useState<string | null>(null);
+
+  const saveDetails = async (e: FormEvent) => {
+    e.preventDefault();
+    const err: Record<string, string> = {};
+    if (form.name.trim().length < 2) err.name = 'Enter the full name.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) err.email = 'Enter a valid work email.';
+    setErrors(err);
+    if (Object.keys(err).length) return;
+    setSaving('details');
+    try {
+      await mutate(() => api.put(`/admin/staff/${staff.id}`, { name: form.name.trim(), email: form.email.trim().toLowerCase(), phone: form.phone.trim() }), { silent: true });
+      onDone(`${form.name.trim()}'s details were saved.`);
+      onClose();
+    } catch (err) {
+      setErrors(err instanceof ApiError && Object.keys(err.fieldErrors).length ? err.fieldErrors : { email: err instanceof ApiError ? err.message : 'Something went wrong. Please try again.' });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const savePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) return setPwError('Use at least 10 characters, with letters and numbers.');
+    if (password !== password2) return setPwError("The two passwords don't match.");
+    setPwError(null);
+    setSaving('password');
+    try {
+      const r = await mutate(() => api.post<{ authenticatorKey?: string }>(`/admin/staff/${staff.id}/password`, { password }), { silent: true });
+      setPassword('');
+      setPassword2('');
+      if (r.authenticatorKey) {
+        setKey(r.authenticatorKey);
+      } else {
+        onDone(`${staff.name}'s password was changed. They have been signed out on their other devices; their authenticator app stays the same.`);
+        onClose();
+      }
+    } catch (err) {
+      setPwError(err instanceof ApiError ? (err.fieldErrors.password ?? err.message) : 'Something went wrong. Please try again.');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (key) {
+    return (
+      <Modal
+        open
+        onClose={() => {
+          onDone(`${staff.name} can now sign in with the new password and the authenticator key you shared.`);
+          onClose();
+        }}
+        title={`${staff.name} is ready to sign in`}
+        description="Share the password and this authenticator key with them privately. The key is shown only once."
+        footer={
+          <Button
+            onClick={() => {
+              onDone(`${staff.name} can now sign in with the new password and the authenticator key you shared.`);
+              onClose();
+            }}
+          >
+            Done
+          </Button>
+        }
+      >
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-navy-700">
+          <li>In an authenticator app (Google Authenticator, Microsoft Authenticator…), add an account using this key:</li>
+        </ol>
+        <p className="mt-3 break-all rounded-xl bg-ivory px-4 py-3 font-mono text-base tracking-wider text-navy-900 ring-1 ring-navy-100" data-authenticator-key>{key}</p>
+        <ol start={2} className="mt-3 list-decimal space-y-2 pl-5 text-sm text-navy-700">
+          <li>
+            Sign in at <span className="font-semibold">Staff sign in</span> with <span className="font-semibold">{staff.email}</span>, the new password, and the 6-digit code from the app.
+          </li>
+        </ol>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} size="lg" title={`Edit ${staff.name}`} description={`${staffRoleLabel[staff.role] ?? staff.role}. The role can't be changed, because their students and tasks depend on it.`}>
+      <form onSubmit={saveDetails} noValidate className="space-y-4" data-staff-details>
+        <h3 className="text-sm font-semibold text-navy-900">Details</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField label="Full name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} error={errors.name} />
+          <TextField label="Work email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={errors.email} hint="Used to sign in" />
+          <TextField label="Phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} hint="Shown to their students" />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" loading={saving === 'details'}>
+            Save details
+          </Button>
+        </div>
+      </form>
+
+      <form onSubmit={savePassword} noValidate className="mt-6 space-y-4 border-t border-navy-100 pt-6" data-staff-password>
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-navy-900">
+            <KeyRound className="h-4 w-4" aria-hidden /> Set a new password
+          </h3>
+          <p className="mt-1 text-xs text-navy-500">
+            {staff.invited
+              ? "They haven't finished their invitation yet. Setting a password also creates their authenticator key, which you'll see once to pass on."
+              : 'They will be signed out on their other devices. Their authenticator app stays the same.'}
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField label="New password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} hint="At least 10 characters, with letters and numbers" />
+          <TextField label="Repeat the password" type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} error={pwError ?? undefined} />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" variant="outline" loading={saving === 'password'} disabled={!password}>
+            Set password
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

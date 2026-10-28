@@ -60,7 +60,7 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
       // Uploaded to secure storage and checked (file type and virus scan) before the counsellor sees it.
       setMessage({ tone: 'ok', text: `Uploading “${file.name}”…` });
       onUpload(id, file)
-        .then(() => setMessage({ tone: 'ok', text: `“${file.name}” uploaded. Your counsellor will review it.` }))
+        .then(() => setMessage({ tone: 'ok', text: `“${file.name}” uploaded. We'll check it within 1 working day.` }))
         .catch((err) => setMessage({ tone: 'error', text: err instanceof ApiError ? err.message : 'The upload failed. Please try again.' }));
     }
     if (inputRef.current) inputRef.current.value = '';
@@ -99,7 +99,7 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
         </p>
       )}
 
-      <p className="mt-4 text-xs text-navy-500">PDF, JPG or PNG, between 50 KB and 200 KB each.</p>
+      <p className="mt-4 text-xs text-navy-500">PDF, JPG or PNG · 50–200 KB</p>
 
       <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
 
@@ -159,9 +159,9 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
             </li>
           );
         })}
-        {visible.length === 0 && <li className="py-6 text-center text-sm text-navy-400">{docs.length ? 'Nothing here. Well done!' : 'Your counsellor will list the documents you need.'}</li>}
+        {visible.length === 0 && <li className="py-6 text-center text-sm text-navy-400">{docs.length ? 'Nothing here' : 'No documents requested yet'}</li>}
       </ul>
-      <p className="mt-4 text-xs text-navy-400">Uploaded the wrong file? Remove it and upload the right one, until your counsellor has checked it. Verified documents are locked; ask your counsellor if one needs changing.</p>
+      <p className="mt-4 text-xs text-navy-400">Wrong file? Remove it before it's checked. Verified documents are locked.</p>
 
       <Modal
         open={!!removing}

@@ -7,14 +7,21 @@ interface FieldShellProps {
   error?: string;
   hint?: string;
   id: string;
+  /** Shows a red asterisk after the label (and tells screen readers the field is required). */
+  required?: boolean;
   children: ReactNode;
 }
 
-function FieldShell({ label, error, hint, id, children }: FieldShellProps) {
+function FieldShell({ label, error, hint, id, required, children }: FieldShellProps) {
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-navy-800">
         {label}
+        {required && (
+          <span className="ml-0.5 text-red-600" aria-hidden>
+            *
+          </span>
+        )}
       </label>
       {children}
       {error ? (
@@ -37,20 +44,21 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const TextField = forwardRef<HTMLInputElement, InputProps>(function TextField(
-  { label, error, hint, className, type = 'text', ...rest },
+  { label, error, hint, className, type = 'text', required, ...rest },
   ref,
 ) {
   const id = useId();
   const [show, setShow] = useState(false);
   const isPassword = type === 'password';
   return (
-    <FieldShell label={label} error={error} hint={hint} id={id}>
+    <FieldShell label={label} error={error} hint={hint} id={id} required={required}>
       <div className="relative">
         <input
           ref={ref}
           id={id}
           type={isPassword && show ? 'text' : type}
           aria-invalid={!!error}
+          aria-required={required || undefined}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
           className={cn('input', error && 'input-error', isPassword && 'pr-12', className)}
           {...rest}
@@ -78,16 +86,17 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(function SelectField(
-  { label, error, options, placeholder, className, ...rest },
+  { label, error, options, placeholder, className, required, ...rest },
   ref,
 ) {
   const id = useId();
   return (
-    <FieldShell label={label} error={error} id={id}>
+    <FieldShell label={label} error={error} id={id} required={required}>
       <select
         ref={ref}
         id={id}
         aria-invalid={!!error}
+        aria-required={required || undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         className={cn('input appearance-none bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10', error && 'input-error', className)}
         style={{

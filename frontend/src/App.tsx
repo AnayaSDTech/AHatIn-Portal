@@ -25,6 +25,7 @@ import { SchedulePage } from './pages/staff/SchedulePage';
 import { LeadsPage } from './pages/staff/LeadsPage';
 import { StudentsPage } from './pages/staff/StudentsPage';
 import { StudentRecordPage } from './pages/staff/StudentRecordPage';
+import { MyProfilePage } from './pages/staff/MyProfilePage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AssignCounsellorsPage } from './pages/admin/AssignCounsellorsPage';
 import { StaffUsersPage } from './pages/admin/StaffUsersPage';
@@ -80,6 +81,7 @@ const router = createBrowserRouter([
       { path: '/staff/leads', element: <LeadsPage /> },
       { path: '/staff/students', element: <StudentsPage /> },
       { path: '/staff/students/:id', element: <StudentRecordPage /> },
+      { path: '/staff/profile', element: <MyProfilePage /> },
     ],
   },
   // Admin area

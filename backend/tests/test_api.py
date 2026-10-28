@@ -1,5 +1,6 @@
 """End-to-end API tests against a real MongoDB (database ahat_test)."""
 
+import os
 from datetime import timedelta
 
 from app.core.clock import today
@@ -461,19 +462,26 @@ async def test_profile_gate_and_admin_assignment(make_api):
     assert await db.notes.find_one({"studentId": sid, "text": {"$regex": "^Changed their study plans"}})
 
 
-async def test_matching_profile_admin_only(make_api):
+async def test_counsellor_edits_own_matching_profile(make_api):
+    body = {"countries": [{"country": "Germany", "years": 2}], "universities": ["RWTH Aachen"], "subjects": ["engineering"], "languages": ["German"], "capacity": 25}
+    counsellor = await make_api()
+    await counsellor.staff_login()  # Priya (c1)
+    mine = (await counsellor.get("/staff/me/matching-profile")).json()
+    assert mine["matchingProfile"]["universities"] == ["University of Leeds"] and mine["activeStudents"] >= 1
+    r = await counsellor.put("/staff/me/matching-profile", body)
+    assert r.status_code == 200 and r.json()["capacity"] == 25
+    assert (await counsellor.put("/staff/me/matching-profile", {**body, "subjects": ["astrology"]})).status_code == 422
+    assert (await get_db().users.find_one({"_id": "c1"}))["matchingProfile"]["universities"] == ["RWTH Aachen"]
+    assert (await counsellor.get("/admin/assignments")).status_code == 403
+
+    # The admin only invites staff: no editing of matching profiles.
     admin = await make_api()
     await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
-    body = {"countries": [{"country": "Germany", "years": 2}], "universities": ["RWTH Aachen"], "subjects": ["engineering"], "languages": ["German"], "capacity": 25}
-    r = await admin.put("/admin/staff/c2/matching-profile", body)
-    assert r.status_code == 200 and r.json()["capacity"] == 25
-    assert (await admin.put("/admin/staff/c2/matching-profile", {**body, "subjects": ["astrology"]})).status_code == 422
-    assert (await admin.put("/admin/staff/u5/matching-profile", body)).status_code == 400  # officers aren't matched
-    profiles = (await admin.get("/admin/counsellors/matching")).json()
-    assert next(p for p in profiles if p["id"] == "c2")["matchingProfile"]["universities"] == ["RWTH Aachen"]
-    counsellor = await make_api()
-    await counsellor.staff_login()
-    assert (await counsellor.get("/admin/assignments")).status_code == 403
+    assert (await admin.put("/staff/me/matching-profile", body)).status_code == 403
+    assert (await admin.put("/admin/staff/c2/matching-profile", body)).status_code in (404, 405)
+    officer = await make_api()
+    await officer.staff_login("kavya.i@ahatin.example")
+    assert (await officer.get("/staff/me/matching-profile")).status_code == 403  # officers aren't matched
 
 
 async def test_officer_handovers_and_access(make_api):
@@ -563,3 +571,223 @@ def test_demo_codes_and_production_checks():
 
     with pytest.raises(RuntimeError, match="SESSION_SECRET.*COOKIE_SECURE"):
         Settings(**{**prod, "session_secret": "dev-session-secret-change-me", "cookie_secure": False}).check_production()
+
+
+async def test_admin_edits_staff_and_sets_passwords(make_api):
+    import pyotp
+
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    # Details: name, email, phone; emails stay unique.
+    r = await admin.put("/admin/staff/c2", {"name": "Rohan K. Kapoor", "email": "rohan.kapoor@ahatin.example", "phone": "+91 98000 22223"})
+    assert r.status_code == 200 and r.json()["name"] == "Rohan K. Kapoor" and r.json()["phone"] == "+91 98000 22223"
+    assert (await admin.put("/admin/staff/c2", {"name": "Rohan", "email": "demo.counsellor@ahatin.example"})).status_code == 409
+
+    # New password for an active counsellor: works, and they're signed out elsewhere.
+    priya = await make_api()
+    await priya.staff_login()
+    assert (await admin.post("/admin/staff/c1/password", {"password": "short1"})).status_code == 422
+    r = await admin.post("/admin/staff/c1/password", {"password": "NewPassword42"})
+    assert r.status_code == 200 and "authenticatorKey" not in r.json()
+    assert (await priya.get("/auth/me")).status_code == 401
+    assert (await (await make_api()).post("/auth/staff/login", {"email": "demo.counsellor@ahatin.example", "password": "Staff@1234"})).status_code == 401
+    again = await make_api()
+    # The new password is accepted (the authenticator step is the same as before).
+    assert (await again.post("/auth/staff/login", {"email": "demo.counsellor@ahatin.example", "password": "NewPassword42"})).status_code == 200
+
+    # Someone invited but never set up: a password plus an authenticator key, shown once, and they can sign in.
+    staff = (await admin.post("/admin/staff", {"name": "Test Officer", "email": "test.officer@ahat.example", "role": "visa_officer"})).json()["user"]
+    assert staff["invited"] is True
+    r = await admin.post(f"/admin/staff/{staff['id']}/password", {"password": "Welcome2027x"})
+    key = r.json()["authenticatorKey"]
+    assert r.json()["user"]["invited"] is False and r.json()["otpauthUri"].startswith("otpauth://")
+    newbie = await make_api()
+    j = (await newbie.post("/auth/staff/login", {"email": "test.officer@ahat.example", "password": "Welcome2027x"})).json()
+    r = await newbie.post("/auth/staff/verify", {"challenge_id": j["challengeId"], "code": pyotp.TOTP(key).now()})
+    assert r.status_code == 200 and r.json()["user"]["role"] == "visa_officer"
+
+    # Only the admin can do this.
+    assert (await newbie.put("/admin/staff/c2", {"name": "X Y", "email": "x@ahat.example"})).status_code == 403
+
+
+async def test_staff_change_own_name(make_api):
+    api = await make_api()
+    await api.staff_login()
+    r = await api.put("/staff/me/name", {"name": "Priya S. Desai"})
+    assert r.status_code == 200 and r.json()["name"] == "Priya S. Desai"
+    assert (await api.get("/auth/me")).json()["name"] == "Priya S. Desai"
+    assert (await api.put("/staff/me/name", {"name": "P"})).status_code == 422
+    student = await make_api()
+    await student.student_login()
+    assert (await student.put("/staff/me/name", {"name": "Someone Else"})).status_code == 403
+
+
+async def test_full_student_journey(make_api, bucket):
+    """One new student from registration to the final post-arrival check-in, through every hand-over.
+    With JOURNEY_SNAPSHOTS set, the student's view at each step is saved there (to check the dashboard's status rules)."""
+    import json
+
+    db = get_db()
+    snapshots = []
+    pdf = b"%PDF-1.4 journey" + b"." * (60 * 1024)
+
+    student = await make_api()
+    code = (await student.post("/auth/register", {"name": "Journey Tester", "email": "journey@example.com", "mobile": "9811188888", "consent": True})).json()["demoCode"]
+    assert (await student.post("/auth/otp/verify", {"email": "journey@example.com", "code": code})).status_code == 200
+    sid = (await student.get("/me/record")).json()["record"]["id"]
+    admin, priya, kavya, aditya = [await make_api() for _ in range(4)]
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    await priya.staff_login()
+    await kavya.staff_login("kavya.i@ahatin.example")
+    await aditya.staff_login("aditya.r@ahatin.example")
+
+    async def snap(label):
+        mine = (await student.get("/me/record")).json()
+        snapshots.append({"label": label, "record": mine["record"], "sessions": (await student.get("/sessions")).json()})
+        return mine["record"]
+
+    async def upload(doc_id):
+        up = (await student.post(f"/students/{sid}/documents/{doc_id}/upload-url", {"fileName": "proof.pdf", "contentType": "application/pdf", "size": len(pdf)})).json()
+        bucket.put_url(up["url"], pdf)
+        r = await student.post(f"/students/{sid}/documents/{doc_id}/upload-complete", {"uploadId": up["uploadId"]})
+        assert r.status_code == 200, r.text
+
+    def doc_named(rec, name):
+        return next(d for d in rec["documents"] if d["name"] == name)
+
+    async def open_follow_up(event):
+        return await db.follow_ups.find_one({"sourceEvent": event, "done": False})
+
+    await snap("Registered")
+
+    # Profile complete -> the admin assigns a counsellor.
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    assert (await admin.post(f"/students/{sid}/assign", {"counsellorId": "c1"})).status_code == 200
+    await snap("Counsellor assigned")
+
+    # 1. Career Counselling: a session, then the career plan.
+    d, slot = await _free_slot("c1")
+    r = await student.post("/sessions", {"type": "Career counselling", "date": d, "time": slot["time"], "mode": slot["modes"][0]})
+    assert r.status_code == 200 and r.json()["counsellorId"] == "c1", r.text
+    await snap("Career session booked")
+    plan = {"direction": "computing", "course": "Data Science & Analytics", "level": "masters", "destinations": ["United Kingdom"], "notes": ""}
+    assert (await priya.post(f"/students/{sid}/career-plan", plan)).status_code == 200
+    await snap("Career plan shared")
+
+    # 2. University & Country Selection: shortlist shared, the student decides and approves.
+    item = {"course": "MSc Data Science", "country": "United Kingdom", "intake": "September 2027", "agency": "Demo Agency", "reason": "Strong programme"}
+    await priya.post(f"/students/{sid}/shortlist/items", {**item, "university": "University of Leeds"})
+    rec = (await priya.post(f"/students/{sid}/shortlist/items", {**item, "university": "University of Bristol"})).json()
+    assert (await priya.post(f"/students/{sid}/shortlist/share")).status_code == 200
+    await snap("Shortlist shared")
+    leeds, bristol = rec["journey"]["shortlist"]["items"]
+    await student.put(f"/students/{sid}/shortlist/items/{leeds['id']}/choice", {"choice": "apply"})
+    await student.put(f"/students/{sid}/shortlist/items/{bristol['id']}/choice", {"choice": "removed", "reason": "Prefer Leeds"})
+    assert (await student.post(f"/students/{sid}/shortlist/approve", {})).status_code == 200
+    rec = await snap("Shortlist approved")
+    app_id = rec["applications"][0]["id"]
+    assert [a["state"] for a in rec["applications"]] == ["draft"]
+
+    # 3. Application Assistance: submitted, offer, the student accepts -> the admin is asked for a Financial Aid Officer.
+    assert (await priya.post(f"/students/{sid}/applications/{app_id}/status", {"to": "submitted"})).status_code == 200
+    rec = await snap("Application submitted")
+    assert rec["stage"] == "applications_submitted"
+    assert (await priya.post(f"/students/{sid}/applications/{app_id}/status", {"to": "conditional_offer"})).status_code == 200
+    await snap("Offer received")
+    assert not await open_follow_up(f"student:{sid}:assign-finance")
+    assert (await student.post(f"/students/{sid}/applications/{app_id}/decision", {"accept": True})).status_code == 200
+    rec = await snap("Offer accepted")
+    assert rec["stage"] == "offer_accepted"
+    assert await open_follow_up(f"student:{sid}:assign-finance")
+    assert sid in {s["id"] for s in (await admin.get("/admin/assignments")).json()["waitingFinance"]}
+    d2, slot2 = await _free_slot("u6")
+    funding_session = {"type": "Scholarship & funding", "date": d2, "time": slot2["time"], "mode": slot2["modes"][0]}
+    assert (await student.post("/sessions", funding_session)).status_code == 400  # no Financial Aid Officer yet
+
+    # 4. Scholarship & Financial Guidance: Kavya sets the cost and asks for proof of funds; the student plans and uploads.
+    assert (await admin.post(f"/students/{sid}/officer", {"kind": "finance", "officerId": "u6"})).status_code == 200
+    assert not await open_follow_up(f"student:{sid}:assign-finance")
+    await snap("Financial Aid Officer assigned")
+    assert (await priya.put(f"/students/{sid}/funding/estimated-cost", {"lakh": 30})).status_code == 403  # now the officer's
+    assert (await kavya.put(f"/students/{sid}/funding/estimated-cost", {"lakh": 30})).status_code == 200
+    await snap("Estimated cost set")
+    rec = (await kavya.post(f"/students/{sid}/documents", {"name": "Bank statement (6 months)", "category": "funds"})).json()
+    funds_id = doc_named(rec, "Bank statement (6 months)")["id"]
+    assert (await student.post(f"/students/{sid}/funding/sources", {"kind": "Education loan", "amount": 20})).status_code == 200
+    await snap("Funding plan started")
+    assert (await student.post(f"/students/{sid}/funding/sources", {"kind": "Family savings", "amount": 10})).status_code == 200
+    await upload(funds_id)
+    await snap("Proof of funds uploaded")
+    assert await db.follow_ups.find_one({"personId": sid, "counsellorId": "u6", "action": "Verify uploaded document: Bank statement (6 months)", "done": False})
+    assert not await open_follow_up(f"student:{sid}:assign-visa")
+    assert (await priya.post(f"/students/{sid}/documents/{funds_id}/verify")).status_code == 403
+    assert (await kavya.post(f"/students/{sid}/documents/{funds_id}/verify")).status_code == 200
+    await snap("Proof of funds verified")
+    assert await open_follow_up(f"student:{sid}:assign-visa")
+    assert sid in {s["id"] for s in (await admin.get("/admin/assignments")).json()["waitingVisa"]}
+    # Separate chats.
+    assert (await student.post("/messages", {"text": "Thanks for the help!", "thread": "finance"})).json()["thread"] == "finance"
+    assert any(m["thread"] == "finance" and m["studentId"] == sid for m in (await kavya.get("/messages")).json())
+    assert not any(m["studentId"] == sid for m in (await priya.get("/messages")).json())
+    r = await student.post("/sessions", funding_session)
+    assert r.status_code == 200 and r.json()["counsellorId"] == "u6", r.text
+    assert (await student.post(f"/sessions/{r.json()['id']}/cancel", {})).status_code == 200
+
+    # 5. Visa Assistance: only the Visa Officer records visa progress.
+    assert (await admin.post(f"/students/{sid}/officer", {"kind": "visa", "officerId": "u7"})).status_code == 200
+    await snap("Visa Officer assigned")
+    assert (await kavya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 403
+    assert (await priya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 403
+    assert (await student.put(f"/students/{sid}/departure/tasks/flight", {"done": True})).status_code == 400  # not before the visa
+    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 200
+    await snap("CAS received")
+    rec = (await aditya.post(f"/students/{sid}/documents", {"name": "Visa photograph", "category": "visa"})).json()
+    visa_doc = doc_named(rec, "Visa photograph")["id"]
+    await upload(visa_doc)
+    assert (await kavya.post(f"/students/{sid}/documents/{visa_doc}/verify")).status_code == 403
+    assert (await aditya.post(f"/students/{sid}/documents/{visa_doc}/verify")).status_code == 200
+    for stage in ("documents_verified", "fees_paid"):
+        assert (await aditya.post(f"/students/{sid}/visa", {"stage": stage})).status_code == 200
+    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "submitted", "reference": "GWF012345678"})).status_code == 200
+    rec = await snap("Visa submitted")
+    assert rec["stage"] == "visa_filed" and await open_follow_up(f"visa:{sid}:submitted")
+    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "biometrics"})).status_code == 200
+    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "granted"})).status_code == 200
+    rec = await snap("Visa granted")
+    assert rec["stage"] == "visa_granted" and not await open_follow_up(f"visa:{sid}:submitted")
+    d3, slot3 = await _free_slot("u7")
+    r = await student.post("/sessions", {"type": "Pre-departure briefing", "date": d3, "time": slot3["time"], "mode": slot3["modes"][0]})
+    assert r.status_code == 200 and r.json()["counsellorId"] == "u7", r.text
+    assert (await student.post(f"/sessions/{r.json()['id']}/cancel", {})).status_code == 200
+
+    # 6. Pre-departure: the student ticks every task, the Visa Officer confirms.
+    tasks = ["accommodation", "flight", "insurance", "money", "briefing", "documents"]
+    for key in tasks[:3]:
+        assert (await student.put(f"/students/{sid}/departure/tasks/{key}", {"done": True})).status_code == 200
+    await snap("Pre-departure half done")
+    assert (await aditya.post(f"/students/{sid}/departure/confirm")).status_code == 400  # tasks left
+    for key in tasks[3:]:
+        assert (await student.put(f"/students/{sid}/departure/tasks/{key}", {"done": True})).status_code == 200
+    await snap("Pre-departure tasks done")
+    assert (await priya.post(f"/students/{sid}/departure/confirm")).status_code == 403
+    assert (await aditya.post(f"/students/{sid}/departure/confirm")).status_code == 200
+    await snap("Ready to travel")
+
+    # 7. Post-arrival Support: the student confirms arrival, the Visa Officer records the final check-in.
+    assert (await student.post(f"/students/{sid}/arrival")).status_code == 200
+    rec = await snap("Arrived")
+    assert rec["stage"] == "arrived"
+    assert await db.follow_ups.find_one({"sourceEvent": f"arrival:{sid}", "counsellorId": "u7", "done": False})
+    assert (await aditya.post(f"/students/{sid}/final-check-in", {"note": "Settled in well, classes started."})).status_code == 200
+    rec = await snap("Final check-in")
+    assert rec["stage"] == "settled" and not await open_follow_up(f"arrival:{sid}")
+
+    # Nothing is left waiting for the admin, and each person looking after the student can open the record.
+    queue = (await admin.get("/admin/assignments")).json()
+    assert sid not in {s["id"] for k in ("waiting", "waitingFinance", "waitingVisa") for s in queue[k]}
+    for api in (priya, kavya, aditya):
+        assert sid in {s["id"] for s in (await api.get("/students")).json()}
+
+    if path := os.environ.get("JOURNEY_SNAPSHOTS"):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(snapshots, f, default=str)

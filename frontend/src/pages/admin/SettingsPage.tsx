@@ -38,7 +38,7 @@ export function SettingsPage() {
   const { workingHours, quietHours, staffSecurity } = settings;
   return (
     <>
-      <PageHeader title="Settings" description="Administrators can change these values without new code. Read-only in this demo." />
+      <PageHeader title="Settings" description="Working hours, quiet hours, staff security and follow-up rules." />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel title="Working hours" icon={<Clock className="h-4 w-4" aria-hidden />}>

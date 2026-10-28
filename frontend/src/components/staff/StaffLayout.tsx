@@ -1,13 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Building2, CalendarCheck, CalendarDays, LayoutDashboard, LogOut, Settings, UserCheck, UserCog, Users, UsersRound } from 'lucide-react';
+import { Building2, CalendarCheck, CalendarDays, LayoutDashboard, LogOut, Settings, UserCheck, UserCog, UserRoundPen, Users, UsersRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '../ui/Logo';
-import { DemoBadge } from '../ui/DemoBadge';
 import { useAuth } from '../../context/AuthContext';
 import { useStaffReady } from '../../hooks/useStaffData';
 import { useApi } from '../../lib/api/store';
 import { cn, initials } from '../../lib/utils';
-import { staffRoleLabel } from '../../data/staff';
+import { DOC_AREA, areaOfRole, staffRoleLabel, type StaffStudent } from '../../data/staff';
+import { DESK } from '../../lib/officerCase';
+
+const NO_STUDENTS: StaffStudent[] = [];
 
 interface NavItem {
   to: string;
@@ -23,10 +25,16 @@ const counsellorNav: NavItem[] = [
   { to: '/staff/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/staff/leads', label: 'Leads', icon: UsersRound },
   { to: '/staff/students', label: 'Students', icon: Users },
+  // The counsellor's matching profile (countries, subjects, capacity), used to suggest them for new students.
+  { to: '/staff/profile', label: 'My profile', icon: UserRoundPen },
 ];
 
-// Financial Aid and Visa Officers work only on the students assigned to them (no leads).
-const officerNav: NavItem[] = counsellorNav.filter((n) => n.to !== '/staff/leads');
+// Financial Aid and Visa Officers work only on the students assigned to them (no leads, no matching profile).
+const officerNav: NavItem[] = [
+  { to: '/staff', label: 'Today', icon: CalendarCheck, end: true },
+  { to: '/staff/students', label: 'My students', icon: Users },
+  { to: '/staff/schedule', label: 'Schedule', icon: CalendarDays },
+];
 
 const adminNav: NavItem[] = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -49,8 +57,18 @@ export function StaffLayout() {
   // Students waiting for the admin to assign a counsellor.
   const [queue] = useApi<{ waiting: unknown[]; waitingFinance?: unknown[]; waitingVisa?: unknown[] }>(user?.role === 'admin' ? '/admin/assignments' : null, { waiting: [] }, { pollMs: 60_000 });
   const toAssign = queue.waiting.length + (queue.waitingFinance?.length ?? 0) + (queue.waitingVisa?.length ?? 0);
+  // Officers: documents in their area waiting to be checked.
+  const area = areaOfRole(user?.role ?? '');
+  const desk = area === 'finance' || area === 'visa' ? DESK[area] : null;
+  const [students] = useApi<StaffStudent[]>(desk ? '/students' : null, NO_STUDENTS);
+  const toVerify = students.reduce((n, s) => n + s.documents.filter((d) => d.state === 'pending' && DOC_AREA[d.category] === area).length, 0);
   if (!user) return null;
-  const nav = user.role === 'admin' ? adminNav.map((n) => (n.to === '/admin/assign' ? { ...n, badge: toAssign } : n)) : user.role === 'finance_officer' || user.role === 'visa_officer' ? officerNav : counsellorNav;
+  const nav =
+    user.role === 'admin'
+      ? adminNav.map((n) => (n.to === '/admin/assign' ? { ...n, badge: toAssign } : n))
+      : desk
+        ? officerNav.map((n) => (n.to === '/staff/students' ? { ...n, badge: toVerify } : n))
+        : counsellorNav;
 
   const handleLogout = async () => {
     await logout();
@@ -64,6 +82,18 @@ export function StaffLayout() {
         <div className="px-6 py-6">
           <Logo light />
         </div>
+        {desk && (
+          <div className="mx-3 mb-5 flex items-center gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10" data-desk-card>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold-500 text-navy-950">
+              <desk.icon className="h-5 w-5" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-white">{desk.name}</span>
+              <span className="block text-[11px] leading-snug text-navy-300">{desk.covers}</span>
+            </span>
+          </div>
+        )}
+        {desk && <p className="px-6 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-navy-400">Workspace</p>}
         <nav className="flex-1 space-y-1 px-3" aria-label="Staff">
           {nav.map((item) => (
             <NavLink
@@ -84,7 +114,13 @@ export function StaffLayout() {
           ))}
         </nav>
         <div className="border-t border-white/10 p-4">
-          <DemoBadge light label="Demo data" />
+          <div className="flex items-center gap-3" data-signed-in>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-500 text-xs font-bold text-navy-950">{initials(user.name)}</span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-white">{user.name}</span>
+              <span className="block truncate text-[11px] text-navy-300">{staffRoleLabel[user.role] ?? user.role}</span>
+            </span>
+          </div>
         </div>
       </aside>
 

@@ -2,14 +2,12 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { DemoBadge } from '../ui/DemoBadge';
 
 export function PageHeader({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
     <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <DemoBadge label="Demo data" />
-        <h1 className="mt-3 text-3xl">{title}</h1>
+        <h1 className="text-3xl">{title}</h1>
         {description && <p className="mt-1.5 text-navy-600">{description}</p>}
       </div>
       {action}

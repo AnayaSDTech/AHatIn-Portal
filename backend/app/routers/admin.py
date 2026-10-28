@@ -10,13 +10,13 @@ from app.core.audit import audit
 from app.core.auth import STAFF_ROLES, Admin, revoke_all_sessions
 from app.core.clock import iso, now, today_iso
 from app.core.errors import ApiError, not_found
-from app.core.security import encrypt, new_totp_secret, random_token, sha256
+from app.core.security import encrypt, hash_password, new_totp_secret, random_token, sha256, totp_uri
 from app.db import get_db, new_id
 from app import matching
 from app.domain import profile_complete, stage_index
 from app.records import serialize_grant
 from app.routers.staff import agencies_with_counts
-from app.schemas import AgencyBody, GrantBody, MatchingProfileBody, StaffUserBody
+from app.schemas import AgencyBody, GrantBody, StaffPasswordBody, StaffUpdateBody, StaffUserBody
 from app.services import notify
 from app.services.students import profile_out
 from app.services.team import waiting_for
@@ -145,24 +145,6 @@ async def assignment_queue(_: Admin):
     return {"waiting": waiting, "incomplete": incomplete, "waitingFinance": lists["finance"], "waitingVisa": lists["visa"], "officers": officers}
 
 
-@router.get("/counsellors/matching")
-async def matching_profiles(_: Admin):
-    """Every active counsellor's matching profile and current load, for the assignment screen."""
-    counsellors, loads = await _active_loads()
-    return [{"id": c["_id"], "name": c["name"], "activeStudents": loads[c["_id"]], "matchingProfile": {**matching.blank_matching_profile(), **(c.get("matchingProfile") or {})}} for c in counsellors]
-
-
-@router.put("/staff/{user_id}/matching-profile")
-async def save_matching_profile(user_id: str, body: MatchingProfileBody, admin: Admin):
-    u = await _staff_user(user_id)
-    if u["role"] != "counsellor":
-        raise ApiError(400, "Only counsellors have a matching profile.")
-    profile = body.model_dump()
-    await get_db().users.update_one({"_id": user_id}, {"$set": {"matchingProfile": profile, "updatedAt": now()}})
-    await audit(admin, "staff.matching_profile", "users", user_id)
-    return profile
-
-
 # ---------------------------------------------------------------- staff accounts
 
 
@@ -173,6 +155,9 @@ def _staff_out(u: dict) -> dict:
         "email": u["email"],
         "role": u["role"],
         "status": "deactivated" if u.get("status") == "deactivated" else "active",
+        # Created, but hasn't set a password and authenticator yet.
+        "invited": u.get("status") == "invited",
+        "phone": (u.get("counsellorProfile") or {}).get("phone", "") or u.get("mobile", ""),
         "lastLogin": iso(u["lastLoginAt"]) if u.get("lastLoginAt") else "",
     }
 
@@ -224,6 +209,41 @@ async def _staff_user(user_id: str) -> dict:
     if not u:
         raise not_found("Staff user not found.")
     return u
+
+
+@router.put("/staff/{user_id}")
+async def update_staff(user_id: str, body: StaffUpdateBody, admin: Admin):
+    """Name, email and phone of a staff member. The role can't be changed (their students and tasks depend on it)."""
+    db = get_db()
+    u = await _staff_user(user_id)
+    if body.email != u["email"] and await db.users.find_one({"email": body.email, "_id": {"$ne": user_id}}):
+        raise ApiError(409, "Another account already uses this email.", {"email": "Another account already uses this email."})
+    changes = {"name": body.name, "email": body.email, "counsellorProfile.phone": body.phone, "updatedAt": now()}
+    await db.users.update_one({"_id": user_id}, {"$set": changes})
+    await audit(admin, "staff.updated", "users", user_id, {k: v for k, v in (("name", body.name), ("email", body.email)) if v != u[k]})
+    return _staff_out(await db.users.find_one({"_id": user_id}))
+
+
+@router.post("/staff/{user_id}/password")
+async def set_staff_password(user_id: str, body: StaffPasswordBody, admin: Admin):
+    """Sets a staff member's password. Someone who never finished their invitation also gets an authenticator key (shown
+    once, for the admin to pass on), so they can sign in straight away. Everyone else is signed out on their other devices."""
+    db = get_db()
+    u = await _staff_user(user_id)
+    changes: dict = {"passwordHash": hash_password(body.password), "updatedAt": now()}
+    out: dict = {}
+    if not u.get("totpSecretEnc"):
+        secret = new_totp_secret()
+        changes.update(totpSecretEnc=encrypt(secret), activatedAt=now())
+        if u.get("status") != "deactivated":
+            changes["status"] = "active"
+        out = {"authenticatorKey": secret, "otpauthUri": totp_uri(secret, u["email"])}
+        await db.invites.update_many({"userId": user_id, "usedAt": None}, {"$set": {"usedAt": now()}})
+    await db.users.update_one({"_id": user_id}, {"$set": changes})
+    if user_id != admin["_id"] and not out:
+        await revoke_all_sessions(user_id)
+    await audit(admin, "staff.password_set", "users", user_id)
+    return {"user": _staff_out(await db.users.find_one({"_id": user_id})), **out}
 
 
 @router.post("/staff/{user_id}/deactivate")

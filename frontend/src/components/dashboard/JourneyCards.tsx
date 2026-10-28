@@ -146,14 +146,14 @@ export function ShortlistCard({ student, actions }: { student: StaffStudent; act
           )}
           {added > 0 && sl.firstApprovedAt
             ? <>Choose <strong>Apply here</strong> or <strong>Remove</strong> for the new {added === 1 ? 'option' : 'options'}, then approve your shortlist again.</>
-            : <>For each option, choose <strong>Apply here</strong> or <strong>Remove</strong>, and ask about anything you're unsure of. Then approve your shortlist.</>}
+            : <>Choose <strong>Apply here</strong> or <strong>Remove</strong> for each option, then approve.</>}
         </p>
       ) : sl.status === 'approved' ? (
         <p className="mb-4 text-sm text-navy-600">
-          You approved this shortlist on {formatDate(sl.approvedAt!)}. Your counsellor is preparing applications for the {chosen.length} {chosen.length === 1 ? 'option' : 'options'} you chose.
+          Approved {formatDate(sl.approvedAt!)} · {chosen.length} {chosen.length === 1 ? 'application' : 'applications'}
         </p>
       ) : (
-        <p className="mb-4 text-sm text-navy-600">Your counsellor is updating your shortlist. You'll be asked to review it again.</p>
+        <p className="mb-4 text-sm text-navy-600">Being updated by your counsellor.</p>
       )}
 
       {sl.status === 'approved' && !expanded ? (
@@ -228,6 +228,10 @@ export function ShortlistCard({ student, actions }: { student: StaffStudent; act
 
 /* ------------------------------ Funding ------------------------------ */
 
+/** Who looks after funding (and visa, travel and arrival) for this student: the officer once assigned, else the counsellor. */
+const financeLead = (s: StaffStudent) => (s.financeOfficerId ? 'Your Financial Aid Officer' : 'Your counsellor');
+const visaLead = (s: StaffStudent) => (s.visaOfficerId ? 'Your Visa Officer' : 'Your counsellor');
+
 export function FundingCard({ student, actions, notNeeded }: { student: StaffStudent; actions: Actions; notNeeded: boolean }) {
   const f = student.journey.funding;
   const [kind, setKind] = useState('');
@@ -266,7 +270,7 @@ export function FundingCard({ student, actions, notNeeded }: { student: StaffStu
           </p>
         </>
       ) : (
-        <p className="text-sm text-navy-600">Your counsellor will estimate your total cost of study.</p>
+        <p className="text-sm text-navy-600">{financeLead(student)} will estimate your total cost of study.</p>
       )}
 
       <h3 className="mt-6 font-sans text-sm font-semibold text-navy-900">How you'll pay</h3>
@@ -327,8 +331,8 @@ export function FundingCard({ student, actions, notNeeded }: { student: StaffStu
 
       {funds.length > 0 && (
         <p className="mt-6 rounded-xl bg-navy-50/70 px-4 py-3 text-xs text-navy-600">
-          Proof of funds: {funds.filter((d) => d.state === 'verified').length} of {funds.length} verified. Upload them in your{' '}
-          <a href="#documents" className="font-semibold text-navy-900 underline underline-offset-2">document checklist</a>.
+          Proof of funds: {funds.filter((d) => d.state === 'verified').length}/{funds.length} verified ·{' '}
+          <a href="#documents" className="font-semibold text-navy-900 underline underline-offset-2">Documents</a>
         </p>
       )}
     </Panel>
@@ -359,14 +363,14 @@ export function VisaCard({ student }: { student: StaffStudent }) {
         </li>
       </ol>
       {v.reference && <p className="mt-4 text-xs text-navy-500">Application reference: <span className="font-semibold text-navy-800">{v.reference}</span></p>}
-      {v.stage === 'refused' && v.refusalReason && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{v.refusalReason} Your counsellor will talk you through the next steps.</p>}
+      {v.stage === 'refused' && v.refusalReason && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{v.refusalReason} {visaLead(student)} will talk you through the next steps.</p>}
       {visaDocs.length > 0 && (
         <p className="mt-4 rounded-xl bg-navy-50/70 px-4 py-3 text-xs text-navy-600">
           Visa documents: {visaDocs.filter((d) => d.state === 'verified').length} of {visaDocs.length} verified. Upload them in your{' '}
           <a href="#documents" className="font-semibold text-navy-900 underline underline-offset-2">document checklist</a>.
         </p>
       )}
-      <p className="mt-4 text-xs text-navy-400">Visa fees and the health surcharge are paid on the official government website. Your counsellor records each step here.</p>
+      <p className="mt-4 text-xs text-navy-400">Visa fees and the health surcharge are paid on the official government website. {visaLead(student)} records each step here.</p>
     </Panel>
   );
 }
@@ -384,7 +388,7 @@ export function DepartureCard({ student, actions }: { student: StaffStudent; act
     <Panel id="departure" title={arrival.arrivedAt ? 'Settling in' : 'Getting ready to travel'} icon={arrival.arrivedAt ? <MapPin className="h-4 w-4" aria-hidden /> : <Plane className="h-4 w-4" aria-hidden />}>
       {!arrival.arrivedAt && (
         <>
-          <p className="text-sm text-navy-600">{locked ? 'Your counsellor has confirmed you are ready to travel.' : `Tick each task when it's done (${done} of ${DEPARTURE_TASKS.length}).`}</p>
+          <p className="text-sm text-navy-600">{locked ? `${visaLead(student)} has confirmed you are ready to travel.` : `Tick each task when it's done (${done} of ${DEPARTURE_TASKS.length}).`}</p>
           <ul className="mt-4 space-y-2">
             {DEPARTURE_TASKS.map((t) => (
               <li key={t.key}>
@@ -395,7 +399,7 @@ export function DepartureCard({ student, actions }: { student: StaffStudent; act
               </li>
             ))}
           </ul>
-          {!locked && done === DEPARTURE_TASKS.length && <p className="mt-4 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-800">All done. Your counsellor will check everything and confirm you are ready to travel.</p>}
+          {!locked && done === DEPARTURE_TASKS.length && <p className="mt-4 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-800">All done. {visaLead(student)} will check everything and confirm you are ready to travel.</p>}
           {locked && (
             <div className="mt-5 flex flex-col items-start gap-3 border-t border-navy-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-navy-600">Landed? Let us know you've arrived safely.</p>
@@ -412,7 +416,7 @@ export function DepartureCard({ student, actions }: { student: StaffStudent; act
           {arrival.finalCheckInAt ? (
             <p className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-500" aria-hidden /> Final check-in done on {formatDate(arrival.finalCheckInAt)}. Welcome to your new home!</p>
           ) : (
-            <p className="text-navy-500">Your counsellor will check in with you during your first months. Book a post-arrival check-in session any time.</p>
+            <p className="text-navy-500">{visaLead(student)} will check in with you during your first months. Book a post-arrival check-in session any time.</p>
           )}
         </div>
       )}
@@ -436,7 +440,7 @@ export function DepartureCard({ student, actions }: { student: StaffStudent; act
           </>
         }
       >
-        <p className="text-sm text-navy-600">Your counsellor will be told straight away and will check in with you during your first months.</p>
+        <p className="text-sm text-navy-600">{visaLead(student)} will be told straight away and will check in with you during your first months.</p>
       </Modal>
     </Panel>
   );

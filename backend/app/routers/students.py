@@ -845,7 +845,7 @@ async def set_departure_task(sid: str, key: str, body: DepartureTaskBody, user: 
         if (j.get("visa") or {}).get("stage") != "granted":
             raise ApiError(400, "Pre-departure tasks open once your visa is granted.")
         if j["departure"].get("confirmedAt"):
-            raise ApiError(400, "Your counsellor has already confirmed you are ready to travel.")
+            raise ApiError(400, "Your Visa Officer has already confirmed you are ready to travel.")
         done = j["departure"].setdefault("done", {})
         if body.done:
             done.setdefault(key, now_iso())
@@ -879,7 +879,7 @@ async def confirm_arrival(sid: str, user: CurrentUser):
 
     def fn(j, _):
         if not j["departure"].get("confirmedAt"):
-            raise ApiError(400, "Your counsellor confirms you are ready to travel first.")
+            raise ApiError(400, "Your Visa Officer confirms you are ready to travel first.")
         if j["arrival"].get("arrivedAt"):
             raise ApiError(400, "You have already confirmed your arrival.")
         j["arrival"]["arrivedAt"] = now_iso()

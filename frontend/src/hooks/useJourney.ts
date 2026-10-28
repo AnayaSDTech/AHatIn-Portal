@@ -57,7 +57,8 @@ export function useStudentActions(studentId: string | undefined) {
       decideOffer: (appId: string, accept: boolean, _university: string) => act(() => api.post(`${base}/applications/${appId}/decision`, { accept })),
 
       /* ---------- 4. Funding ---------- */
-      setEstimatedCost: (lakh: number) => act(() => api.put(`${base}/funding/estimated-cost`, { lakh })),
+      /** Saves the estimated cost; rejects with the reason if it can't be saved (so the form can say so). */
+      setEstimatedCost: (lakh: number) => mutate(() => api.put(`${base}/funding/estimated-cost`, { lakh }), { silent: true }),
       addFundingSource: (kind: string, amount: number) => act(() => api.post(`${base}/funding/sources`, { kind, amount })),
       removeFundingSource: (id: string) => act(() => api.delete(`${base}/funding/sources/${id}`)),
       addScholarship: (name: string, amount: string, deadline: string) => act(() => api.post(`${base}/funding/scholarships`, { name, amount, deadline })),
