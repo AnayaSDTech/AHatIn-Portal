@@ -64,7 +64,7 @@ csrf_middleware(app)
 errors.install(app)
 app.add_middleware(SecurityHeaders)
 if settings.allowed_origins:
-    # Only needed when the frontend is served from a different origin (normally it uses the same one via a proxy).
+    # When the website is on another address than the API (ahat.in → api.ahat.in).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

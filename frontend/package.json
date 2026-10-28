@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:hostinger": "npm run build && powershell -NoProfile -Command \"Remove-Item ahat-frontend.zip -ErrorAction SilentlyContinue; Compress-Archive -Path dist/* -DestinationPath ahat-frontend.zip\"",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "icons": "node scripts/generate-icons.mjs"

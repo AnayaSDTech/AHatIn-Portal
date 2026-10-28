@@ -16,6 +16,8 @@ build/
 .env
 .env.*
 !.env.example
+# Production build settings: public values only (the API address), so they are kept in Git.
+!.env.production
 *.local
 
 # Logs
@@ -54,3 +56,6 @@ $RECYCLE.BIN/
 *.temp
 .cache/
 .eslintcache
+
+# Upload package for Hostinger (npm run build:hostinger)
+ahat-frontend.zip

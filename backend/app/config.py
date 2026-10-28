@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost:5173"
     # Every online session uses this Google Meet room (hosted by info@ahat.in) for now.
     meeting_link: str = "https://meet.google.com/juz-bodt-wbd"
-    api_allowed_origins: str = ""  # comma-separated, development only
+    api_allowed_origins: str = ""  # comma-separated: websites on another address that call this API (e.g. https://ahat.in)
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "ahat"
@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     session_cookie_name: str = "ahat_session"
     csrf_cookie_name: str = "ahat_csrf"
     cookie_secure: bool = False  # True in production (HTTPS)
+    cookie_domain: str = ""  # e.g. ".ahat.in" when the app (portal.ahat.in) and API (api.ahat.in) are on different subdomains
     session_secret: str = "dev-session-secret-change-me"
     otp_pepper: str = "dev-otp-pepper-change-me"
     field_encryption_key: str = ""  # Fernet key; generated per process in development if empty

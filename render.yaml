@@ -1,6 +1,6 @@
 # Render Blueprint for the AHat backend (FastAPI). Deploy: Render dashboard → New → Blueprint → this repository.
 # Values marked "sync: false" are secrets: Render asks for them when the Blueprint is created (copy them from backend/.env).
-# The frontend stays on Vercel and forwards /api/* here (frontend/vercel.json), so the site and the API share one origin.
+# The website is on Hostinger (https://ahat.in) and calls this API at https://api.ahat.in (a custom domain on this service).
 services:
   - type: web
     name: ahat-backend
@@ -9,7 +9,7 @@ services:
     plan: free                 # free instances sleep after 15 minutes idle; use "starter" so emails and reminders run on time
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    # --proxy-headers: read the visitor's real IP (for rate limits) from Render's and Vercel's forwarding headers.
+    # --proxy-headers: read the visitor's real IP (for rate limits) from Render's forwarding headers.
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
     healthCheckPath: /api/health
     autoDeploy: true
@@ -32,9 +32,14 @@ services:
       - key: MEETING_LINK
         value: https://meet.google.com/juz-bodt-wbd
 
-      # The live website address (the Vercel domain), used in email links.
+      # The website (Hostinger), used in email links, and the addresses allowed to call this API from a browser.
       - key: APP_BASE_URL
-        sync: false
+        value: https://ahat.in
+      - key: API_ALLOWED_ORIGINS
+        value: https://ahat.in,https://www.ahat.in
+      # Sign-in cookies are shared by ahat.in (website) and api.ahat.in (this API).
+      - key: COOKIE_DOMAIN
+        value: .ahat.in
 
       # Database (MongoDB Atlas). Atlas → Network Access must allow Render (0.0.0.0/0 on the free plan).
       - key: MONGODB_URI

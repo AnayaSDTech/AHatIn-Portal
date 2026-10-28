@@ -54,8 +54,9 @@ async def start_session(response: Response, request: Request, user: dict) -> Non
         }
     )
     await get_db().users.update_one({"_id": user["_id"]}, {"$set": {"lastLoginAt": t}})
-    response.set_cookie(s.session_cookie_name, token, httponly=True, secure=s.cookie_secure, samesite="lax", path="/", max_age=int(absolute.total_seconds()))
-    response.set_cookie(s.csrf_cookie_name, random_token(16), httponly=False, secure=s.cookie_secure, samesite="lax", path="/")
+    domain = s.cookie_domain or None
+    response.set_cookie(s.session_cookie_name, token, httponly=True, secure=s.cookie_secure, samesite="lax", path="/", domain=domain, max_age=int(absolute.total_seconds()))
+    response.set_cookie(s.csrf_cookie_name, random_token(16), httponly=False, secure=s.cookie_secure, samesite="lax", path="/", domain=domain)
 
 
 async def end_session(request: Request, response: Response) -> None:
@@ -63,7 +64,7 @@ async def end_session(request: Request, response: Response) -> None:
     token = request.cookies.get(s.session_cookie_name)
     if token:
         await get_db().auth_sessions.update_one({"tokenHash": sha256(token)}, {"$set": {"revokedAt": now()}})
-    response.delete_cookie(s.session_cookie_name, path="/")
+    response.delete_cookie(s.session_cookie_name, path="/", domain=s.cookie_domain or None)
 
 
 async def revoke_all_sessions(user_id: str) -> None:
@@ -128,5 +129,5 @@ def csrf_middleware(app) -> None:
                 return JSONResponse({"detail": "Your session has expired. Please refresh the page.", "errors": [], "trace_id": ""}, status_code=403)
         response = await call_next(request)
         if not request.cookies.get(s.csrf_cookie_name):
-            response.set_cookie(s.csrf_cookie_name, random_token(16), httponly=False, secure=s.cookie_secure, samesite="lax", path="/")
+            response.set_cookie(s.csrf_cookie_name, random_token(16), httponly=False, secure=s.cookie_secure, samesite="lax", path="/", domain=s.cookie_domain or None)
         return response
