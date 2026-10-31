@@ -106,10 +106,16 @@ class Api:
     async def delete(self, path, **kw):
         return await self.c.delete(f"/api/v1{path}", headers=self._headers(), **kw)
 
-    async def student_login(self, email="demo.student@ahatin.example"):
-        r = await self.post("/auth/otp/request", {"email": email})
+    async def student_login(self, email="demo.student@ahatin.example", password="Student@1234"):
+        r = await self.post("/auth/login", {"email": email, "password": password})
+        assert r.status_code == 200 and "user" in r.json(), r.text
+        return r.json()["user"]
+
+    async def register_student(self, name, email, mobile, password="Welcome123"):
+        """Registers, then verifies the email with the emailed code (shown on screen for test emails): signed in."""
+        r = await self.post("/auth/register", {"name": name, "email": email, "mobile": mobile, "password": password, "consent": True})
         assert r.status_code == 200, r.text
-        r = await self.post("/auth/otp/verify", {"email": email, "code": r.json()["demoCode"]})
+        r = await self.post("/auth/verify-email", {"email": email, "code": r.json()["demoCode"]})
         assert r.status_code == 200, r.text
         return r.json()["user"]
 

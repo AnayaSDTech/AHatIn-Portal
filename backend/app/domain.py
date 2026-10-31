@@ -80,8 +80,8 @@ VISA_LABELS = {
 DEPARTURE_TASKS = ["accommodation", "flight", "insurance", "money", "briefing", "documents"]
 
 SERVICE_TITLES = {
-    "S1": "Career Counselling & Course Selection",
-    "S2": "University & Country Selection",
+    # S1 covers the career plan and the university shortlist (there is no S2 any more; the other codes stay as they were).
+    "S1": "Career Counselling & University Selection",
     "S3": "Application Assistance",
     "S4": "Scholarship & Financial Guidance",
     "S5": "Visa Assistance",
@@ -89,7 +89,7 @@ SERVICE_TITLES = {
     "S7": "Post-Arrival Support",
 }
 # Who looks after each service: the counsellor (1-3), the Financial Aid Officer (4), the Visa Officer (5-7).
-SERVICE_AREA = {"S1": "counsellor", "S2": "counsellor", "S3": "counsellor", "S4": "finance", "S5": "visa", "S6": "visa", "S7": "visa"}
+SERVICE_AREA = {"S1": "counsellor", "S3": "counsellor", "S4": "finance", "S5": "visa", "S6": "visa", "S7": "visa"}
 OFFICER_FIELD = {"finance": "financeOfficerId", "visa": "visaOfficerId"}
 OFFICER_ROLE = {"finance": "finance_officer", "visa": "visa_officer"}
 AREA_OF_ROLE = {"finance_officer": "finance", "visa_officer": "visa"}
@@ -111,7 +111,7 @@ FUNDING_SOURCES = ["Family savings", "Education loan", "Scholarship", "Sponsor",
 SCHOLARSHIP_STATUSES = ["to_apply", "applied", "awarded", "not_awarded"]
 DOC_CATEGORIES = ["general", "funds", "visa"]
 
-STARTER_DOCUMENTS = ["Passport (first and last page)", "Degree certificate", "Academic transcripts", "English test score report", "Updated CV"]
+STARTER_DOCUMENTS = ["Passport (first and last page)", "Degree certificate", "Academic transcripts", "Updated CV"]
 
 DESTINATION_LABELS = {"uk": "United Kingdom", "europe": "Europe", "undecided": "Not decided"}
 
@@ -140,14 +140,35 @@ def empty_journey() -> dict:
 def blank_profile() -> dict:
     return {
         "dateOfBirth": "",
+        "gender": "",
+        # Permanent address (city is part of it).
+        "addressLine1": "",
+        "addressLine2": "",
         "city": "",
+        "state": "",
+        "pincode": "",
         "passportNumber": "",
+        # 10th (SSC) and 12th (HSC).
+        "sscBoard": "",
+        "sscSchool": "",
+        "sscYear": "",
+        "sscScore": "",
+        "hscBoard": "",
+        "hscStream": "",
+        "hscCollege": "",
+        "hscYear": "",
+        "hscScore": "",
+        # Highest qualification.
         "degree": "",
+        "degreeSubject": "",
         "institution": "",
+        "graduationYear": "",
         "grade": "",
         "englishTest": "Not taken yet",
         "englishScore": "",
         "workExperience": "",
+        # Up to MAX_COURSES courses; `courseInterest` is the first one (used for matching and as the record's goal).
+        "courseInterests": [],
         "courseInterest": "",
         "destination": "",
         "intake": "",
@@ -155,8 +176,25 @@ def blank_profile() -> dict:
     }
 
 
-PROFILE_REQUIRED = ["dateOfBirth", "city", "degree", "institution", "grade", "englishTest", "courseInterest", "destination", "intake", "budget"]
-STUDY_PLAN_FIELDS = {"courseInterest": "course of interest", "destination": "preferred destination", "intake": "preferred intake"}
+GENDERS = ("Female", "Male", "Other", "Prefer not to say")
+INDIAN_STATES = (
+    "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh",
+    "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir",
+    "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+    "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+    "Uttar Pradesh", "Uttarakhand", "West Bengal",
+)
+MAX_COURSES = 3
+# Starting the journey needs only these. The form also requires the address and the highest qualification's year (the 10th,
+# 12th, gender and grade are optional), but profiles completed before those were added stay complete.
+PROFILE_REQUIRED = ["dateOfBirth", "city", "degree", "institution", "englishTest", "courseInterest", "destination", "intake", "budget"]
+STUDY_PLAN_FIELDS = {"courseInterests": "courses of interest", "destination": "preferred destination", "intake": "preferred intake"}
+
+
+def courses_of(profile: dict | None) -> list[str]:
+    """The student's courses of interest (profiles saved before there could be several have just `courseInterest`)."""
+    p = profile or {}
+    return list(p.get("courseInterests") or ([p["courseInterest"]] if p.get("courseInterest") else []))
 
 
 def profile_complete(profile: dict | None) -> bool:

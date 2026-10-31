@@ -5,9 +5,9 @@ import { Panel, Pill } from '../dashboard/Panel';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { SERVICE_AREA, canEditArea, counsellorName, ownerOf, teamTitle, type StaffStudent } from '../../data/staff';
-import { useAgencies } from '../../hooks/useStaffData';
 import { useApi } from '../../lib/api/store';
 import { CareerPlanFields, careerPlanDraft, careerPlanError, useCareerOptions } from './CareerPlanFields';
+import { DocumentRequest } from './DocumentRequest';
 import type { useStudentActions } from '../../hooks/useJourney';
 import {
   DEPARTURE_TASKS,
@@ -29,7 +29,7 @@ import { cn, formatDate, formatDateTime } from '../../lib/utils';
 type Actions = ReturnType<typeof useStudentActions>;
 
 const tone: Record<ServiceStatus, 'green' | 'blue' | 'grey'> = { completed: 'green', in_progress: 'blue', not_started: 'grey', not_needed: 'grey' };
-const short: Record<ServiceCode, string> = { S1: 'Counselling', S2: 'Shortlist', S3: 'Applications', S4: 'Funding', S5: 'Visa', S6: 'Pre-departure', S7: 'Post-arrival' };
+const short: Record<ServiceCode, string> = { S1: 'Counselling & shortlist', S3: 'Applications', S4: 'Funding', S5: 'Visa', S6: 'Pre-departure', S7: 'Post-arrival' };
 
 function Field({ label, id, children }: { label: string; id: string; children: ReactNode }) {
   return (
@@ -176,7 +176,7 @@ function CareerTab({ student, actions }: { student: StaffStudent; actions: Actio
   );
 }
 
-const blankItem = { university: '', universityOther: '', course: '', courseOther: '', country: 'United Kingdom', intake: '', tuition: '', livingCost: '', deadline: '', agency: '', earnsCommission: true, reason: '' };
+const blankItem = { university: '', universityOther: '', course: '', courseOther: '', country: 'United Kingdom', intake: '', tuition: '', livingCost: '', deadline: '', duration: '', reason: '' };
 
 /** Universities by country and upcoming intakes, from the backend (courses come from the career options). */
 interface ShortlistOptions {
@@ -186,16 +186,14 @@ interface ShortlistOptions {
 }
 const NO_SHORTLIST_OPTIONS: ShortlistOptions = { universities: {}, intakes: [], otherUniversity: '' };
 const OTHER_COURSE = 'Other (type the course)';
+const DURATIONS = ['6 months', '9 months', '1 year', '15 months', '18 months', '2 years', '3 years', '4 years', '5 years'];
 
 function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Actions }) {
   const sl = student.journey.shortlist;
-  const [agencies] = useAgencies();
-  const agencyNames = [...agencies.filter((a) => a.status === 'Active').map((a) => a.name), 'Own application'];
   const [options] = useApi<ShortlistOptions>('/shortlist-options', NO_SHORTLIST_OPTIONS);
   const careerOptions = useCareerOptions();
   const [form, setForm] = useState(blankItem);
-  // Until one is chosen: the first active agency, the course from the student's career plan and their preferred intake.
-  const agency = form.agency || agencyNames[0]!;
+  // Until one is chosen: the course from the student's career plan and their preferred intake.
   const planCourse = student.journey.careerPlan?.course;
   const course = form.course || (planCourse && planCourse !== careerOptions.otherCourse ? planCourse : '');
   const intake = form.intake || (options.intakes.includes(student.intake) ? student.intake : '');
@@ -214,10 +212,10 @@ function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Ac
     e.preventDefault();
     const university = (form.university === options.otherUniversity ? form.universityOther : form.university).trim();
     const courseName = (course === OTHER_COURSE ? form.courseOther : course).trim();
-    const missing = [university, courseName, intake, form.tuition, form.livingCost, form.deadline, form.reason].some((v) => !v.trim());
+    const missing = [university, courseName, intake, form.duration, form.tuition, form.livingCost, form.deadline, form.reason].some((v) => !v.trim());
     if (missing) return setError('Fill in every field, including a short reason for the student.');
     const { universityOther: _u, courseOther: _c, ...rest } = form;
-    actions.addShortlistItem({ ...rest, agency, university, course: courseName, intake, reason: form.reason.trim() });
+    actions.addShortlistItem({ ...rest, university, course: courseName, intake, reason: form.reason.trim() });
     setForm(blankItem);
     setError(null);
     setAdding(false);
@@ -251,7 +249,7 @@ function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Ac
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-navy-900">{i.university}</p>
-                  <p className="text-xs text-navy-500">{i.course} · {i.country} · {i.intake} · {i.tuition} · apply by {formatDate(i.deadline)} · {i.agency} · {i.earnsCommission ? 'commission' : 'no commission'}</p>
+                  <p className="text-xs text-navy-500">{[i.course, i.country, i.intake, i.duration, i.tuition, `apply by ${formatDate(i.deadline)}`].filter(Boolean).join(' · ')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {i.choice === 'apply' && <Pill tone="green">Student: apply</Pill>}
@@ -338,19 +336,16 @@ function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Ac
                 {options.intakes.map((i) => <option key={i}>{i}</option>)}
               </select>
             </Field>
+            <Field label="Course duration" id="sl-duration">
+              <select id="sl-duration" value={form.duration} onChange={set('duration')} className="input py-2">
+                <option value="" disabled>Choose a duration</option>
+                {DURATIONS.map((d) => <option key={d}>{d}</option>)}
+              </select>
+            </Field>
             <Field label="Tuition" id="sl-tuition"><input id="sl-tuition" value={form.tuition} onChange={set('tuition')} className="input py-2" placeholder="e.g. £30,000 a year" /></Field>
             <Field label="Living cost" id="sl-living"><input id="sl-living" value={form.livingCost} onChange={set('livingCost')} className="input py-2" placeholder="e.g. £1,300 a month" /></Field>
             <Field label="Application deadline" id="sl-deadline"><input id="sl-deadline" type="date" value={form.deadline} onChange={set('deadline')} className="input py-2" /></Field>
-            <Field label="Applied through" id="sl-agency">
-              <select id="sl-agency" value={agency} onChange={set('agency')} className="input py-2">
-                {agencyNames.map((a) => <option key={a}>{a}</option>)}
-              </select>
-            </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm text-navy-700">
-            <input type="checkbox" checked={form.earnsCommission} onChange={(e) => setForm((f) => ({ ...f, earnsCommission: e.target.checked }))} className="h-4 w-4 accent-navy-900" />
-            AHat earns commission from this university (disclosed to the student)
-          </label>
           <Field label="Why you recommend it (shown to the student)" id="sl-reason"><textarea id="sl-reason" rows={2} value={form.reason} onChange={set('reason')} className="input resize-none" /></Field>
           {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
@@ -388,7 +383,6 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
     }
   };
   const [sch, setSch] = useState({ name: '', amount: '', deadline: '' });
-  const [docName, setDocName] = useState('');
   const funds = student.documents.filter((d) => d.category === 'funds');
   const covered = f.sources.reduce((n, x) => n + x.amount, 0);
 
@@ -471,18 +465,6 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
         <p className="mt-1 text-sm text-navy-600">
           {funds.length ? `${funds.filter((d) => d.state === 'verified').length} of ${funds.length} verified. This service is complete once they are all verified and the funding plan covers the estimated cost.` : 'Request the documents the student must show, e.g. bank statements held for 28 days (UK) or a blocked account confirmation (Germany).'}
         </p>
-        <form
-          className="mt-2 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (docName.trim().length < 3) return;
-            actions.requestDocument(docName.trim(), 'funds');
-            setDocName('');
-          }}
-        >
-          <input aria-label="Proof-of-funds document" value={docName} onChange={(e) => setDocName(e.target.value)} className="input py-2" placeholder="e.g. Bank statement (28 days)" />
-          <Button type="submit" size="sm" variant="outline">Request</Button>
-        </form>
       </div>
     </div>
   );
@@ -493,7 +475,6 @@ function VisaTab({ student, actions }: { student: StaffStudent; actions: Actions
   const [note, setNote] = useState('');
   const [reference, setReference] = useState('');
   const [refusing, setRefusing] = useState(false);
-  const [docName, setDocName] = useState('');
   const accepted = student.applications.some((a) => a.state === 'accepted');
   const i = v ? VISA_PATH.indexOf(v.stage) : -1;
   const next: VisaStage | null = !v ? 'cas_received' : v.stage === 'refused' ? 'documents_verified' : i >= 0 && i < VISA_PATH.length - 1 ? VISA_PATH[i + 1]! : null;
@@ -544,18 +525,6 @@ function VisaTab({ student, actions }: { student: StaffStudent; actions: Actions
           )}
         </div>
       )}
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (docName.trim().length < 3) return;
-          actions.requestDocument(docName.trim(), 'visa');
-          setDocName('');
-        }}
-      >
-        <input aria-label="Visa document" value={docName} onChange={(e) => setDocName(e.target.value)} className="input py-2" placeholder="Request a visa document, e.g. TB test certificate" />
-        <Button type="submit" size="sm" variant="outline">Request</Button>
-      </form>
       {refusing && (
         <Modal
           open
@@ -698,14 +667,25 @@ export function JourneyPanel({ student, services, actions, role }: { student: St
       {/* Read-only for anyone else: every control inside is disabled. */}
       <fieldset disabled={!canEdit} className="min-w-0 disabled:opacity-80">
       <div className="mt-4" role="tabpanel">
-        {tab === 'S1' && <CareerTab student={student} actions={actions} />}
-        {tab === 'S2' && <ShortlistTab student={student} actions={actions} />}
+        {tab === 'S1' && (
+          <div className="space-y-6">
+            <div data-journey-part="career">
+              <h3 className="mb-3 font-sans text-sm font-semibold text-navy-900">Career plan</h3>
+              <CareerTab student={student} actions={actions} />
+            </div>
+            <div className="border-t border-navy-100 pt-5" data-journey-part="shortlist">
+              <h3 className="mb-3 font-sans text-sm font-semibold text-navy-900">University shortlist</h3>
+              <ShortlistTab student={student} actions={actions} />
+            </div>
+          </div>
+        )}
         {tab === 'S3' && <Hint>Applications are created when the student approves the shortlist. Update their status in <a href="#applications" className="font-semibold underline">Applications</a> below; the student accepts or declines offers on their dashboard.</Hint>}
         {tab === 'S4' && <FundingTab student={student} actions={actions} />}
         {tab === 'S5' && <VisaTab student={student} actions={actions} />}
         {tab === 'S6' && <DepartureTab student={student} actions={actions} />}
         {tab === 'S7' && <ArrivalTab student={student} actions={actions} />}
       </div>
+      <DocumentRequest key={tab} stage={tab} student={student} onRequest={actions.requestDocument} />
       </fieldset>
 
       {overriding && <OverrideModal view={view} actions={actions} onClose={() => setOverriding(false)} />}

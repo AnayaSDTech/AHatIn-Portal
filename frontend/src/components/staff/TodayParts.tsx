@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlarmClock, CalendarDays, Check, CheckCircle2, ClipboardList, FileSearch, MessageCircle, MessageSquare, Phone, PlaneLanding } from 'lucide-react';
+import { AlarmClock, Bell, CalendarDays, Check, CheckCircle2, ClipboardList, FileSearch, MessageCircle, MessageSquare, Phone, PlaneLanding, UserPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { SessionRow } from '../scheduling/SessionManage';
-import { counsellorName, type FollowUp, type FollowUpType, type Message, type StaffStudent } from '../../data/staff';
+import { counsellorName, type FollowUp, type FollowUpType, type Message, type StaffNotification, type StaffStudent } from '../../data/staff';
+import { useStaffNotifications } from '../../hooks/useStaffData';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
 import type { Session } from '../../lib/scheduling';
@@ -28,20 +29,61 @@ export function greeting() {
 
 export const todayLabel = () => new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-/** A small count card; clicking it opens what it counts. */
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** One line on where the day stands, shown under the greeting. */
+export function daySummary(overdue: number, dueToday: number, sessions: number) {
+  if (!overdue && !dueToday && !sessions) return 'Nothing due today';
+  return [overdue && `${plural(overdue, 'overdue task')}`, dueToday && `${dueToday} due today`, sessions && `${plural(sessions, 'session')} today`].filter(Boolean).join(' · ');
+}
+
+/** The greeting at the top of a Today page. `children` sits on the right. */
+export function TodayHeader({ name, summary, children }: { name: string; summary: string; children?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wider text-navy-400">{todayLabel()}</p>
+        <h1 className="mt-1 text-3xl">
+          {greeting()}, {name.split(' ')[0]}
+        </h1>
+        <p className="mt-1 text-sm text-navy-500" data-day-summary>
+          {summary}
+        </p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** The counts in one connected strip. */
+export function StatStrip({ children }: { children: ReactNode }) {
+  return <div className="card mb-6 grid grid-cols-2 gap-px overflow-hidden bg-navy-100 lg:grid-cols-4" data-stat-strip>{children}</div>;
+}
+
+/** The two columns of a Today page: the person's work, and a rail of what's coming in (first on phones). */
+export function TodayColumns({ main, rail }: { main: ReactNode; rail: ReactNode }) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-12">
+      <div className="min-w-0 space-y-6 xl:col-span-8">{main}</div>
+      <div className="order-first min-w-0 space-y-6 xl:order-none xl:col-span-4">{rail}</div>
+    </div>
+  );
+}
+
+/** One count in the strip; clicking it opens what it counts. */
 export function Stat({ label, value, icon: Icon, tone, onClick, href }: { label: string; value: number; icon: LucideIcon; tone: string; onClick?: () => void; href?: string }) {
   const body = (
     <>
-      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', value ? tone : 'bg-navy-50 text-navy-400')}>
-        <Icon className="h-5 w-5" aria-hidden />
+      <span className="min-w-0">
+        <span className="block text-xs font-medium text-navy-500">{label}</span>
+        <span className="mt-2 block font-display text-3xl leading-none text-navy-900">{value}</span>
       </span>
-      <span>
-        <span className="block font-display text-2xl leading-none text-navy-900">{value}</span>
-        <span className="mt-1 block text-xs font-medium text-navy-500">{label}</span>
+      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', value ? tone : 'bg-navy-50 text-navy-400')}>
+        <Icon className="h-4 w-4" aria-hidden />
       </span>
     </>
   );
-  const cls = 'card flex items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lift';
+  const cls = 'flex items-center justify-between gap-3 bg-white p-4 text-left transition hover:bg-ivory sm:p-5';
   return href ? (
     <Link to={href} className={cls} data-stat={label}>
       {body}
@@ -69,7 +111,7 @@ export function Section({ id, title, icon: Icon, action, children }: { id?: stri
 
 export function AllClear({ children }: { children: ReactNode }) {
   return (
-    <p className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-navy-400">
+    <p className="flex items-center justify-center gap-2 px-5 py-7 text-sm text-navy-400">
       <CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden /> {children}
     </p>
   );
@@ -192,6 +234,65 @@ export function SessionsTodaySection({ sessions, nameOf, showCounsellor }: { ses
             <SessionRow key={s.id} session={s} studentName={nameOf(s.studentId)} showCounsellor={showCounsellor} stacked />
           ))}
         </div>
+      )}
+    </Section>
+  );
+}
+
+const notificationIcon: Record<StaffNotification['kind'], LucideIcon> = {
+  assigned: UserPlus,
+  session: CalendarDays,
+  message: MessageSquare,
+  document: FileSearch,
+  update: Bell,
+};
+
+/** New updates for this staff member, newest first. Each goes once it is opened or marked as read. */
+export function NotificationsSection() {
+  const [items] = useStaffNotifications();
+  const read = (id: string) => act(() => api.post(`/staff/notifications/${id}/read`));
+  return (
+    <Section
+      id="notifications"
+      title={`Notifications · ${items.length}`}
+      icon={Bell}
+      action={
+        items.length > 0 && (
+          <button type="button" onClick={() => act(() => api.post('/staff/notifications/read-all'))} className="shrink-0 text-xs font-semibold text-navy-500 hover:text-navy-900" data-read-all>
+            Mark all as read
+          </button>
+        )
+      }
+    >
+      {items.length === 0 ? (
+        <AllClear>No new notifications</AllClear>
+      ) : (
+        <ul className="max-h-96 divide-y divide-navy-100 overflow-y-auto" aria-label="Notifications">
+          {items.map((n) => {
+            const Icon = notificationIcon[n.kind] ?? Bell;
+            return (
+              <li key={n.id} className="flex items-start gap-3 px-5 py-3 transition hover:bg-ivory/60" data-notification={n.kind}>
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold-50 text-gold-700">
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                <Link to={n.path} onClick={() => read(n.id)} className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold leading-snug text-navy-900">{n.title}</span>
+                  <span className="mt-0.5 line-clamp-2 text-xs text-navy-500">{n.text}</span>
+                  <span className="mt-0.5 block text-[11px] text-navy-400">{relativeTime(n.at)}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => read(n.id)}
+                  className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-navy-100 text-navy-500 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                  aria-label={`Mark as read: ${n.title}`}
+                  title="Mark as read"
+                >
+                  <Check className="h-4 w-4" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </Section>
   );

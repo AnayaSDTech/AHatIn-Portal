@@ -37,6 +37,9 @@ export function BookSessionModal({ open, onClose, studentId, team, initialType }
 
   const [type, setType] = useState('');
   const area = sessionArea(type);
+  // Opened for one person (from their tab or card): only the topics that person covers.
+  const forArea = initialType ? sessionArea(initialType) : null;
+  const topics = forArea ? sessionTypes.filter((t) => sessionArea(t) === forArea) : [...sessionTypes];
   // Until a topic is chosen, show the counsellor's times.
   const host = team[area];
   const counsellor = host ?? team.counsellor!;
@@ -115,7 +118,7 @@ export function BookSessionModal({ open, onClose, studentId, team, initialType }
       open={open}
       onClose={onClose}
       size="lg"
-      title="Book a session"
+      title={forArea && host ? `Book a session with ${host.name.split(' ')[0]}` : 'Book a session'}
       description={availability ? `Free times with ${counsellor.name}, ${role}. Sessions last ${availability.slotMinutes} minutes.` : undefined}
       footer={
         <>
@@ -135,22 +138,31 @@ export function BookSessionModal({ open, onClose, studentId, team, initialType }
           </p>
         )}
 
-        <SelectField
-          label="What would you like to discuss?"
-          placeholder="Choose a topic"
-          options={sessionTypes.map((t) => {
-            const who = team[sessionArea(t)];
-            return { value: t, label: who ? `${t} · with ${who.name}` : `${t} · once your ${teamTitle[sessionArea(t)]} is assigned` };
-          })}
-          value={type}
-          onChange={(e) => {
-            // A different person has different free times.
-            if (sessionArea(e.target.value) !== area) setPick({ date: '', time: '' });
-            setType(e.target.value);
-            setErrors(({ type: _cleared, ...rest }) => rest);
-          }}
-          error={errors.type}
-        />
+        {topics.length === 1 ? (
+          <div data-session-topic>
+            <p className="mb-1.5 text-sm font-medium text-navy-800">Topic</p>
+            <p className="rounded-xl bg-ivory px-4 py-3 text-sm font-semibold text-navy-900">{topics[0]}</p>
+          </div>
+        ) : (
+          <SelectField
+            label="What would you like to discuss?"
+            placeholder="Choose a topic"
+            options={topics.map((t) => {
+              const who = team[sessionArea(t)];
+              // All with the same person when opened for one of them, so the name is in the title instead.
+              if (forArea) return { value: t, label: t };
+              return { value: t, label: who ? `${t} · with ${who.name}` : `${t} · once your ${teamTitle[sessionArea(t)]} is assigned` };
+            })}
+            value={type}
+            onChange={(e) => {
+              // A different person has different free times.
+              if (sessionArea(e.target.value) !== area) setPick({ date: '', time: '' });
+              setType(e.target.value);
+              setErrors(({ type: _cleared, ...rest }) => rest);
+            }}
+            error={errors.type}
+          />
+        )}
 
         {!host ? (
           <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900" data-not-assigned>

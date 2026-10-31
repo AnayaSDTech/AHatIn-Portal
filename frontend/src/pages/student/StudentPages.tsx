@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CalendarPlus, Clock, Inbox, MessageSquare, PiggyBank } from 'lucide-react';
+import { CalendarPlus, Clock, Inbox, MessageSquare, PiggyBank, UserRoundPen } from 'lucide-react';
 import { Panel } from '../../components/dashboard/Panel';
 import { Button } from '../../components/ui/Button';
 import { useStudent } from '../../components/student/StudentLayout';
 import { ServiceTracker, type TrackerAction } from '../../components/dashboard/ServiceTracker';
-import { CareerPlanDetails } from '../../components/dashboard/CareerPlanDetails';
-import { GettingStarted } from '../../components/dashboard/GettingStarted';
+import { CareerPlanSummary } from '../../components/dashboard/CareerPlanDetails';
+import { StageDetails } from '../../components/dashboard/StageDetails';
+import { stageSteps } from '../../lib/journeySteps';
 import { NotificationsCard, buildNotifications } from '../../components/dashboard/NotificationsCard';
 import { CounsellorCard } from '../../components/dashboard/CounsellorCard';
 import { ApplicationsCard } from '../../components/dashboard/ApplicationsCard';
@@ -13,11 +14,11 @@ import { DocumentChecklist } from '../../components/dashboard/DocumentChecklist'
 import { SessionsCard } from '../../components/dashboard/SessionsCard';
 import { MessagesCard } from '../../components/dashboard/MessagesCard';
 import { DepartureCard, FundingCard, ShortlistCard, VisaCard } from '../../components/dashboard/JourneyCards';
-import { DEPARTURE_TASKS, type ServiceCode } from '../../lib/journey';
+import { DEPARTURE_TASKS, applicationDocumentsDue, type ServiceCode } from '../../lib/journey';
 import { cn } from '../../lib/utils';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
-import type { AppState, TeamArea } from '../../data/staff';
+import type { AppState, StaffStudent, TeamArea } from '../../data/staff';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 /** Shown on a section page that has nothing in it yet. */
@@ -43,17 +44,26 @@ function NotStartedYet({ what }: { what: string }) {
   );
 }
 
+/** The kind of session that fits where the student is now; they can still choose another in the booking window. */
+function sessionFor(record: StaffStudent, area: TeamArea) {
+  const { careerPlan, visa, departure, arrival } = record.journey;
+  if (area === 'finance') return 'Scholarship & funding';
+  if (area === 'visa') return arrival.arrivedAt ? 'Post-arrival check-in' : visa?.stage === 'granted' || departure.confirmedAt ? 'Pre-departure briefing' : 'Visa preparation';
+  return careerPlan ? 'Application review' : 'Career counselling';
+}
+
 /**
- * Contact cards for everyone looking after the student (counsellor, Financial Aid Officer, Visa Officer): message, email
- * or call. "Message" opens that person's chat.
+ * Contact cards for everyone looking after the student (counsellor, Financial Aid Officer, Visa Officer): message or
+ * email, or book a session. "Message" opens that person's chat; "Book" opens the booking window for a session with them.
  */
 function TeamContacts({ onMessage }: { onMessage: (chat: TeamArea) => void }) {
-  const { counsellor, team, profileComplete } = useStudent();
+  const { counsellor, team, profileComplete, record, openBooking } = useStudent();
+  const book = (area: TeamArea) => () => openBooking(sessionFor(record, area));
   return (
     <>
-      <CounsellorCard counsellor={counsellor} profileComplete={profileComplete} onMessage={() => onMessage('counsellor')} />
-      {team.finance && <CounsellorCard counsellor={team.finance} title="Your Financial Aid Officer" onMessage={() => onMessage('finance')} />}
-      {team.visa && <CounsellorCard counsellor={team.visa} title="Your Visa Officer" onMessage={() => onMessage('visa')} />}
+      <CounsellorCard counsellor={counsellor} profileComplete={profileComplete} onMessage={() => onMessage('counsellor')} onBook={book('counsellor')} />
+      {team.finance && <CounsellorCard counsellor={team.finance} title="Your Financial Aid Officer" onMessage={() => onMessage('finance')} onBook={book('finance')} />}
+      {team.visa && <CounsellorCard counsellor={team.visa} title="Your Visa Officer" onMessage={() => onMessage('visa')} onBook={book('visa')} />}
     </>
   );
 }
@@ -64,7 +74,12 @@ export function StudentOverviewPage() {
   const { record, services, sessions, profile, profileComplete, messages, counsellor, appUpdates, go, openBooking, openProfile } = useStudent();
   const openChat = useOpenChat();
   // The journey starts once the profile is complete and the admin has assigned a counsellor.
-  const started = profileComplete && !!counsellor;
+  const journeyStarted = profileComplete && !!counsellor;
+  /** A stage that is under way or done (its link in the tracker shows only then). */
+  const started = (code: ServiceCode) => {
+    const status = services.find((sv) => sv.code === code)?.status;
+    return status === 'in_progress' || status === 'completed';
+  };
 
   // Buttons in the progress tracker for steps that are waiting on the student.
   const trackerActions = useMemo(() => {
@@ -76,11 +91,11 @@ export function StudentOverviewPage() {
 
     if (status('S1') === 'not_started') a.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };
 
-    if (journey.shortlist?.status === 'shared') a.S2 = { label: 'Review shortlist', onClick: to('shortlist') };
 
     const offers = applications.filter((x) => x.state === 'conditional_offer' || x.state === 'unconditional_offer');
     if (open('S3') && offers.length && !applications.some((x) => x.state === 'accepted')) a.S3 = { label: 'Reply to offer', onClick: to('applications') };
-    else if (open('S3') && applications.length && applications.every((x) => x.state === 'draft') && documents.some((d) => d.state === 'missing' || d.state === 'rejected'))
+    else if (journey.shortlist?.status === 'shared') a.S3 = { label: 'Review shortlist', onClick: to('shortlist') };
+    else if (open('S3') && applications.length && applications.every((x) => x.state === 'draft') && applicationDocumentsDue(record))
       a.S3 = { label: 'Upload documents', onClick: to('documents') };
 
     if (open('S4')) {
@@ -98,16 +113,45 @@ export function StudentOverviewPage() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       <div className="order-2 min-w-0 lg:order-1 lg:col-span-7">
-        {started ? (
-          <ServiceTracker
+        <ServiceTracker
             services={services}
-            actions={trackerActions}
-            links={{ S3: { label: 'View applications', onClick: () => go('applications') } }}
-            details={record.journey.careerPlan ? { S1: <CareerPlanDetails plan={record.journey.careerPlan} /> } : undefined}
+            // Buttons for the student's next steps once the journey has started (profile complete, counsellor assigned).
+            actions={journeyStarted ? trackerActions : {}}
+            intro={
+              !profileComplete ? (
+                <Button onClick={openProfile} className="w-full sm:w-auto" data-complete-profile>
+                  <UserRoundPen className="h-4 w-4" aria-hidden /> Complete your profile
+                </Button>
+              ) : !counsellor ? (
+                <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900" data-being-matched>
+                  We're matching you with a counsellor and will email you when they're assigned.
+                </p>
+              ) : undefined
+            }
+            links={{
+              // The shortlist once the counsellor has shared it; applications, funding and visa once that stage has started.
+              ...(record.journey.shortlist?.sharedAt ? { S1: { label: 'View shortlist', onClick: () => go('shortlist') } } : {}),
+              ...(started('S3') ? { S3: { label: 'View applications', onClick: () => go('applications') } } : {}),
+              ...(started('S4') ? { S4: { label: 'View funding', onClick: () => go('funding') } } : {}),
+              ...(started('S5') ? { S5: { label: 'View visa', onClick: () => go('visa') } } : {}),
+            }}
+            details={Object.fromEntries(
+              services
+                .filter((sv) => sv.status !== 'not_needed')
+                .map((sv) => {
+                  const plan = sv.code === 'S1' ? record.journey.careerPlan : undefined;
+                  return [
+                    sv.code,
+                    <StageDetails
+                      key={sv.code}
+                      code={sv.code}
+                      steps={stageSteps(sv.code, record, sessions, sv.status)}
+                      extra={plan ? <CareerPlanSummary plan={plan} /> : undefined}
+                    />,
+                  ];
+                }),
+            )}
           />
-        ) : (
-          <GettingStarted profile={profile} profileComplete={profileComplete} counsellor={counsellor} onCompleteProfile={openProfile} onBook={() => openBooking('Career counselling')} />
-        )}
       </div>
       <div className="order-1 min-w-0 space-y-6 lg:order-2 lg:col-span-5">
         <NotificationsCard items={buildNotifications(record, services, sessions, profile, messages, appUpdates)} onOpenProfile={openProfile} onGo={go} />
@@ -150,11 +194,21 @@ function useOpenChat() {
 export function StudentSessionsPage() {
   const { record, user, counsellor, team, profileComplete } = useStudent();
   const openChat = useOpenChat();
+  // Which person's sessions are shown: ?with=finance or ?with=visa, otherwise the counsellor's.
+  const [params, setParams] = useSearchParams();
+  const tab: TeamArea = params.get('with') === 'finance' && team.finance ? 'finance' : params.get('with') === 'visa' && team.visa ? 'visa' : 'counsellor';
   if (!counsellor || !profileComplete) return <NotStartedYet what="book sessions" />;
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       <div className="min-w-0 lg:col-span-7">
-        <SessionsCard studentId={record.id} studentName={user.name} team={team} />
+        <SessionsCard
+          studentId={record.id}
+          studentName={user.name}
+          team={team}
+          initial={tab}
+          onTab={(k) => setParams(k === 'counsellor' ? {} : { with: k }, { replace: true })}
+          suggestedType={(k) => sessionFor(record, k)}
+        />
       </div>
       <div className="min-w-0 space-y-6 lg:col-span-5">
         <TeamContacts onMessage={openChat} />
@@ -239,7 +293,7 @@ export function StudentFundingPage() {
   const started = !notNeeded && (!!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || record.documents.some((d) => d.category === 'funds'));
   if (!showFunding) return <Empty>Your funding plan starts after you accept an offer: we assign you a Financial Aid Officer, who sets your estimated cost and helps with scholarships and proof of funds. Your visa progress appears here later.</Empty>;
   return (
-    <div className={cn('grid grid-cols-1 gap-6', record.journey.visa && 'lg:grid-cols-2')}>
+    <div className={cn('grid grid-cols-1 gap-6', (record.journey.visa || record.visaOfficerId) && 'lg:grid-cols-2')}>
       <div className="min-w-0">
         {started ? <FundingCard student={record} actions={actions} notNeeded={notNeeded} /> : <FundingNotStarted />}
       </div>

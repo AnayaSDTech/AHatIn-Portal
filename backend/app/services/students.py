@@ -8,7 +8,7 @@ from app.core.errors import ApiError, not_found
 from app.core.scope import visible_student
 from app.core.security import decrypt, encrypt
 from app.db import get_db, new_id
-from app.domain import DESTINATION_LABELS, STARTER_DOCUMENTS, blank_profile, empty_journey, format_mobile, mobile_digits, profile_complete
+from app.domain import DESTINATION_LABELS, STARTER_DOCUMENTS, blank_profile, courses_of, empty_journey, format_mobile, mobile_digits, profile_complete
 from app.records import serialize_counsellor
 from app.services.workflow import next_reference
 
@@ -93,6 +93,9 @@ def profile_out(record: dict) -> dict:
     p = {**blank_profile(), **(record.get("profile") or {})}
     enc = p.pop("passportNumberEnc", None)
     p["passportNumber"] = decrypt(enc) if enc else p.get("passportNumber", "")
+    p["courseInterests"] = courses_of(p)
+    # The mobile number lives on the record (given at registration); the student can change it from their profile.
+    p["mobile"] = record.get("mobileDigits") or mobile_digits(record.get("mobile", ""))
     return p
 
 

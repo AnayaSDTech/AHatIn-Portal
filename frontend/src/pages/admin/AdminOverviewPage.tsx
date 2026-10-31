@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlarmClock, AlertTriangle, BarChart3, Megaphone, Percent, ShieldCheck, UsersRound } from 'lucide-react';
 import { PageHeader, StatCard } from '../../components/staff/StaffUi';
+import { NotificationsSection } from '../../components/staff/TodayParts';
 import { Panel } from '../../components/dashboard/Panel';
 import type { Overview } from '../../data/staff';
 import { useApi } from '../../lib/api/store';
@@ -35,6 +36,10 @@ export function AdminOverviewPage() {
           </p>
         </div>
       ))}
+
+      <div className="mb-6">
+        <NotificationsSection />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Enquiries" value={enquiries} icon={Megaphone} tone="blue" />

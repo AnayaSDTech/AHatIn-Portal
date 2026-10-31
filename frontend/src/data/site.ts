@@ -129,7 +129,7 @@ export const services: Service[] = [
 
 export const aboutPoints = [
   { title: 'Always free for students', text: 'Our guidance costs you nothing, from first conversation to settling in.' },
-  { title: 'One named counsellor', text: 'A dedicated counsellor stays with you through every step.' },
+  { title: 'Dedicated counsellor', text: 'A dedicated counsellor stays with you through every step.' },
   { title: 'Honest, transparent advice', text: 'We tell you which universities earn us commission, so you can decide with confidence.' },
   { title: 'Your progress, always visible', text: 'Track every application, document and deadline in your student portal.' },
 ];

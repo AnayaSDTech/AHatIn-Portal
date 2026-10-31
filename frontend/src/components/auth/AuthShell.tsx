@@ -18,12 +18,12 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
 
         <div className="relative hidden overflow-hidden lg:m-6 lg:block lg:rounded-[2rem]">
           <SmartImage src={images.campus} alt="" className="absolute inset-0 h-full w-full" />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/70 to-navy-900/30" aria-hidden />
-          <div className="absolute inset-x-0 bottom-0 p-12 text-white">
+          <div className="absolute inset-0 bg-gradient-to-b from-navy-950/30 via-navy-950/80 to-navy-950/30" aria-hidden />
+          <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
             <p className="font-display text-3xl leading-snug">Everything about your application, in one place.</p>
             <ul className="mt-6 space-y-3 text-sm text-navy-100">
               {[
-                'See your progress across all seven services',
+                'See your progress at every stage of your journey',
                 'Upload documents and track verification',
                 'Never miss an application or visa deadline',
                 'Message your counsellor any time',

@@ -78,6 +78,8 @@ async def check_handover(sid: str) -> None:
         f"Assign a {title}: {student['name']}",
         f"{student['name']} ({student['reference']}) has completed {done}. Please assign a {title} in the staff portal: {notify.portal_link('/admin/assign')}",
         dedupe_key=event,
+        alert_path="/admin/assign",
+        alert_text=f"{student['name']} ({student['reference']}) has completed {done}.",
     )
 
 
@@ -124,12 +126,13 @@ async def assign_officer(student: dict, area: str, officer: dict, by: dict, reas
     sid = student["_id"]
     if previous:
         await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": previous}, {"$set": {"counsellorId": officer["_id"]}})
+        await db.staff_alerts.delete_many({"userId": previous, "studentId": sid})
     await add_note(sid, by["name"], f"{'Changed' if previous else 'Assigned'} {title}: {officer['name']}. {reason}")
     first = officer["name"].split(" ")[0]
     what = "scholarships, your funding plan and proof of funds" if area == "finance" else "your visa, getting ready to travel and settling in after you arrive"
     await notify.email_counsellor(
         officer["_id"], f"New student assigned: {student['name']}",
-        f"You are now {student['name']}'s {title} ({student['reference']}). Reason: {reason}", path=f"/staff/students/{sid}",
+        f"You are now {student['name']}'s {title} ({student['reference']}). Reason: {reason}", path=f"/staff/students/{sid}", kind="assigned",
     )
     await notify.email_student(
         student, f"Meet your {title}: {officer['name']}",

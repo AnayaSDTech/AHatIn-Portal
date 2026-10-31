@@ -109,7 +109,7 @@ async def _send_invites(session: dict, student: dict, counsellor: dict, subject:
     if notify_student:
         await notify.email_student(student, subject, full, attachments=[ics])
     if notify_counsellor:
-        await notify.email_counsellor(counsellor["_id"], subject, full, path="/staff/schedule", attachments=[ics])
+        await notify.email_counsellor(counsellor["_id"], subject, full, path="/staff/schedule", attachments=[ics], kind="session")
 
 
 @router.post("/sessions")

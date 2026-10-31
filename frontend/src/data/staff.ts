@@ -61,7 +61,7 @@ export interface StudentTeam {
   visa: Counsellor | null;
 }
 export const teamTitle: Record<TeamArea, string> = { counsellor: 'Counsellor', finance: 'Financial Aid Officer', visa: 'Visa Officer' };
-export const SERVICE_AREA: Record<string, TeamArea> = { S1: 'counsellor', S2: 'counsellor', S3: 'counsellor', S4: 'finance', S5: 'visa', S6: 'visa', S7: 'visa' };
+export const SERVICE_AREA: Record<string, TeamArea> = { S1: 'counsellor', S3: 'counsellor', S4: 'finance', S5: 'visa', S6: 'visa', S7: 'visa' };
 export const DOC_AREA: Record<string, TeamArea> = { general: 'counsellor', funds: 'finance', visa: 'visa' };
 /** Each kind of session is with the person who looks after it. */
 export const SESSION_AREA: Record<string, TeamArea> = { 'Scholarship & funding': 'finance', 'Visa preparation': 'visa', 'Pre-departure briefing': 'visa', 'Post-arrival check-in': 'visa' };
@@ -112,6 +112,17 @@ export interface Lead {
 }
 
 export type FollowUpType = 'call' | 'whatsapp' | 'verify' | 'reminder' | 'checkin';
+
+/** An update for a staff member, shown on their Today page until opened or marked as read. */
+export interface StaffNotification {
+  id: string;
+  title: string;
+  text: string;
+  /** Where the update can be seen. */
+  path: string;
+  kind: 'assigned' | 'session' | 'message' | 'document' | 'update';
+  at: string;
+}
 
 export interface FollowUp {
   id: string;
@@ -175,8 +186,11 @@ export const appTransitions: Record<AppState, AppState[]> = {
 
 export interface StaffStudent {
   id: string;
-  /** Null until the admin assigns a counsellor (once the student's profile is complete). */
+  /** Null until a counsellor is assigned (automatically once the student's profile is complete). */
   counsellorId: string | null;
+  counsellorAssignedAt?: string;
+  /** Assigned to the counsellor, who hasn't opened the record yet: listed under "New students" on their dashboard. */
+  newForCounsellor?: boolean;
   /** Assigned by the admin once Application Assistance is complete. */
   financeOfficerId?: string | null;
   /** Assigned by the admin once Scholarship & Financial Guidance is complete. */
@@ -208,6 +222,8 @@ export interface StudentDocument {
   uploadedAt?: string;
   fileName?: string;
   reason?: string;
+  /** Staff who have opened the current file: a document can be verified only by someone who has opened it. */
+  viewedBy?: string[];
 }
 
 export interface StudentApplication {
@@ -249,7 +265,7 @@ export function applicationUpdates(applications: StudentApplication[], seenAt: s
 /** Accepting or declining an offer is the student's decision; staff can't change or correct it. */
 export const isStudentDecision = (s: AppState) => s === 'accepted' || s === 'declined';
 
-export const serviceShortNames = ['Counselling', 'Uni & country', 'Applications', 'Funding', 'Visa', 'Pre-departure', 'Post-arrival'];
+export const serviceShortNames = ['Counselling & shortlist', 'Applications', 'Funding', 'Visa', 'Pre-departure', 'Post-arrival'];
 
 /* ------------------------------ Admin ------------------------------ */
 

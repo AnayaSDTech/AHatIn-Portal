@@ -24,6 +24,9 @@ def serialize_document(d: dict) -> dict:
         out["fileName"] = d["fileName"]
     if d.get("reason"):
         out["reason"] = d["reason"]
+    # Staff who have opened the current file (a document is verified only after being opened).
+    if d.get("viewedBy"):
+        out["viewedBy"] = d["viewedBy"]
     return out
 
 
@@ -61,6 +64,10 @@ def serialize_student(s: dict, documents: list[dict], applications: list[dict], 
     }
     for field in ("financeOfficerId", "visaOfficerId"):
         out[field] = s.get(field)
+    if s.get("counsellorAssignedAt"):
+        out["counsellorAssignedAt"] = iso_or(s["counsellorAssignedAt"])
+    # Assigned but not yet opened by the counsellor (students assigned before this was recorded don't count as new).
+    out["newForCounsellor"] = bool(s.get("counsellorId")) and "counsellorSeenAt" in s and s["counsellorSeenAt"] is None
     if s.get("officerHistory"):
         out["officerHistory"] = [{**h, "at": iso_or(h["at"])} for h in s["officerHistory"]]
     if s.get("userId"):
@@ -148,6 +155,10 @@ def serialize_message(m: dict) -> dict:
     if m.get("readAt"):
         out["readAt"] = iso_or(m["readAt"])
     return out
+
+
+def serialize_alert(a: dict) -> dict:
+    return {"id": a["_id"], "title": a["title"], "text": a["text"], "path": a["path"], "kind": a["kind"], "at": iso(a["createdAt"])}
 
 
 def serialize_grant(g: dict) -> dict:

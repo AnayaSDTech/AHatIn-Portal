@@ -22,7 +22,7 @@ from app.domain import DEPARTURE_TASKS, blank_profile, empty_journey, mobile_dig
 from app.services import storage
 from app.services.students import profile_in
 
-BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks"]
+BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks", "staff_alerts"]
 
 COUNSELLORS = [
     ("c1", "Priya Desai", "demo.counsellor@ahatin.example", "+91 98000 11111", "https://meet.google.com/juz-bodt-wbd", 40),
@@ -36,6 +36,7 @@ MATCHING = {
     "c3": {"countries": [{"country": "Germany", "years": 5}, {"country": "United Kingdom", "years": 3}], "universities": ["Technical University of Munich"], "subjects": ["finance", "business", "engineering"], "languages": ["English", "Hindi", "German"], "capacity": 30},
 }
 DEFAULT_STAFF_PASSWORD = "Staff@1234"
+DEMO_STUDENT_PASSWORD = "Student@1234"
 
 
 def demo_totp_secret(email: str) -> str:
@@ -83,6 +84,7 @@ def item(id_: str, university: str, course: str, country: str, **extra) -> dict:
         "tuition": "£30,000 a year",
         "livingCost": "£1,300 a month",
         "deadline": days_from_now(40),
+        "duration": "1 year",
         "agency": "Demo Partner Agency A",
         "earnsCommission": True,
         "reason": "Good match for your profile and goals.",
@@ -135,7 +137,8 @@ async def upsert_user(doc: dict, password: str | None = None) -> None:
     existing = await db.users.find_one({"_id": doc["_id"]})
     if password:
         doc["passwordHash"] = existing["passwordHash"] if existing and existing.get("passwordHash") else hash_password(password)
-        doc["totpSecretEnc"] = encrypt(demo_totp_secret(doc["email"]))
+        if doc["role"] != "student":  # staff also sign in with an authenticator app
+            doc["totpSecretEnc"] = encrypt(demo_totp_secret(doc["email"]))
     doc.setdefault("status", "active")
     doc.setdefault("createdAt", now() - timedelta(days=400))
     await db.users.delete_many({"email": doc["email"], "_id": {"$ne": doc["_id"]}})
@@ -157,7 +160,10 @@ async def seed_users() -> None:
         ("demo-student-1", "Ananya Sharma", "demo.student@ahatin.example", "+919800000000", "AH-2026-00042"),
         ("demo-student-2", "Aarav Patel", "new.student@ahatin.example", "+919800033333", "AH-2026-00090"),
     ]:
-        await upsert_user({"_id": uid, "role": "student", "name": name, "email": email, "mobile": mobile, "studentReference": ref, "emailVerifiedAt": now() - timedelta(days=60), "consentAt": now() - timedelta(days=60)})
+        await upsert_user(
+            {"_id": uid, "role": "student", "name": name, "email": email, "mobile": mobile, "studentReference": ref, "emailVerifiedAt": now() - timedelta(days=60), "consentAt": now() - timedelta(days=60)},
+            DEMO_STUDENT_PASSWORD,
+        )
 
 
 # ---------------------------------------------------------------- students

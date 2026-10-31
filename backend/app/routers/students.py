@@ -31,6 +31,7 @@ from app.domain import (
     STUDENT_DECISIONS,
     STUDY_PLAN_FIELDS,
     VISA_LABELS,
+    format_mobile,
     profile_complete,
 )
 from app.records import actor_name, add_note, advance_stage, iso_or, load_student, load_students
@@ -61,6 +62,7 @@ from app.schemas import (
     VisaBody,
 )
 from app.services import notify, storage
+from app.services.assignment import assign_counsellor, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
 from app.services.team import assign_officer, check_handover, owner_for, require_area, team_of
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
@@ -87,7 +89,12 @@ async def list_students(user: CurrentUser):
 
 @router.get("/students/{sid}")
 async def get_student(sid: str, user: CurrentUser):
-    await student_for(user, sid)
+    student = await student_for(user, sid)
+    # The counsellor has now seen their newly assigned student (others opening the record don't count).
+    if user["_id"] == student.get("counsellorId") and "counsellorSeenAt" in student and student["counsellorSeenAt"] is None:
+        await get_db().students.update_one({"_id": sid}, {"$set": {"counsellorSeenAt": now()}})
+    # Opening the record is how a "new student" notification gets read.
+    await get_db().staff_alerts.delete_many({"userId": user["_id"], "studentId": sid, "kind": "assigned"})
     return await load_student(sid)
 
 
@@ -129,15 +136,20 @@ async def save_profile(body: ProfileBody, user: CurrentUser):
     current = profile_out(record)
     was_complete = has_complete_profile(record)
     # The passport number can't be changed here (staff update it); everything else comes from the form.
-    profile = {**body.model_dump(), "passportNumber": current.get("passportNumber", "")}
+    profile = {**body.model_dump(exclude={"mobile"}), "passportNumber": current.get("passportNumber", "")}
     # The record's goal, destination and intake follow the student's own study plans.
     updates = {
         "profile": profile_in(profile),
-        "goal": body.courseInterest,
+        "goal": ", ".join(body.courseInterests),
         "destination": body.destination,
         "intake": body.intake,
         "updatedAt": now(),
     }
+    mobile = body.mobile or current["mobile"]
+    if body.mobile and body.mobile != current["mobile"]:
+        updates.update(mobile=format_mobile(body.mobile), mobileDigits=body.mobile)
+        if record.get("userId"):
+            await get_db().users.update_one({"_id": record["userId"]}, {"$set": {"mobile": f"+91{body.mobile}"}})
     complete = profile_complete(profile)
     if complete and not was_complete:
         updates["profileCompletedAt"] = now()
@@ -145,22 +157,31 @@ async def save_profile(body: ProfileBody, user: CurrentUser):
     sid = record["_id"]
 
     if complete and not was_complete and not record.get("counsellorId"):
-        # Joins the admin's "Waiting for a counsellor" list.
-        await add_note(sid, actor_name(user), "Completed their profile. Waiting for the admin to assign a counsellor.")
+        # The best-matched counsellor with room is assigned straight away.
+        await add_note(sid, actor_name(user), "Completed their profile.")
+        if await auto_assign(sid):
+            return {**profile, "mobile": mobile}
+        # Automatic assignment is off, or no counsellor has room: the student joins the admin's "Waiting for a counsellor" list.
+        await add_note(sid, "System", "Waiting for the admin to assign a counsellor.")
+        await notify.email_admins(f"Assign a counsellor: {record['name']}", f"{record['name']} ({record['reference']}) has completed their profile and is waiting for a counsellor.", alert_path="/admin/assign")
         await create_follow_up(
             counsellor_id=None, person=record["name"], person_id=sid, person_type="student",
             action="Assign a counsellor (profile complete)", rule="Profile complete · 1 working day", due_at=one_working_day_from_now(), type_="reminder", source_event=f"student:{sid}:assign",
         )
-        return profile
+        return {**profile, "mobile": mobile}
 
-    changed = [label for key, label in STUDY_PLAN_FIELDS.items() if current.get(key, "") != profile[key]]
+    def shown(v) -> str:
+        return ", ".join(v) if isinstance(v, list) else v
+
+    changed = [k for k in STUDY_PLAN_FIELDS if shown(current.get(k, "")) != shown(profile[k])]
     if changed and was_complete and record.get("counsellorId"):
-        detail = "; ".join(f"{STUDY_PLAN_FIELDS[k]}: {current.get(k) or 'not set'} → {profile[k]}" for k in STUDY_PLAN_FIELDS if current.get(k, "") != profile[k])
+        detail = "; ".join(f"{STUDY_PLAN_FIELDS[k]}: {shown(current.get(k, '')) or 'not set'} → {shown(profile[k])}" for k in changed)
         await add_note(sid, actor_name(user), f"Changed their study plans ({detail}).")
         await notify.email_counsellor(record["counsellorId"], f"{record['name']} changed their study plans", f"{record['name']} updated their profile. {detail[0].upper()}{detail[1:]}.", path=f"/staff/students/{sid}")
     else:
         await add_note(sid, actor_name(user), "Updated their profile.")
-    return profile
+        await notify.alert_staff(record.get("counsellorId"), f"{record['name']} updated their profile", "Their profile details changed.", path=f"/staff/students/{sid}", key=f"profile:{sid}")
+    return {**profile, "mobile": mobile}
 
 
 # ---------------------------------------------------------------- notes and ownership
@@ -175,7 +196,8 @@ async def add_staff_note(sid: str, body: TextBody, user: Staff):
 
 @router.post("/students/{sid}/assign")
 async def assign(sid: str, body: AssignBody, user: Admin):
-    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete)."""
+    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete): those who
+    completed their profile while no counsellor had room, or before counsellors were assigned automatically."""
     db = get_db()
     async with lock(f"student:{sid}:assign"):
         student = await student_for(user, sid, who="staff")
@@ -186,25 +208,7 @@ async def assign(sid: str, body: AssignBody, user: Admin):
         target = await db.users.find_one({"_id": body.counsellorId, "role": "counsellor", "status": "active"})
         if not target:
             raise ApiError(400, "Choose an active counsellor.", {"counsellorId": "Choose an active counsellor."})
-        t = now()
-        reason = body.reason or "Matched on the student's profile"
-        entry = {"at": t, "by": user["name"], "from": "", "to": target["_id"], "reason": reason}
-        await db.students.update_one({"_id": sid}, {"$set": {"counsellorId": target["_id"], "counsellorAssignedAt": t, "updatedAt": t}, "$push": {"assignmentHistory": entry}})
-    await close_follow_ups(f"student:{sid}:assign")
-    # Anything else waiting on this student (e.g. a document to check) moves to the new counsellor.
-    await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": None}, {"$set": {"counsellorId": target["_id"]}})
-    await add_note(sid, user["name"], f"Assigned to {target['name']}: {reason}")
-    await audit(user, "student.assigned", "students", sid, {"to": target["_id"], "reason": reason})
-    first = target["name"].split(" ")[0]
-    await notify.email_counsellor(
-        target["_id"], f"New student assigned: {student['name']}",
-        f"{student['name']} ({student['reference']}) is now assigned to you. Please book their first career counselling session.", path=f"/staff/students/{sid}",
-    )
-    await notify.email_student(
-        student, f"Meet your counsellor: {target['name']}",
-        f"{target['name']} is your AHat counsellor. {first} will guide you through your career plan, university shortlist and applications. "
-        "You can now book your first career counselling session and message them from your dashboard.",
-    )
+        await assign_counsellor(student, target, user["name"], body.reason or "Matched on the student's profile", actor=user)
     return await load_student(sid)
 
 
@@ -255,12 +259,17 @@ async def reassign(sid: str, body: ReassignBody, user: Admin):
         raise ApiError(400, "The student is already with this counsellor.", {"counsellorId": "Choose a different counsellor."})
     old = await db.users.find_one({"_id": student["counsellorId"]})
     entry = {"at": now(), "by": user["name"], "from": student["counsellorId"], "to": target["_id"], "reason": body.reason}
-    await db.students.update_one({"_id": sid}, {"$set": {"counsellorId": target["_id"], "updatedAt": now()}, "$push": {"assignmentHistory": entry}})
+    t = now()
+    await db.students.update_one(
+        {"_id": sid},
+        {"$set": {"counsellorId": target["_id"], "counsellorAssignedAt": t, "counsellorSeenAt": None, "updatedAt": t}, "$push": {"assignmentHistory": entry}},
+    )
     # Open follow-ups move with the student; booked sessions stay with the counsellor until rescheduled.
     await db.follow_ups.update_many({"personId": sid, "done": False}, {"$set": {"counsellorId": target["_id"]}})
     await add_note(sid, user["name"], f"Reassigned from {old['name'] if old else 'Unassigned'} to {target['name']}: {body.reason}")
+    await db.staff_alerts.delete_many({"userId": student["counsellorId"], "studentId": sid})
     await audit(user, "student.reassigned", "students", sid, {"from": student["counsellorId"], "to": target["_id"], "reason": body.reason})
-    await notify.email_counsellor(target["_id"], f"New student assigned: {student['name']}", f"{student['name']} ({student['reference']}) is now assigned to you. Reason: {body.reason}", path=f"/staff/students/{sid}")
+    await notify.email_counsellor(target["_id"], f"New student assigned: {student['name']}", f"{student['name']} ({student['reference']}) is now assigned to you. Reason: {body.reason}", path=f"/staff/students/{sid}", kind="assigned")
     return await load_student(sid)
 
 
@@ -468,7 +477,7 @@ async def approve_shortlist(sid: str, _: ApproveBody, user: CurrentUser):
     chosen, removed = await _journey(sid, fn)
     existing = {(a["university"], a["course"]) async for a in db.applications.find({"studentId": sid}, {"university": 1, "course": 1})}
     new_apps = [
-        {"_id": new_id(), "studentId": sid, "university": i["university"], "course": i["course"], "agency": i["agency"], "state": "draft", "deadline": i.get("deadline") or None, "history": [], "createdAt": now()}
+        {"_id": new_id(), "studentId": sid, "university": i["university"], "course": i["course"], "agency": i.get("agency", ""), "state": "draft", "deadline": i.get("deadline") or None, "history": [], "createdAt": now()}
         for i in chosen
         if (i["university"], i["course"]) not in existing
     ]
@@ -583,6 +592,8 @@ async def add_funding_source(sid: str, body: FundingSourceBody, user: CurrentUse
 
     await _journey(sid, fn)
     await add_note(sid, actor_name(user), f"Funding plan: added {body.kind} (₹{lakh(amount)} lakh).")
+    if not is_staff(user["role"]):
+        await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} updated their funding plan", f"Added {body.kind} (₹{lakh(amount)} lakh).", path=f"/staff/students/{sid}", key=f"funding:{sid}")
     await check_handover(sid)
     return await load_student(sid)
 
@@ -597,6 +608,8 @@ async def remove_funding_source(sid: str, source_id: str, user: CurrentUser):
         j["funding"]["sources"] = [x for x in j["funding"]["sources"] if x["id"] != source_id]
 
     await _journey(sid, fn)
+    if not is_staff(user["role"]):
+        await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} updated their funding plan", "Removed a funding source.", path=f"/staff/students/{sid}", key=f"funding:{sid}")
     return await load_student(sid)
 
 
@@ -619,14 +632,18 @@ async def set_scholarship_status(sid: str, sch_id: str, body: ScholarshipStatusB
         require_area(user, student, "finance")
     if not is_staff(user["role"]) and body.status != "applied":
         raise ApiError(403, "Your Financial Aid Officer records the scholarship result.")
+    names: list[str] = []
 
     def fn(j, _):
         sch = next((x for x in j["funding"]["scholarships"] if x["id"] == sch_id), None)
         if not sch:
             raise not_found("Scholarship not found.")
         sch["status"] = body.status
+        names.append(sch["name"])
 
     await _journey(sid, fn)
+    if not is_staff(user["role"]):
+        await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} applied for a scholarship", f"Marked {names[0]} as applied.", path=f"/staff/students/{sid}")
     return await load_student(sid)
 
 
@@ -712,7 +729,7 @@ async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBo
     await db.documents.update_one(
         {"_id": doc_id},
         {
-            "$set": {"state": "pending", "fileName": up["fileName"], "fileKey": up["key"], "contentType": up["contentType"], "size": up["size"], "uploadedAt": now()},
+            "$set": {"state": "pending", "fileName": up["fileName"], "fileKey": up["key"], "contentType": up["contentType"], "size": up["size"], "uploadedAt": now(), "viewedBy": []},
             "$unset": {"reason": ""},
         },
     )
@@ -731,6 +748,10 @@ async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBo
         type_="verify",
         source_event=f"doc:{doc_id}:{up['_id']}",
     )
+    await notify.alert_staff(
+        owner_for(student, DOC_AREA.get(d.get("category", "general"), "counsellor")), f"{student['name']} uploaded a document", f"{d['name']} is ready to check.",
+        path=f"/staff/students/{sid}", kind="document", key=f"doc:{doc_id}",
+    )
     return await load_student(sid)
 
 
@@ -748,6 +769,7 @@ async def remove_upload(sid: str, doc_id: str, user: CurrentUser):
     if d.get("fileKey"):
         await storage.delete(d["fileKey"])
     await close_follow_ups(f"doc:{doc_id}:")
+    await notify.clear_alerts(f"doc:{doc_id}")
     await add_note(sid, actor_name(user), f"Removed the uploaded file for {d['name']}.")
     return await load_student(sid)
 
@@ -759,8 +781,11 @@ async def verify_document(sid: str, doc_id: str, user: Staff):
     require_area(user, student, DOC_AREA.get(d.get("category", "general"), "counsellor"))
     if d["state"] != "pending":
         raise ApiError(400, "Only uploaded documents waiting for review can be verified.")
+    if user["_id"] not in (d.get("viewedBy") or []):
+        raise ApiError(400, "Open the document and check it before verifying it.")
     await get_db().documents.update_one({"_id": doc_id}, {"$set": {"state": "verified", "verifiedAt": now(), "verifiedBy": user["_id"]}, "$unset": {"reason": ""}})
     await close_follow_ups(f"doc:{doc_id}:")
+    await notify.clear_alerts(f"doc:{doc_id}")
     await add_note(sid, user["name"], f"Verified document: {d['name']}.")
     await audit(user, "document.verified", "documents", doc_id)
     if d.get("category") == "funds":
@@ -777,6 +802,7 @@ async def reject_document(sid: str, doc_id: str, body: RejectBody, user: Staff):
         raise ApiError(400, "Only uploaded documents waiting for review can be rejected.")
     await get_db().documents.update_one({"_id": doc_id}, {"$set": {"state": "rejected", "reason": body.reason, "rejectedAt": now(), "rejectedBy": user["_id"]}})
     await close_follow_ups(f"doc:{doc_id}:")
+    await notify.clear_alerts(f"doc:{doc_id}")
     await add_note(sid, user["name"], f"Rejected document: {d['name']} ({body.reason}).")
     await audit(user, "document.rejected", "documents", doc_id, {"reason": body.reason})
     await notify.email_student(student, f"Please re-upload: {d['name']}", f"{d['name']} needs to be uploaded again: {body.reason}")
@@ -789,6 +815,9 @@ async def document_download_url(sid: str, doc_id: str, user: CurrentUser):
     d = await _document(sid, doc_id)
     if not d.get("fileKey"):
         raise not_found("No file has been uploaded for this document.")
+    if is_staff(user["role"]):
+        # Remembered so the document can be verified (only by someone who has opened it).
+        await get_db().documents.update_one({"_id": doc_id, "fileKey": d["fileKey"]}, {"$addToSet": {"viewedBy": user["_id"]}})
     await audit(user, "document.viewed", "documents", doc_id)
     return {"url": storage.download_url(d["fileKey"], d.get("contentType", "application/octet-stream"), d.get("fileName", "document"))}
 
@@ -837,7 +866,7 @@ async def set_visa_stage(sid: str, body: VisaBody, user: Staff):
 
 @router.put("/students/{sid}/departure/tasks/{key}")
 async def set_departure_task(sid: str, key: str, body: DepartureTaskBody, user: CurrentUser):
-    await student_for(user, sid, who="student")
+    student = await student_for(user, sid, who="student")
     if key not in DEPARTURE_TASKS:
         raise not_found("Unknown task.")
 
@@ -853,6 +882,7 @@ async def set_departure_task(sid: str, key: str, body: DepartureTaskBody, user: 
             done.pop(key, None)
 
     await _journey(sid, fn)
+    await notify.alert_staff(owner_for(student, "visa"), f"{student['name']} updated their pre-departure checklist", f"{'Completed' if body.done else 'Reopened'}: {key}.", path=f"/staff/students/{sid}", key=f"departure:{sid}")
     return await load_student(sid)
 
 

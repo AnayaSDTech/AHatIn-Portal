@@ -87,7 +87,8 @@ export function ApplicationsCard({ applications, onDecide, updated }: Props) {
                     </span>
                     {updated?.has(a.id) && <span className="block text-xs text-gold-700">Was: {statusMeta[updated.get(a.id)!].label}</span>}
                     <span className="block text-sm text-navy-500">
-                      {a.course} · via {a.agency}
+                      {a.course}
+                      {a.agency && ` · via ${a.agency}`}
                     </span>
                   </span>
                   <span className="flex items-center gap-3">

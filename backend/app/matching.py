@@ -2,13 +2,14 @@
 
 Score out of 100:
 - Country (50): the counsellor knows the student's preferred destination; more years score higher.
-- Subject (30): the student's course of interest falls in one of the counsellor's subject areas.
+- Subject (30): the student's courses of interest fall in one of the counsellor's subject areas.
 - Spare capacity (20): room left against the counsellor's capacity. Counsellors at capacity are flagged, not hidden.
 """
 
 import re
 
 from app import career
+from app.domain import courses_of
 
 COUNTRY_POINTS = 50
 SUBJECT_POINTS = 30
@@ -53,6 +54,11 @@ def blank_matching_profile() -> dict:
     return {"countries": [], "universities": [], "subjects": [], "languages": [], "capacity": DEFAULT_CAPACITY}
 
 
+def subject_of_profile(profile: dict) -> str | None:
+    """The subject area of the student's courses: the first course (in their order) that matches one."""
+    return next((key for key in map(subject_for, courses_of(profile)) if key), None)
+
+
 def score(profile: dict, counsellor: dict, active_students: int) -> dict:
     """One counsellor's match for a student profile, with the points and the reasons the admin sees."""
     m = {**blank_matching_profile(), **(counsellor.get("matchingProfile") or {})}
@@ -70,7 +76,7 @@ def score(profile: dict, counsellor: dict, active_students: int) -> dict:
         country = 0
         reasons.append(f"No experience with {destination}")
 
-    subject_key = subject_for(profile.get("courseInterest") or "")
+    subject_key = subject_of_profile(profile)
     if not subject_key:
         subject = SUBJECT_POINTS // 2
         reasons.append("Course not matched to a subject area")

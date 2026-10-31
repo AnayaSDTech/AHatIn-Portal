@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { AlertCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { OtpInput } from './OtpInput';
@@ -11,10 +11,14 @@ interface Props {
   onVerify: (code: string) => Promise<void>;
   onResend: () => Promise<OtpRequestResult>;
   onBack: () => void;
+  /** Shown above the code boxes, instead of the default "If an account exists…". */
+  message?: ReactNode;
+  /** Label of the submit button. */
+  submitLabel?: string;
 }
 
-/** Step 2 of student login and registration: enter the 6-digit code sent to the email. */
-export function VerifyCodeStep({ email, initial, onVerify, onResend, onBack }: Props) {
+/** Enter the 6-digit code sent to the email (to verify the email when registering). */
+export function VerifyCodeStep({ email, initial, onVerify, onResend, onBack, message, submitLabel = 'Verify and continue' }: Props) {
   const [code, setCode] = useState('');
   const [info, setInfo] = useState(initial);
   const [cooldown, setCooldown] = useState(initial.resendIn);
@@ -71,7 +75,11 @@ export function VerifyCodeStep({ email, initial, onVerify, onResend, onBack }: P
       <div className="flex items-start gap-3 rounded-2xl bg-navy-50/70 p-4 text-sm text-navy-700">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-navy-500" aria-hidden />
         <p>
-          If an account exists for <span className="font-semibold text-navy-900">{email}</span>, we've sent a 6-digit code.
+          {message ?? (
+            <>
+              If an account exists for <span className="font-semibold text-navy-900">{email}</span>, we've sent a 6-digit code.
+            </>
+          )}{' '}
           It expires in {Math.round(info.expiresIn / 60)} minutes.
         </p>
       </div>
@@ -101,7 +109,7 @@ export function VerifyCodeStep({ email, initial, onVerify, onResend, onBack }: P
       <OtpInput value={code} onChange={setCode} invalid={!!error} disabled={verifying} />
 
       <Button type="submit" size="lg" className="w-full" loading={verifying}>
-        Verify and continue
+        {submitLabel}
       </Button>
 
       <div className="flex items-center justify-between text-sm">

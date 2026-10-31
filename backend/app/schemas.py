@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from app.domain import APP_LABELS, DEPARTURE_TASKS, DOC_CATEGORIES, SCHOLARSHIP_STATUSES, SESSION_TYPES, STAGES
+from app.domain import APP_LABELS, DEPARTURE_TASKS, DOC_CATEGORIES, GENDERS, INDIAN_STATES, MAX_COURSES, SCHOLARSHIP_STATUSES, SESSION_TYPES, STAGES
 
 NAME_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ .'-])*$", re.UNICODE)
 HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -80,9 +80,19 @@ class EmailBody(Body):
         return v.lower()
 
 
+def check_student_password(v: str) -> str:
+    if len(v) < 8 or not (re.search(r"[A-Za-z]", v) and re.search(r"\d", v)):
+        raise ValueError("Use at least 8 characters, with letters and numbers.")
+    return v
+
+
+StudentPassword = Annotated[str, Field(max_length=200), AfterValidator(check_student_password)]
+
+
 class RegisterBody(EmailBody):
     name: Name
     mobile: Mobile
+    password: StudentPassword
     # Not asked at registration; the student adds them in their profile (or the counsellor agrees them later).
     destination: str | None = None
     intake: str | None = None
@@ -96,8 +106,24 @@ class RegisterBody(EmailBody):
         return v
 
 
-class OtpVerifyBody(EmailBody):
+class CodeBody(EmailBody):
+    """A 6-digit code sent by email (to verify the email, or to reset the password)."""
+
     code: str = Field(pattern=r"^\d{6}$")
+
+
+class StudentLoginBody(EmailBody):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class ResetPasswordBody(CodeBody):
+    password: StudentPassword
+
+
+class ChangePasswordBody(Body):
+    # Empty only for accounts made before students had passwords.
+    currentPassword: str = Field(default="", max_length=200)
+    newPassword: StudentPassword
 
 
 class StaffLoginBody(EmailBody):
@@ -146,22 +172,121 @@ class EnquiryBody(EmailBody):
 
 # ---------------------------------------------------------------- student profile
 
+# A student whose highest qualification is the 12th gives it as their 12th details.
+SCHOOL_QUALIFICATION = "12th / HSC"
 SCORE_RANGES = {"IELTS": (0, 9, 0.5), "PTE": (10, 90, 1), "TOEFL": (0, 120, 1), "Duolingo": (10, 160, 1)}
 
 
 class ProfileBody(Body):
     dateOfBirth: str
+    gender: str = ""
+    # The mobile number given at registration; None keeps it (older app versions don't send it).
+    mobile: Mobile | None = None
+    # Permanent address.
+    addressLine1: str = Field(min_length=3, max_length=120)
+    addressLine2: str = Field(default="", max_length=120)
     city: str = Field(min_length=2, max_length=60)
+    state: str
+    pincode: str = Field(pattern=r"^[1-9]\d{5}$")
+    # 10th (SSC) and 12th (HSC): optional.
+    sscBoard: str = Field(default="", max_length=60)
+    sscSchool: str = Field(default="", max_length=120)
+    sscYear: str = ""
+    sscScore: str = Field(default="", max_length=30)
+    hscBoard: str = Field(default="", max_length=60)
+    hscStream: str = Field(default="", max_length=60)
+    hscCollege: str = Field(default="", max_length=120)
+    hscYear: str = ""
+    hscScore: str = Field(default="", max_length=30)
+    # Highest qualification (required; the year may be the expected one).
     degree: str = Field(min_length=2, max_length=100)
-    institution: str = Field(min_length=2, max_length=100)
-    grade: str = Field(min_length=1, max_length=30)
+    degreeSubject: str = Field(default="", max_length=100)
+    institution: str = Field(min_length=2, max_length=150)
+    graduationYear: str
+    grade: str = Field(default="", max_length=30)
     englishTest: str = Field(min_length=1)
     englishScore: str = ""
     workExperience: str = Field(default="", max_length=60)
-    courseInterest: str = Field(min_length=2, max_length=100)
+    courseInterests: list[str] = Field(default_factory=list)
+    # Older app versions send a single course.
+    courseInterest: str = ""
     destination: str = Field(min_length=1, max_length=60)
     intake: str = Field(min_length=1, max_length=60)
     budget: str = Field(min_length=1, max_length=60)
+
+    @model_validator(mode="before")
+    @classmethod
+    def school_qualification(cls, data):
+        """Everything that reads the highest qualification finds it in the same fields, whatever the level."""
+        if isinstance(data, dict) and data.get("degree") == SCHOOL_QUALIFICATION:
+            return {
+                **data,
+                "degreeSubject": data.get("hscStream", ""),
+                "institution": data.get("hscCollege", ""),
+                "graduationYear": data.get("hscYear", ""),
+                "grade": data.get("hscScore", ""),
+            }
+        return data
+
+    @field_validator("gender")
+    @classmethod
+    def known_gender(cls, v: str) -> str:
+        if v and v not in GENDERS:
+            raise ValueError("Choose an option from the list.")
+        return v
+
+    @field_validator("state")
+    @classmethod
+    def known_state(cls, v: str) -> str:
+        if v not in INDIAN_STATES:
+            raise ValueError("Choose your state from the list.")
+        return v
+
+    @field_validator("sscYear", "hscYear", "graduationYear")
+    @classmethod
+    def year(cls, v: str, info) -> str:
+        if not v and info.field_name != "graduationYear":
+            return v  # the 10th and 12th are optional
+        # The highest qualification (which may be the 12th) may still be in progress: its expected year.
+        latest = date.today().year + (0 if info.field_name == "sscYear" else 6)
+        if not (v.isdigit() and 1970 <= int(v) <= latest):
+            raise ValueError("Choose the year from the list.")
+        return v
+
+    @model_validator(mode="after")
+    def years_in_order(self):
+        """Checked for the years given (the 10th and 12th are optional)."""
+        if self.sscYear and self.hscYear and int(self.hscYear) <= int(self.sscYear):
+            raise ValueError("Your 12th year must be after your 10th year.")
+        if self.hscYear and int(self.graduationYear) < int(self.hscYear):
+            raise ValueError("The year of your highest qualification can't be before your 12th.")
+        if self.degree == SCHOOL_QUALIFICATION and not self.hscBoard:
+            raise ValueError("Choose the board of your 12th.")
+        return self
+
+    @field_validator("courseInterests")
+    @classmethod
+    def courses(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for c in (" ".join(x.split()) for x in v):
+            if not c:
+                continue
+            if not 2 <= len(c) <= 100:
+                raise ValueError("Each course must be 2 to 100 characters.")
+            if c.lower() not in {x.lower() for x in out}:
+                out.append(c)
+        if len(out) > MAX_COURSES:
+            raise ValueError(f"Choose up to {MAX_COURSES} courses.")
+        return out
+
+    @model_validator(mode="after")
+    def one_course(self):
+        if not self.courseInterests and len(self.courseInterest) >= 2:
+            self.courseInterests = [self.courseInterest[:100]]
+        if not self.courseInterests:
+            raise ValueError("Enter at least one course you are interested in.")
+        self.courseInterest = self.courseInterests[0]
+        return self
 
     @field_validator("dateOfBirth")
     @classmethod
@@ -283,8 +408,7 @@ class ShortlistItemBody(Body):
     tuition: str = Field(default="", max_length=60)
     livingCost: str = Field(default="", max_length=60)
     deadline: str = ""
-    agency: str = Field(min_length=1, max_length=100)
-    earnsCommission: bool = False
+    duration: str = Field(min_length=1, max_length=40)
     reason: str = Field(min_length=3, max_length=500)
 
     @field_validator("deadline")

@@ -4,6 +4,12 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def undeliverable(address: str) -> bool:
+    """Addresses on reserved test domains (e.g. the demo accounts' @ahatin.example) can never receive mail."""
+    domain = address.rsplit("@", 1)[-1].lower()
+    return domain.endswith((".example", ".test", ".invalid", ".localhost")) or domain in ("example.com", "example.org", "example.net")
+
+
 class Settings(BaseSettings):
     """All configuration comes from environment variables (or a .env file in development)."""
 
@@ -34,6 +40,9 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 600
     otp_resend_seconds: int = 30
     otp_max_attempts: int = 5
+    # A student gets the best-matched counsellor with room as soon as their profile is complete. When off (or when no
+    # counsellor has room), they wait in the admin's Assignments list instead.
+    auto_assign_counsellors: bool = True
 
     # Document storage: a private S3-compatible bucket (Backblaze B2 in use).
     s3_endpoint: str = ""
@@ -41,9 +50,9 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
-    # Each uploaded document must be between these sizes (50 KB to 200 KB).
-    min_upload_bytes: int = 50 * 1024
-    max_upload_bytes: int = 200 * 1024
+    # Each uploaded document must be between these sizes (1 KB to 300 KB).
+    min_upload_bytes: int = 1024
+    max_upload_bytes: int = 300 * 1024
 
     clamav_host: str = ""  # empty = scanning disabled (development only)
     clamav_port: int = 3310
@@ -78,6 +87,17 @@ class Settings(BaseSettings):
     def show_demo_codes(self, email: str) -> bool:
         """Development: everyone. Elsewhere, with DEMO_LOGINS on, only the demo accounts."""
         return self.expose_dev_codes or (self.demo_logins and email.lower().endswith("@" + self.demo_email_domain))
+
+    @property
+    def can_send_email(self) -> bool:
+        return bool(self.resend_api_key or self.smtp_host)
+
+    def show_email_code(self, email: str) -> bool:
+        """An emailed code goes on screen only when the email can't arrive: demo addresses, or development without an
+        email service. Everyone else, in every environment, gets it by email only."""
+        if self.is_dev and not self.can_send_email:
+            return True
+        return self.show_demo_codes(email) if not self.is_dev else undeliverable(email)
 
     def check_production(self) -> None:
         """Refuses to start a production server with development secrets or settings."""

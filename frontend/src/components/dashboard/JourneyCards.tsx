@@ -40,16 +40,20 @@ function ShortlistOption({ item, editable, isNew, actions }: { item: ShortlistIt
         {item.choice === 'removed' && <Pill tone="grey">Removed</Pill>}
         {isNew && <Pill tone="gold">New</Pill>}
       </div>
-      <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs text-navy-600 sm:grid-cols-3">
+      <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs text-navy-600 sm:grid-cols-2">
+        {item.duration && <div><dt className="inline text-navy-400">Duration: </dt><dd className="inline font-medium text-navy-800">{item.duration}</dd></div>}
         <div><dt className="inline text-navy-400">Tuition: </dt><dd className="inline font-medium text-navy-800">{item.tuition}</dd></div>
         <div><dt className="inline text-navy-400">Living: </dt><dd className="inline font-medium text-navy-800">{item.livingCost}</dd></div>
         <div><dt className="inline text-navy-400">Apply by: </dt><dd className="inline font-medium text-navy-800">{formatDate(item.deadline)}</dd></div>
       </dl>
       <p className="mt-3 text-sm text-navy-700">{item.reason}</p>
-      <p className="mt-2 text-xs text-navy-500">
-        Via {item.agency} ·{' '}
-        <span className="font-semibold text-navy-700">{item.earnsCommission ? 'AHat earns a commission if you enrol here' : 'AHat earns no commission here'}</span>
-      </p>
+      {/* Only options added before agencies were removed from the form have this. */}
+      {item.agency && (
+        <p className="mt-2 text-xs text-navy-500">
+          Via {item.agency} ·{' '}
+          <span className="font-semibold text-navy-700">{item.earnsCommission ? 'AHat earns a commission if you enrol here' : 'AHat earns no commission here'}</span>
+        </p>
+      )}
       {item.choice === 'removed' && item.removeReason && <p className="mt-2 text-xs text-navy-500">Your reason: {item.removeReason}</p>}
 
       {item.comments.length > 0 && (
@@ -343,6 +347,15 @@ export function FundingCard({ student, actions, notNeeded }: { student: StaffStu
 
 export function VisaCard({ student }: { student: StaffStudent }) {
   const v = student.journey.visa;
+  if (!v && student.visaOfficerId) {
+    return (
+      <Panel id="visa" title="Visa" icon={<Stamp className="h-4 w-4" aria-hidden />} action={<Pill tone="blue">In progress</Pill>}>
+        <p className="text-sm text-navy-600" data-visa-waiting>
+          Waiting for your CAS or admission letter to arrive. Your Visa Officer will take you through the next steps once it does.
+        </p>
+      </Panel>
+    );
+  }
   if (!v) return null;
   const current = v.stage === 'granted' || v.stage === 'refused' ? VISA_PATH.length : VISA_PATH.indexOf(v.stage);
   const visaDocs = student.documents.filter((d) => d.category === 'visa');

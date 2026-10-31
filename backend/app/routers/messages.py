@@ -73,7 +73,8 @@ async def send_message(body: MessageBody, user: CurrentUser):
         await notify.email_student(student, f"New message from {user['name']}", body.text, dedupe_key=f"msg:student:{student['_id']}:{thread}:{window}")
     else:
         await notify.email_counsellor(
-            owner, f"New message from {student['name']}", body.text, path=f"/staff/students/{student['_id']}#messages", dedupe_key=f"msg:staff:{student['_id']}:{thread}:{window}"
+            owner, f"New message from {student['name']}", body.text, path=f"/staff/students/{student['_id']}#messages", dedupe_key=f"msg:staff:{student['_id']}:{thread}:{window}",
+            kind="message", alert_key=f"msg:{student['_id']}:{thread}",
         )
     return serialize_message(msg)
 
@@ -86,3 +87,5 @@ async def mark_read(body: ReadBody, user: CurrentUser):
     thread = _staff_thread(user, body.thread) if staff else body.thread
     other = "student" if staff else "staff"
     await get_db().messages.update_many({"studentId": student["_id"], "thread": _thread_filter(thread), "from": other, "readAt": None}, {"$set": {"readAt": now()}})
+    if staff:
+        await notify.clear_alerts(f"msg:{student['_id']}:{thread}")

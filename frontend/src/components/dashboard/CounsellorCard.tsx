@@ -1,6 +1,6 @@
-import { Mail, MessageSquare, Phone, UserRoundSearch } from 'lucide-react';
+import { CalendarPlus, Mail, MessageSquare, UserRoundSearch } from 'lucide-react';
 import type { Counsellor } from '../../data/staff';
-import { initials } from '../../lib/utils';
+import { cn, initials } from '../../lib/utils';
 
 /** The student's named counsellor, with quick ways to get in touch (or a note while the admin is matching one). */
 export function CounsellorCard({
@@ -8,10 +8,13 @@ export function CounsellorCard({
   onMessage,
   profileComplete = true,
   title = 'Your counsellor',
+  onBook,
 }: {
   counsellor: Counsellor | null;
   /** Opens the chat (on another page, or the box on this one). */
   onMessage?: () => void;
+  /** Opens the booking window for a session with this person; shown instead of "Call" when given. */
+  onBook?: () => void;
   profileComplete?: boolean;
   /** e.g. "Your Financial Aid Officer" for an officer's card. */
   title?: string;
@@ -53,16 +56,18 @@ export function CounsellorCard({
           <p className="truncate text-xs text-navy-500">{counsellor.email}</p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className={cn('mt-4 grid gap-2', onBook ? 'grid-cols-3' : 'grid-cols-2')}>
         <button type="button" onClick={toMessages} className={chip}>
           <MessageSquare className="h-3.5 w-3.5" aria-hidden /> Message
         </button>
         <a href={`mailto:${counsellor.email}`} className={chip}>
           <Mail className="h-3.5 w-3.5" aria-hidden /> Email
         </a>
-        <a href={`tel:${counsellor.phone.replace(/\s/g, '')}`} className={chip}>
-          <Phone className="h-3.5 w-3.5" aria-hidden /> Call
-        </a>
+        {onBook && (
+          <button type="button" onClick={onBook} className={chip} data-book-with={title}>
+            <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> Book
+          </button>
+        )}
       </div>
     </section>
   );

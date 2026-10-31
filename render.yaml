@@ -73,5 +73,6 @@ services:
         sync: false
       - key: MAIL_FROM
         value: AHat <no-reply@ahat.in>
+      # Who gets admin alerts (comma-separated for several).
       - key: ADMIN_ALERT_EMAILS
-        sync: false
+        value: info@ahat.in

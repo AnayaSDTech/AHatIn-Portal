@@ -18,10 +18,11 @@ export interface RegisterPayload {
   name: string;
   email: string;
   mobile: string;
+  password: string;
   consent: boolean;
 }
 
-/** Response after a one-time code is requested. */
+/** Response after a 6-digit code is emailed (to verify an email, or to reset a password). */
 export interface OtpRequestResult {
   /** Seconds until the code expires. */
   expiresIn: number;
@@ -43,6 +44,9 @@ export interface StaffChallenge {
 export interface AuthResult {
   user: User;
 }
+
+/** Student login: signed in, or (email not verified yet) a code was emailed to verify it first. */
+export type StudentLoginResult = AuthResult | { verifyEmail: OtpRequestResult };
 
 /** Error format used by the backend (problem details with a trace ID). */
 export class ApiError extends Error {

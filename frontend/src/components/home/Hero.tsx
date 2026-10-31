@@ -7,12 +7,11 @@ import { images, stats } from '../../data/site';
 import { cn } from '../../lib/utils';
 
 /**
- * Demo journey shown in the hero card (a preview of the student portal). The seven services don't all fit, so the
+ * Demo journey shown in the hero card (a preview of the student portal). The stages don't all fit, so the
  * steps between funding and the last one are shown as a row of dots ("gap").
  */
 const heroSteps: { title: string; note: string; state: 'done' | 'now' | 'next' | 'gap' }[] = [
-  { title: 'Career counselling', note: 'Plan shared: Data Science, UK', state: 'done' },
-  { title: 'University shortlist', note: '4 universities approved', state: 'done' },
+  { title: 'Counselling & university selection', note: 'Data Science, UK · 4 universities shortlisted', state: 'done' },
   { title: 'Applications', note: '3 submitted · 1 offer received', state: 'now' },
   { title: 'Scholarships & funding', note: '1 scholarship applied', state: 'now' },
   { title: '2 more steps', note: 'Visa · Pre-departure', state: 'gap' },
@@ -70,7 +69,7 @@ export function Hero() {
             </ButtonLink>
           </div>
           <ul className="mt-8 flex animate-fade-up flex-wrap gap-x-6 gap-y-2 text-sm text-navy-200 [animation-delay:400ms]">
-            {['No consultancy fees', 'One named counsellor', 'Transparent commission disclosure'].map((t) => (
+            {['No consultancy fees', 'Dedicated counsellor', 'Transparent and honest advice'].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-gold-400" aria-hidden />
                 {t}

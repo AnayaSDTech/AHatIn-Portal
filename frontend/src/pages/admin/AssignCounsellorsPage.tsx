@@ -53,7 +53,7 @@ interface QueueStudent {
   mobile: string;
   registeredAt: string;
   profileCompletedAt: string | null;
-  profile: Record<'courseInterest' | 'destination' | 'intake' | 'budget' | 'degree' | 'institution' | 'grade' | 'englishTest' | 'englishScore' | 'workExperience' | 'city', string>;
+  profile: Record<'courseInterest' | 'destination' | 'intake' | 'budget' | 'degree' | 'institution' | 'grade' | 'englishTest' | 'englishScore' | 'workExperience' | 'city', string> & { courseInterests?: string[]; gender?: string };
   fromEnquiry: boolean;
   subject?: string | null;
   matches?: Match[];
@@ -191,7 +191,7 @@ function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title: strin
 export function AssignCounsellorsPage() {
   const [queue, loaded] = useApi('/admin/assignments', NO_QUEUE, { pollMs: 60_000 });
   const [message, setMessage] = useState<string | null>(null);
-  const [view, setView] = useState<View>('counsellor');
+  const [chosen, setView] = useState<View>('counsellor');
   const [query, setQuery] = useState('');
   const { hash } = useLocation();
 
@@ -210,8 +210,13 @@ export function AssignCounsellorsPage() {
   const matchesQuery = (...fields: (string | null | undefined)[]) => !q || fields.some((f) => f?.toLowerCase().includes(q));
 
   const oldest = (dates: (string | null)[]) => dates.filter(Boolean).sort()[0] ?? null;
+  // Counsellors are assigned automatically, so their queue only shows while someone is waiting (no counsellor had room).
+  const showCounsellorQueue = queue.waiting.length > 0;
+  const view: View = chosen === 'counsellor' && !showCounsellorQueue ? 'finance' : chosen;
   const tabs: { key: View; label: string; hint: string; count: number; since: string | null; icon: LucideIcon; tone: string }[] = [
-    { key: 'counsellor', label: 'Counsellor', hint: 'Profile complete', count: queue.waiting.length, since: oldest(queue.waiting.map((s) => s.profileCompletedAt)), icon: UserCheck, tone: 'bg-navy-900 text-gold-300' },
+    ...(showCounsellorQueue
+      ? [{ key: 'counsellor' as const, label: 'Counsellor', hint: 'Needs your choice', count: queue.waiting.length, since: oldest(queue.waiting.map((s) => s.profileCompletedAt)), icon: UserCheck, tone: 'bg-navy-900 text-gold-300' }]
+      : []),
     { key: 'finance', label: 'Financial Aid Officer', hint: 'Offer accepted', count: queue.waitingFinance.length, since: oldest(queue.waitingFinance.map((s) => s.readySince)), icon: PiggyBank, tone: 'bg-gold-500 text-navy-950' },
     { key: 'visa', label: 'Visa Officer', hint: 'Funding complete', count: queue.waitingVisa.length, since: oldest(queue.waitingVisa.map((s) => s.readySince)), icon: Plane, tone: 'bg-sky-600 text-white' },
     { key: 'incomplete', label: 'Profile incomplete', hint: "Can't be assigned yet", count: queue.incomplete.length, since: null, icon: UserRoundX, tone: 'bg-navy-100 text-navy-700' },
@@ -236,8 +241,8 @@ export function AssignCounsellorsPage() {
         </p>
       )}
 
-      {/* The four queues: each card opens its list. */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="tablist" aria-label="Assignment queues">
+      {/* The queues: each card opens its list. */}
+          <div className={cn('grid gap-3', tabs.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3')} role="tablist" aria-label="Assignment queues">
             {tabs.map((t) => (
               <button
                 key={t.key}
@@ -270,7 +275,8 @@ export function AssignCounsellorsPage() {
 
           <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-navy-600">
-              {view === 'counsellor' && 'Suggestions are ranked on the student’s profile: country 50%, subject 30%, spare capacity 20%. You decide.'}
+              {view === 'counsellor' &&
+                'Counsellors are assigned automatically when a student completes their profile, using this ranking (country 50%, subject 30%, spare capacity 20%). Students wait here only when no counsellor had room, or if they completed their profile before that.'}
               {view === 'finance' && 'Students who have accepted an offer. The Financial Aid Officer looks after scholarships, the funding plan and proof of funds.'}
               {view === 'visa' && 'Students whose funding is complete. The Visa Officer looks after the visa, pre-departure and post-arrival support.'}
               {view === 'incomplete' && 'Registered, but the profile isn’t complete, so they can’t be assigned yet. The profile form opens each time they sign in.'}
@@ -284,7 +290,9 @@ export function AssignCounsellorsPage() {
 
       {view === 'counsellor' &&
         (queue.waiting.length === 0 ? (
-          <Empty icon={UserCheck} title="No one is waiting for a counsellor">Students appear here as soon as they complete their profile.</Empty>
+          <Empty icon={UserCheck} title="No one is waiting for a counsellor">
+            Counsellors are assigned automatically when students complete their profile. A student appears here only if no counsellor has room.
+          </Empty>
         ) : (
           <ul className="space-y-5">
             {queue.waiting
@@ -437,7 +445,7 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
           </div>
           <div className="mt-4 rounded-2xl bg-ivory p-3.5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-400">Wants to study</p>
-            <p className="mt-0.5 font-semibold text-navy-900">{p.courseInterest}</p>
+            <p className="mt-0.5 font-semibold text-navy-900">{(p.courseInterests?.length ? p.courseInterests : [p.courseInterest]).join(' · ')}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Chip icon={MapPin}>{p.destination}</Chip>
               <Chip icon={Clock}>{p.intake}</Chip>

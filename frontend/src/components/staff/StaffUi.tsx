@@ -71,7 +71,7 @@ export function FilterChips<T extends string>({ options, value, onChange, label 
   );
 }
 
-/** Seven small segments showing a student's progress through AHat's services (3 = not needed). */
+/** One small segment for each stage of a student's journey (3 = not needed). */
 export function ServiceBar({ values, names }: { values: number[]; names: string[] }) {
   const counted = values.filter((v) => v !== 3).length;
   return (

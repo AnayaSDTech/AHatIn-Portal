@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, CalendarPlus, CheckCircle2, Clock, FileSearch, Mail, Phone, MessageSquare, School, StickyNote, Trash2, UserCog, XCircle } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CalendarPlus, CheckCircle2, Clock, Eye, FileSearch, Mail, Phone, MessageSquare, School, StickyNote, Trash2, UserCog, XCircle } from 'lucide-react';
 import { api } from '../../lib/api/client';
 import { act, mutate, reportError } from '../../lib/api/store';
 import { useMessages, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
@@ -11,6 +11,7 @@ import { SelectField } from '../../components/ui/FormField';
 import { Panel, Pill } from '../../components/dashboard/Panel';
 import { ServiceBar } from '../../components/staff/StaffUi';
 import { JourneyPanel } from '../../components/staff/JourneyPanel';
+import { DocumentNameField } from '../../components/staff/DocumentRequest';
 import { categoryLabel } from '../../components/dashboard/DocumentChecklist';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
@@ -34,6 +35,7 @@ import {
   type StaffStudent,
   type StudentApplication,
 } from '../../data/staff';
+import { documentsForCategory } from '../../data/documentOptions';
 import { computeServices, overallProgress, serviceValues } from '../../lib/journey';
 import { cn, formatDate, formatDateTime, relativeTime } from '../../lib/utils';
 
@@ -80,6 +82,9 @@ export function StudentRecordPage() {
   const [docCategory, setDocCategory] = useState<DocCategory>(myThread === 'finance' ? 'funds' : myThread === 'visa' ? 'visa' : 'general');
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [removingDoc, setRemovingDoc] = useState<StaffStudent['documents'][number] | null>(null);
+  // Documents opened on this visit, and the one waiting for "Yes, verify".
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  const [verifying, setVerifying] = useState<StaffStudent['documents'][number] | null>(null);
   const [correcting, setCorrecting] = useState<StudentApplication | null>(null);
   const [corrTo, setCorrTo] = useState<AppState | ''>('');
   const [corrReason, setCorrReason] = useState('');
@@ -87,6 +92,12 @@ export function StudentRecordPage() {
 
   const student = students.find((s) => s.id === id);
   const actions = useStudentActions(student?.id);
+  // A newly assigned student, opened by their counsellor: tell the server it has been seen (it then leaves the
+  // counsellor's "New students" list), and refresh the lists.
+  const seenNew = student?.newForCounsellor && student.counsellorId === user?.id;
+  useEffect(() => {
+    if (seenNew && id) mutate(() => api.get(`/students/${id}`), { silent: true }).catch(() => undefined);
+  }, [seenNew, id]);
   const services = useMemo(() => (student ? computeServices(student, sessions) : []), [student, sessions]);
   // A record the user may not see looks exactly like one that doesn't exist.
   if (!studentsLoaded) return null;
@@ -95,11 +106,12 @@ export function StudentRecordPage() {
     .filter((s) => s.studentId === student.id)
     .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 
-  /** Opens an uploaded document in a new tab (a short-lived link from secure storage). */
+  /** Opens an uploaded document in a new tab (a short-lived link from secure storage). Opening it is what allows verifying it. */
   const viewDocument = async (docId: string) => {
     const tab = window.open('', '_blank'); // opened now, so the browser doesn't block it as a pop-up
     try {
       const { url } = await api.get<{ url: string }>(`/students/${student.id}/documents/${docId}/download-url`);
+      setOpened((o) => new Set(o).add(docId));
       if (tab) tab.location.href = url;
       else window.location.href = url;
     } catch (err) {
@@ -107,10 +119,14 @@ export function StudentRecordPage() {
       reportError(err);
     }
   };
+  /** Has this staff member opened the document's current file (now, or on an earlier visit)? */
+  const hasOpened = (d: StaffStudent['documents'][number]) => opened.has(d.id) || !!user && (d.viewedBy ?? []).includes(user.id);
 
-  const verify = (docId: string, name: string) => {
-    actions.verifyDocument(docId, name);
-    setMessage(`${name} verified. The student can see this straight away.`);
+  const confirmVerify = () => {
+    if (!verifying) return;
+    actions.verifyDocument(verifying.id, verifying.name);
+    setMessage(`${verifying.name} verified. The student can see this straight away.`);
+    setVerifying(null);
   };
 
   const confirmReject = () => {
@@ -284,6 +300,11 @@ export function StudentRecordPage() {
                         {d.state === 'missing' ? 'Waiting for the student to upload' : `Uploaded ${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}${d.fileName ? ` · ${d.fileName}` : ''}`}
                         {d.reason && <span className="text-red-600"> · {d.reason}</span>}
                       </p>
+                      {d.state === 'pending' && canEditDoc(d.category) && !hasOpened(d) && (
+                        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700" data-open-hint>
+                          <Eye className="h-3.5 w-3.5" aria-hidden /> Open the document to verify it
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {d.state === 'pending' ? (
@@ -295,11 +316,26 @@ export function StudentRecordPage() {
                             <Pill tone="amber">Being checked</Pill>
                           </div>
                         ) : (
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => void viewDocument(d.id)} className="rounded-full border border-navy-100 px-3 py-1.5 text-xs font-semibold text-navy-700 hover:border-navy-900">
-                            View
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void viewDocument(d.id)}
+                            className={cn(
+                              'rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                              hasOpened(d) ? 'border border-navy-100 text-navy-700 hover:border-navy-900' : 'bg-navy-900 text-white hover:bg-navy-700',
+                            )}
+                            data-view-doc={d.id}
+                          >
+                            {hasOpened(d) ? 'View again' : 'View'}
                           </button>
-                          <button type="button" onClick={() => verify(d.id, d.name)} className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                          <button
+                            type="button"
+                            onClick={() => setVerifying(d)}
+                            disabled={!hasOpened(d)}
+                            title={hasOpened(d) ? undefined : 'Open the document first'}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-navy-100 disabled:text-navy-400"
+                            data-verify-doc={d.id}
+                          >
                             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Verify
                           </button>
                           <button type="button" onClick={() => setRejecting({ id: d.id, name: d.name })} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100">
@@ -308,7 +344,15 @@ export function StudentRecordPage() {
                         </div>
                         )
                       ) : (
-                        <Pill tone={d.state === 'verified' ? 'green' : d.state === 'missing' ? 'grey' : 'red'}>{d.state === 'verified' ? 'Verified' : d.state === 'missing' ? 'Not uploaded' : 'Rejected'}</Pill>
+                        <div className="flex items-center gap-2">
+                          {/* Verified (and rejected) files stay open to everyone looking after the student. */}
+                          {d.state !== 'missing' && (
+                            <button type="button" onClick={() => void viewDocument(d.id)} className="rounded-full border border-navy-100 px-3 py-1.5 text-xs font-semibold text-navy-700 hover:border-navy-900" data-view-doc={d.id}>
+                              View
+                            </button>
+                          )}
+                          <Pill tone={d.state === 'verified' ? 'green' : d.state === 'missing' ? 'grey' : 'red'}>{d.state === 'verified' ? 'Verified' : d.state === 'missing' ? 'Not uploaded' : 'Rejected'}</Pill>
+                        </div>
                       )}
                       {/* Duplicate or mistaken requests can be removed; verified documents stay. */}
                       {d.state !== 'verified' && canEditDoc(d.category) && (
@@ -341,7 +385,7 @@ export function StudentRecordPage() {
                     <li key={a.id} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
                         <p className="font-semibold text-navy-900">{a.university}</p>
-                        <p className="text-sm text-navy-500">{a.course} · via {a.agency}{a.deadline && ` · deadline ${formatDate(a.deadline)}`}</p>
+                        <p className="text-sm text-navy-500">{a.course}{a.agency && ` · via ${a.agency}`}{a.deadline && ` · deadline ${formatDate(a.deadline)}`}</p>
                       </div>
                       <div className="flex flex-col items-start gap-2 sm:items-end">
                         <Pill tone={appTone(a.state)}>{appStateLabel[a.state]}</Pill>
@@ -479,6 +523,28 @@ export function StudentRecordPage() {
       )}
 
       <Modal
+        open={!!verifying}
+        onClose={() => setVerifying(null)}
+        title="Verify this document?"
+        description={verifying ? `${verifying.name}${verifying.fileName ? ` · ${verifying.fileName}` : ''}` : undefined}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setVerifying(null)}>
+              Cancel
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={confirmVerify} data-confirm-verify>
+              <CheckCircle2 className="h-4 w-4" aria-hidden /> Yes, verify
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-navy-600">
+          Confirm you have checked the file: it is readable, it belongs to {student.name}, and it is the document that was asked for. The student sees it as verified straight away, and it
+          can't be removed afterwards.
+        </p>
+      </Modal>
+
+      <Modal
         open={reassigning}
         onClose={() => setReassigning(false)}
         title={`Reassign ${student.name}`}
@@ -595,10 +661,6 @@ export function StudentRecordPage() {
         }
       >
         <div className="space-y-4">
-          <div>
-            <label htmlFor="req-name" className="mb-1.5 block text-sm font-medium text-navy-800">Document</label>
-            <input id="req-name" value={docName} onChange={(e) => setDocName(e.target.value)} className="input" placeholder="e.g. Statement of Purpose (final)" />
-          </div>
           <SelectField
             label="Used for"
             options={[
@@ -607,8 +669,12 @@ export function StudentRecordPage() {
               { value: 'visa', label: 'Visa' },
             ].filter((o) => canEditDoc(o.value as DocCategory))}
             value={docCategory}
-            onChange={(e) => setDocCategory(e.target.value as DocCategory)}
+            onChange={(e) => {
+              setDocCategory(e.target.value as DocCategory);
+              setDocName('');
+            }}
           />
+          <DocumentNameField key={`${docCategory}-${requesting}`} label="Document" options={documentsForCategory(docCategory)} student={student} value={docName} onChange={setDocName} />
         </div>
       </Modal>
 

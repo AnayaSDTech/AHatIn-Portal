@@ -203,6 +203,7 @@ function AllStudents() {
                   <p className="mt-3 text-sm text-navy-700">{s.goal} · {s.destination}</p>
                   <p className="text-xs text-navy-500">{s.intake}</p>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {s.newForCounsellor && s.counsellorId === scope.myId && <Pill tone="gold">New</Pill>}
                     <Pill tone="blue">{stageLabel(s.stage)}</Pill>
                     {pending > 0 && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">

@@ -18,7 +18,7 @@ export interface TrackerAction {
 }
 
 /**
- * The student's seven services. Statuses come from real events in the shared record, never typed in.
+ * The stages of the student's journey. Statuses come from real events in the shared record, never typed in.
  * Where the next step is the student's, a button takes them straight to it.
  */
 export function ServiceTracker({
@@ -26,8 +26,11 @@ export function ServiceTracker({
   actions = {},
   details = {},
   links = {},
+  intro,
 }: {
   services: ServiceView[];
+  /** Shown above the stages, e.g. a button to complete the profile before the journey starts. */
+  intro?: ReactNode;
   actions?: Partial<Record<ServiceCode, TrackerAction>>;
   /** A link shown beside a service's title, e.g. "View applications". */
   links?: Partial<Record<ServiceCode, TrackerAction>>;
@@ -36,6 +39,7 @@ export function ServiceTracker({
 }) {
   return (
     <Panel id="progress" title="Application progress" icon={<Route className="h-4 w-4" aria-hidden />}>
+      {intro && <div className="mb-6">{intro}</div>}
       <ol className="relative">
         {services.map((s, i) => {
           const last = i === services.length - 1;

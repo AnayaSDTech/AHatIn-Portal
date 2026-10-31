@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useApi } from '../lib/api/store';
 import { useAuth } from '../context/AuthContext';
 import { isStaff } from '../lib/api/types';
-import { setCounsellors, type AccessGrant, type Agency, type Counsellor, type FollowUp, type Lead, type Message, type StaffStudent } from '../data/staff';
+import { setCounsellors, type AccessGrant, type Agency, type Counsellor, type FollowUp, type Lead, type Message, type StaffNotification, type StaffStudent } from '../data/staff';
 import type { Availability, Session, TimeOff } from '../lib/scheduling';
 
 /*
@@ -44,6 +44,10 @@ export function useLeads() {
 export function useFollowUps() {
   const { staff } = useSignedIn();
   return useApi<FollowUp[]>(staff ? '/follow-ups' : null, NONE, { pollMs: 60_000 });
+}
+export function useStaffNotifications() {
+  const { staff } = useSignedIn();
+  return useApi<StaffNotification[]>(staff ? '/staff/notifications' : null, NONE, { pollMs: 30_000 });
 }
 export function useGrants() {
   const { staff } = useSignedIn();

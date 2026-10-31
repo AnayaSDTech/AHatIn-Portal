@@ -11,9 +11,9 @@ import { useAuth } from '../context/AuthContext';
 import { registerSchema, type RegisterForm } from '../lib/validation';
 import { ApiError, type OtpRequestResult } from '../lib/api/types';
 
-/** Free student registration: details, then confirm the email with a one-time code. */
+/** Free student registration: details and a password, then verify the email with the 6-digit code we send. */
 export function RegisterPage() {
-  const { register: registerStudent, requestOtp, verifyOtp } = useAuth();
+  const { register: registerStudent, verifyEmail, resendVerification } = useAuth();
   const navigate = useNavigate();
   const [sent, setSent] = useState<{ email: string; result: OtpRequestResult } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -28,13 +28,13 @@ export function RegisterPage() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', mobile: '', consent: false },
+    defaultValues: { name: '', email: '', mobile: '', password: '', confirmPassword: '', consent: false },
   });
 
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
     try {
-      const result = await registerStudent({ ...data, mobile: `+91${data.mobile}` });
+      const result = await registerStudent({ name: data.name, email: data.email, mobile: `+91${data.mobile}`, password: data.password, consent: data.consent });
       setSent({ email: data.email, result });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -48,15 +48,21 @@ export function RegisterPage() {
 
   if (sent) {
     return (
-      <AuthShell title="Confirm your email" subtitle="Enter the 6-digit code to finish creating your account.">
+      <AuthShell title="Verify your email" subtitle="Enter the 6-digit code to finish creating your account.">
         <VerifyCodeStep
           email={sent.email}
           initial={sent.result}
+          message={
+            <>
+              We've sent a 6-digit code to <span className="font-semibold text-navy-900">{sent.email}</span>.
+            </>
+          }
+          submitLabel="Verify email and continue"
           onVerify={async (code) => {
-            await verifyOtp(sent.email, code);
+            await verifyEmail(sent.email, code);
             navigate('/dashboard', { replace: true, state: { welcome: true } });
           }}
-          onResend={() => requestOtp(sent.email)}
+          onResend={() => resendVerification(sent.email)}
           onBack={() => setSent(null)}
         />
       </AuthShell>
@@ -68,7 +74,7 @@ export function RegisterPage() {
       title="Create your free account"
       subtitle={
         <>
-          It takes under a minute, and there's no password to remember. Already registered?{' '}
+          It takes under a minute. Already registered?{' '}
           <Link to="/login" className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
             Log in
           </Link>
@@ -101,6 +107,17 @@ export function RegisterPage() {
             error={errors.mobile?.message}
             {...register('mobile')}
           />
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField
+            label="Password"
+            type="password"
+            autoComplete="new-password"
+            hint="At least 8 characters, with letters and numbers"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <TextField label="Confirm password" type="password" autoComplete="new-password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
         </div>
 
         <div>

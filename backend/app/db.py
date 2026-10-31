@@ -78,6 +78,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("status", ASCENDING), ("sendAfter", ASCENDING)]),
         IndexModel([("dedupeKey", ASCENDING)], unique=True, partialFilterExpression={"dedupeKey": {"$type": "string"}}),
     ],
+    "staff_alerts": [IndexModel([("userId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("key", ASCENDING)]), IndexModel([("userId", ASCENDING), ("studentId", ASCENDING)])],
     "audit_log": [IndexModel([("entity", ASCENDING), ("entityId", ASCENDING), ("at", DESCENDING)]), IndexModel([("actorId", ASCENDING), ("at", DESCENDING)])],
 }
 

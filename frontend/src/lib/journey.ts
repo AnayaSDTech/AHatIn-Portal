@@ -2,19 +2,19 @@ import type { Session } from './scheduling';
 import type { StaffStudent } from '../data/staff';
 
 /**
- * The student's journey through AHat's seven services.
+ * The student's journey through its stages.
  * Each service's status is worked out from real events in the student's record (sessions, shortlist,
  * applications, documents, visa, pre-departure tasks, arrival), never typed in directly. A counsellor can
  * override a service with a reason, e.g. "Not needed" for a self-funded student.
  * Student and staff screens both read this, so they always agree.
  */
 
-export const SERVICE_CODES = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'] as const;
+/** S1 covers the career plan and the university shortlist (there is no S2 any more; the other codes stay as they were). */
+export const SERVICE_CODES = ['S1', 'S3', 'S4', 'S5', 'S6', 'S7'] as const;
 export type ServiceCode = (typeof SERVICE_CODES)[number];
 
 export const SERVICE_TITLES: Record<ServiceCode, string> = {
-  S1: 'Career Counselling & Course Selection',
-  S2: 'University & Country Selection',
+  S1: 'Career Counselling & University Selection',
   S3: 'Application Assistance',
   S4: 'Scholarship & Financial Guidance',
   S5: 'Visa Assistance',
@@ -49,8 +49,11 @@ export interface ShortlistItem {
   tuition: string;
   livingCost: string;
   deadline: string;
-  agency: string;
-  earnsCommission: boolean;
+  /** e.g. "1 year" (options added before this was asked don't have it). */
+  duration?: string;
+  /** Only on options added before these were removed from the form. */
+  agency?: string;
+  earnsCommission?: boolean;
   reason: string;
   /** The student's choice when reviewing: apply, or remove with a reason. */
   choice?: 'apply' | 'removed';
@@ -68,7 +71,7 @@ export interface Shortlist {
   status: 'draft' | 'shared' | 'approved';
   sharedAt?: string;
   approvedAt?: string;
-  /** Set once, the first time a shortlist is approved; later revisions don't undo service 2. */
+  /** Set once, the first time a shortlist is approved; later revisions don't undo it. */
   firstApprovedAt?: string;
   items: ShortlistItem[];
 }
@@ -165,7 +168,8 @@ export interface Journey {
   visa?: Visa;
   departure: Departure;
   arrival: Arrival;
-  overrides: Partial<Record<ServiceCode, Override>>;
+  /** S2: only on students whose university stage was overridden while it was a stage of its own. */
+  overrides: Partial<Record<ServiceCode | 'S2', Override>>;
 }
 
 export const emptyJourney = (): Journey => ({ funding: { sources: [], scholarships: [] }, departure: { done: {} }, arrival: {}, overrides: {} });
@@ -185,6 +189,12 @@ export interface ServiceView {
 
 const lakh = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(1)} lakh`;
 
+/** A document for the applications (not funding or visa, which come later) is still to upload, or to upload again. */
+export const applicationDocumentsDue = (s: StaffStudent) => s.documents.some((d) => d.category !== 'funds' && d.category !== 'visa' && (d.state === 'missing' || d.state === 'rejected'));
+
+/** The university stage was set as completed or not needed while it was a stage of its own. */
+const skippedShortlist = (j: Journey) => ['completed', 'not_needed'].includes(j.overrides.S2?.status ?? '');
+
 function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<ServiceView, 'code' | 'title' | 'autoStatus' | 'override'> {
   const j = s.journey;
   const apps = s.applications;
@@ -192,25 +202,24 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
   const visaLead = s.visaOfficerId ? 'Your Visa Officer' : 'Your counsellor';
   switch (code) {
     case 'S1': {
-      if (j.careerPlan) return { status: 'completed', summary: `Career plan shared · ${j.careerPlan.summary}` };
+      // Complete once the student has both the career plan and the shortlist. A revision doesn't undo it.
+      const sl = j.shortlist;
+      const shared = !!sl?.sharedAt || (!!sl && sl.status !== 'draft') || skippedShortlist(j);
+      const preparing = sl?.status === 'draft' && sl.items.length > 0;
+      if (j.careerPlan && shared) return { status: 'completed', summary: `Career plan and shortlist shared · ${j.careerPlan.summary}` };
+      if (j.careerPlan) {
+        return { status: 'in_progress', summary: `Career plan shared · ${j.careerPlan.summary}`, next: preparing ? 'Your counsellor is preparing your university shortlist' : 'Your counsellor will share your university shortlist' };
+      }
+      if (shared) return { status: 'in_progress', summary: 'University shortlist shared', next: 'Your counsellor shares your career plan after your counselling session' };
       // Any session ever booked counts, so later sessions or a cancellation never move this step back.
       const mine = sessions.filter((x) => x.studentId === s.id);
-      if (mine.length) return { status: 'in_progress', summary: 'Counselling under way', next: 'Your counsellor shares your career plan after your counselling session' };
+      if (mine.length || preparing) return { status: 'in_progress', summary: 'Counselling under way', next: 'Your counsellor shares your career plan after your counselling session' };
       return { status: 'not_started', summary: 'Starts with your first counselling session', next: 'Book a career counselling session' };
     }
-    case 'S2': {
-      const sl = j.shortlist;
-      const chosen = sl?.items.filter((i) => i.choice === 'apply').length ?? 0;
-      if (sl?.firstApprovedAt) {
-        return sl.status === 'shared'
-          ? { status: 'completed', summary: 'Shortlist approved · new option added by your counsellor', next: 'Decide on the new option in your shortlist' }
-          : { status: 'completed', summary: `Shortlist approved · ${chosen} ${chosen === 1 ? 'option' : 'options'} to apply to` };
-      }
-      if (sl?.status === 'shared') return { status: 'in_progress', summary: `Shortlist of ${sl.items.length} ready for you`, next: 'Review and approve your shortlist' };
-      if (sl?.status === 'draft' && sl.items.length) return { status: 'in_progress', summary: 'Your counsellor is preparing your shortlist' };
-      return { status: 'not_started', summary: 'Starts after your career plan' };
-    }
     case 'S3': {
+      const shortlistWaiting = j.shortlist?.status === 'shared';
+      // A new option added to a shortlist that was already approved.
+      const newOption = shortlistWaiting ? 'Decide on the new option in your shortlist' : undefined;
       const accepted = apps.find((a) => a.state === 'accepted');
       if (accepted) return { status: 'completed', summary: `Offer accepted · ${accepted.university}` };
       const sent = apps.filter((a) => a.state !== 'draft');
@@ -220,11 +229,19 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
         return {
           status: 'in_progress',
           summary: `${sent.length} of ${apps.length} submitted · ${offers.length} ${offers.length === 1 ? 'offer' : 'offers'}`,
-          next: offers[0] ? `Reply to your offer from ${offers[0].university}` : drafts[0] ? `Your counsellor is preparing your ${drafts[0].university} application` : 'Waiting for university decisions',
+          next: offers[0] ? `Reply to your offer from ${offers[0].university}` : newOption ?? drafts[0] ? `Your counsellor is preparing your ${drafts[0].university} application` : 'Waiting for university decisions',
         };
       }
-      if (apps.length) return { status: 'not_started', summary: `${apps.length} ${apps.length === 1 ? 'application' : 'applications'} being prepared`, next: 'Make sure your documents are uploaded' };
-      return { status: 'not_started', summary: 'Starts after you approve your shortlist' };
+      // Under way as soon as the shortlist is approved: the counsellor is preparing the applications.
+      const shortlistDone = !!j.shortlist?.firstApprovedAt || skippedShortlist(j) || ['completed', 'not_needed'].includes(j.overrides.S1?.status ?? '');
+      if (apps.length || shortlistDone) {
+        return {
+          status: 'in_progress',
+          summary: apps.length ? `${apps.length} ${apps.length === 1 ? 'application' : 'applications'} being prepared` : 'Your counsellor is preparing your applications',
+          next: newOption ?? (applicationDocumentsDue(s) ? 'Upload your remaining documents' : undefined),
+        };
+      }
+      return { status: 'not_started', summary: 'Starts after you approve your shortlist', next: shortlistWaiting ? 'Review and approve your shortlist' : undefined };
     }
     case 'S4': {
       const f = j.funding;
@@ -237,12 +254,16 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       if (planned && allVerified) return { status: 'completed', summary: `Funding plan covers ${lakh(f.estimatedCost!)} · proof of funds verified` };
       const started = f.sources.length > 0 || f.scholarships.length > 0 || funds.some((d) => d.state !== 'missing');
       if (!started) {
+        // Under way as soon as a Financial Aid Officer is assigned; they set the estimated cost.
+        if (s.financeOfficerId) {
+          return f.estimatedCost
+            ? { status: 'in_progress', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' }
+            : { status: 'in_progress', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Book a session or message them about scholarships, loans or sponsors' };
+        }
         if (f.estimatedCost) return { status: 'not_started', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' };
-        // Starts after Application Assistance: the admin assigns a Financial Aid Officer, who sets the estimated cost.
+        // Starts after Application Assistance: the admin assigns a Financial Aid Officer.
         if (!apps.some((a) => a.state === 'accepted')) return { status: 'not_started', summary: 'Starts once you accept an offer' };
-        return s.financeOfficerId
-          ? { status: 'not_started', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Message them about scholarships, loans or sponsors' }
-          : { status: 'not_started', summary: 'Starts when your Financial Aid Officer is assigned' };
+        return { status: 'not_started', summary: 'Starts when your Financial Aid Officer is assigned' };
       }
       const toUpload = funds.find((d) => d.state === 'missing' || d.state === 'rejected');
       const checking = funds.some((d) => d.state === 'pending');
@@ -264,11 +285,13 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
     }
     case 'S5': {
       const v = j.visa;
+      // Under way as soon as a Visa Officer is assigned.
+      if (!v && s.visaOfficerId) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
       if (!v) return { status: 'not_started', summary: apps.some((a) => a.state === 'accepted') ? 'Starts when your CAS or admission letter arrives' : 'Starts after you accept an offer' };
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
       if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };
       const i = VISA_PATH.indexOf(v.stage);
-      return { status: 'in_progress', summary: visaStageLabel[v.stage], next: i < VISA_PATH.length - 1 ? `Next: ${visaStageLabel[VISA_PATH[i + 1]!].toLowerCase()}` : 'Waiting for the visa decision' };
+      return { status: 'in_progress', summary: visaStageLabel[v.stage], next: i < VISA_PATH.length - 1 ? visaStageLabel[VISA_PATH[i + 1]!] : 'Waiting for the visa decision' };
     }
     case 'S6': {
       const d = j.departure;

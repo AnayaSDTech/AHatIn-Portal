@@ -6,6 +6,7 @@ import { GuestOnly, RequireRole } from './components/auth/RouteGuards';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { StudentLayout } from './components/student/StudentLayout';
 import {
   StudentApplicationsPage,
@@ -16,6 +17,7 @@ import {
   StudentSessionsPage,
   StudentTravelPage,
 } from './pages/student/StudentPages';
+import { ProfilePage as StudentProfilePage } from './pages/student/ProfilePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
 import { StaffSetupPage } from './pages/staff/StaffSetupPage';
@@ -41,12 +43,13 @@ const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
-  // Student login and registration (one-time code)
+  // Student login (email and password), registration (email verified with a code) and forgot password
   {
     element: <Layout hideFooter />,
     children: [
       { path: '/login', element: <GuestOnly><LoginPage /></GuestOnly> },
       { path: '/register', element: <GuestOnly><RegisterPage /></GuestOnly> },
+      { path: '/forgot-password', element: <GuestOnly><ForgotPasswordPage /></GuestOnly> },
     ],
   },
   // Student portal
@@ -64,6 +67,7 @@ const router = createBrowserRouter([
           { path: 'messages', element: <StudentMessagesPage /> },
           { path: 'funding', element: <StudentFundingPage /> },
           { path: 'travel', element: <StudentTravelPage /> },
+          { path: 'profile', element: <StudentProfilePage /> },
         ],
       },
     ],

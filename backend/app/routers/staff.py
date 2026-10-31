@@ -13,7 +13,7 @@ from app.core.scope import active_grant_filter, scope_for, visible_lead
 from app import matching
 from app.db import get_db
 from app.domain import FOLLOW_UP_RULES, LEAD_STAGES, STAGE_LABELS, stage_index
-from app.records import serialize_counsellor, serialize_follow_up, serialize_grant, serialize_lead
+from app.records import serialize_alert, serialize_counsellor, serialize_follow_up, serialize_grant, serialize_lead
 from app.schemas import ContactBody, LeadStageBody, MatchingProfileBody, OwnNameBody, ReassignBody
 from app.services import notify
 from app.services.students import own_record
@@ -21,6 +21,25 @@ from app.services.team import team_of
 from app.services.workflow import close_follow_ups, create_follow_up
 
 router = APIRouter(tags=["staff"])
+
+
+# ---------------------------------------------------------------- notifications
+
+
+@router.get("/staff/notifications")
+async def my_notifications(user: Staff):
+    found = await get_db().staff_alerts.find({"userId": user["_id"]}).sort("createdAt", -1).to_list(200)
+    return [serialize_alert(a) for a in found]
+
+
+@router.post("/staff/notifications/read-all", status_code=204)
+async def read_all_notifications(user: Staff):
+    await get_db().staff_alerts.delete_many({"userId": user["_id"]})
+
+
+@router.post("/staff/notifications/{alert_id}/read", status_code=204)
+async def read_notification(alert_id: str, user: Staff):
+    await get_db().staff_alerts.delete_one({"_id": alert_id, "userId": user["_id"]})
 
 
 # ---------------------------------------------------------------- who the user is and what they may see
@@ -165,7 +184,7 @@ async def reassign_lead(lead_id: str, body: ReassignBody, user: Admin):
     lead = await _push_activity(lead_id, activity, {"counsellorId": target["_id"]})
     await db.follow_ups.update_many({"personId": lead_id, "done": False}, {"$set": {"counsellorId": target["_id"]}})
     await audit(user, "lead.reassigned", "leads", lead_id, {"to": target["_id"], "reason": body.reason})
-    await notify.email_counsellor(target["_id"], f"New lead assigned: {lead['name']}", f"{lead['name']} ({lead['interest']}) is now assigned to you. Reason: {body.reason}", path=f"/staff/leads?open={lead_id}")
+    await notify.email_counsellor(target["_id"], f"New lead assigned: {lead['name']}", f"{lead['name']} ({lead['interest']}) is now assigned to you. Reason: {body.reason}", path=f"/staff/leads?open={lead_id}", kind="assigned")
     return serialize_lead(lead)
 
 

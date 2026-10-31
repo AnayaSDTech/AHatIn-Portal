@@ -3,6 +3,7 @@ set), otherwise SMTP (if SMTP_HOST is set), otherwise writes them to the log (de
 
 import base64
 import logging
+import re
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 
@@ -10,7 +11,7 @@ import aiosmtplib
 import httpx
 from pymongo.errors import DuplicateKeyError
 
-from app.config import get_settings
+from app.config import get_settings, undeliverable
 from app.core.clock import local_now, now
 from app.db import get_db, new_id
 
@@ -51,8 +52,31 @@ async def queue_email(
         pass
 
 
-async def email_admins(subject: str, body: str, dedupe_key: str | None = None) -> None:
+async def alert_staff(user_id: str | None, title: str, text: str, *, path: str = "/staff", kind: str = "update", key: str | None = None) -> None:
+    """Adds to a staff member's notifications on their Today page, until they open it or mark it as read.
+    `key`: one notification per key at a time; a newer event replaces the unread one."""
+    if not user_id:
+        return
+    student = re.match(r"/staff/students/([^/#?]+)", path)
+    doc = {"title": title, "text": " ".join(text.split())[:300], "path": path, "kind": kind, "studentId": student[1] if student else None, "createdAt": now()}
+    alerts = get_db().staff_alerts
+    if key:
+        await alerts.update_one({"userId": user_id, "key": key}, {"$set": doc, "$setOnInsert": {"_id": new_id()}}, upsert=True)
+    else:
+        await alerts.insert_one({"_id": new_id(), "userId": user_id, **doc})
+
+
+async def clear_alerts(key: str) -> None:
+    """The thing a notification was about has been dealt with, so it no longer needs reading."""
+    await get_db().staff_alerts.delete_many({"key": key})
+
+
+async def email_admins(subject: str, body: str, dedupe_key: str | None = None, *, alert_path: str | None = None, alert_text: str | None = None) -> None:
+    """`alert_path`: also adds a notification for each admin, for events about a student that need them to act."""
     s = get_settings()
+    if alert_path:
+        async for a in get_db().users.find({"role": "admin", "status": "active"}, {"_id": 1}):
+            await alert_staff(a["_id"], subject, alert_text or body, path=alert_path, kind="assigned")
     recipients = [e.strip() for e in s.admin_alert_emails.split(",") if e.strip()]
     if not recipients:
         admins = await get_db().users.find({"role": "admin", "status": "active"}, {"email": 1}).to_list(None)
@@ -64,12 +88,6 @@ async def email_admins(subject: str, body: str, dedupe_key: str | None = None) -
 def in_quiet_hours() -> bool:
     h = local_now().hour
     return h >= 21 or h < 8
-
-
-def _undeliverable(address: str) -> bool:
-    """Addresses on reserved test domains (e.g. the demo accounts' @ahatin.example) can never receive mail."""
-    domain = address.rsplit("@", 1)[-1].lower()
-    return domain.endswith((".example", ".test", ".invalid", ".localhost")) or domain in ("example.com", "example.org", "example.net")
 
 
 async def _send_resend(n: dict) -> None:
@@ -92,7 +110,7 @@ async def _send_resend(n: dict) -> None:
 
 async def _send_email(n: dict) -> None:
     s = get_settings()
-    if _undeliverable(n["to"]):
+    if undeliverable(n["to"]):
         log.info("EMAIL (not sent, test address) to=%s subject=%s\n%s", n["to"], n["subject"], n["body"])
         return
     if s.resend_api_key:
@@ -161,10 +179,14 @@ async def email_student(record: dict, subject: str, text: str, *, dedupe_key: st
     await queue_email(record["email"], subject, body, dedupe_key=dedupe_key, send_after=send_after, attachments=attachments)
 
 
-async def email_counsellor(counsellor_id: str, subject: str, text: str, *, path: str = "/staff", dedupe_key: str | None = None, attachments: list[dict] | None = None) -> None:
+async def email_counsellor(
+    counsellor_id: str, subject: str, text: str, *, path: str = "/staff", dedupe_key: str | None = None, attachments: list[dict] | None = None, kind: str = "update", alert_key: str | None = None
+) -> None:
+    """Emails a staff member and adds the same update to their notifications."""
     c = await get_db().users.find_one({"_id": counsellor_id, "status": "active"})
     if not c:
         return
+    await alert_staff(c["_id"], subject, text, path=path, kind=kind, key=alert_key)
     body = f"Hello {c['name'].split(' ')[0]},\n\n{text}\n\nOpen the staff portal: {portal_link(path)}\n\nAHat"
     await queue_email(c["email"], subject, body, dedupe_key=dedupe_key, attachments=attachments)
 

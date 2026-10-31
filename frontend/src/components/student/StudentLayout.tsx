@@ -4,7 +4,6 @@ import { CalendarDays, FolderCheck, LayoutDashboard, Menu, MessageSquare, PartyP
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Container } from '../ui/Container';
-import { ProfileModal } from '../dashboard/ProfileModal';
 import { BookSessionModal } from '../dashboard/BookSessionModal';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -12,8 +11,7 @@ import { blankProfile, type StudentProfile } from '../../data/dashboard';
 import { applicationUpdates, type ApplicationUpdate, type Counsellor, type Message, type StaffStudent, type StudentTeam } from '../../data/staff';
 import { useMessages, useSessions } from '../../hooks/useStaffData';
 import { useStudentActions, type StudentActions } from '../../hooks/useJourney';
-import { api } from '../../lib/api/client';
-import { mutate, useApi } from '../../lib/api/store';
+import { useApi } from '../../lib/api/store';
 import type { User } from '../../lib/api/types';
 import { computeServices, overallProgress, type ServiceView } from '../../lib/journey';
 import type { Session } from '../../lib/scheduling';
@@ -50,6 +48,11 @@ export interface StudentContext {
 }
 
 export const useStudent = () => useOutletContext<StudentContext>();
+
+export const PROFILE_PATH = '/dashboard/profile';
+
+/** "My profile": its own page, shown at the right of the tabs (and under "More" on phones). */
+const profileSection: Section = { to: PROFILE_PATH, label: 'My profile', title: 'My profile', description: '', icon: UserRound };
 
 /** Which page each section lives on. */
 const PAGE_FOR: Record<string, string> = {
@@ -129,14 +132,10 @@ export function StudentLayout() {
     return Boolean(st?.welcome || st?.signedIn);
   });
 
-  // "My profile" in the account menu opens the profile (passed as navigation state, so the page doesn't jump).
-  const [profileOpen, setProfileOpen] = useState<false | 'view' | 'edit'>(false);
+  // Older links asked for the profile with navigation state: it is a page now.
   useEffect(() => {
-    if ((location.state as { openProfile?: boolean } | null)?.openProfile) {
-      setProfileOpen('view');
-      navigate(location.pathname, { replace: true, state: null });
-    }
-  }, [location.key, location.state, location.pathname, navigate]);
+    if ((location.state as { openProfile?: boolean } | null)?.openProfile) navigate(PROFILE_PATH, { replace: true });
+  }, [location.key, location.state, navigate]);
 
   // The student's own record (the same one staff work on), their profile and their counsellor.
   // Refreshed regularly, so changes made by the counsellor show up while the dashboard is open.
@@ -155,8 +154,9 @@ export function StudentLayout() {
   useEffect(() => {
     if (!mine || prompted.current) return;
     prompted.current = true;
-    if (justSignedIn && !mine.profileComplete) setProfileOpen('edit');
-  }, [mine, justSignedIn]);
+    // Just signed in with an incomplete profile: start on the profile form.
+    if (justSignedIn && !mine.profileComplete && location.pathname !== PROFILE_PATH) navigate(PROFILE_PATH);
+  }, [mine, justSignedIn, location.pathname, navigate]);
   const [allSessions] = useSessions();
   const [messages] = useMessages();
   const sessions = useMemo(() => allSessions.filter((s) => s.studentId === record?.id), [allSessions, record?.id]);
@@ -187,7 +187,7 @@ export function StudentLayout() {
   const status = (code: string) => services.find((s) => s.code === code)?.status;
   const funds = documents.filter((d) => d.category === 'funds');
   const f = journey.funding;
-  const showFunding = !!journey.visa || (status('S4') !== 'not_needed' && (!!record.financeOfficerId || !!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || funds.length > 0));
+  const showFunding = !!journey.visa || !!record.visaOfficerId || (status('S4') !== 'not_needed' && (!!record.financeOfficerId || !!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || funds.length > 0));
   const showTravel = journey.visa?.stage === 'granted' || !!journey.departure.confirmedAt;
 
   const unread = messages.filter((m) => m.studentId === record.id && m.from === 'staff' && !m.readAt).length;
@@ -205,7 +205,9 @@ export function StudentLayout() {
     { to: '/dashboard/funding', label: 'Funding & visa', title: 'Funding & visa', description: 'Your funding plan, scholarships and visa progress.', icon: PiggyBank, hidden: !showFunding },
     { to: '/dashboard/travel', label: 'Travel', title: 'Travel & arrival', description: 'Get ready to travel, then tell us when you have arrived.', icon: Plane, hidden: !showTravel },
   ];
-  const current = sections.find((s) => (s.to === '/dashboard' ? location.pathname.replace(/\/$/, '') === '/dashboard' : location.pathname.startsWith(s.to))) ?? sections[0]!;
+  const current =
+    [...sections, profileSection].find((s) => (s.to === '/dashboard' ? location.pathname.replace(/\/$/, '') === '/dashboard' : location.pathname.startsWith(s.to))) ?? sections[0]!;
+  const onProfilePage = current === profileSection;
   const isOverview = current.to === '/dashboard';
 
   const firstName = user.name.split(' ')[0];
@@ -230,12 +232,12 @@ export function StudentLayout() {
     showFunding,
     showTravel,
     go: (target) => {
-      if (target === 'profile') return setProfileOpen(profileComplete ? 'view' : 'edit');
+      if (target === 'profile') return navigate(PROFILE_PATH);
       const page = PAGE_FOR[target];
       if (page === undefined) return goToSection(target);
       navigate(`/dashboard${page ? `/${page}` : ''}#${target}`);
     },
-    openProfile: () => setProfileOpen(profileComplete ? 'view' : 'edit'),
+    openProfile: () => navigate(PROFILE_PATH),
     openBooking: (topic) => {
       if (!profileComplete) return setNotYet('profile');
       if (!counsellor) return setNotYet('counsellor');
@@ -257,14 +259,14 @@ export function StudentLayout() {
                 {(() => {
                   // The study plan at a glance, from the profile (or the record) once known.
                   const plan = [
-                    profile.courseInterest,
+                    ...profile.courseInterests,
                     profile.destination || (record.destination !== 'Not decided' ? record.destination : ''),
                     profile.intake || (record.intake !== 'To be decided' ? record.intake : ''),
                   ].filter(Boolean);
                   return plan.length ? (
                     <div className="mt-4 flex flex-wrap gap-2" data-study-plan>
                       {plan.map((p, i) => (
-                        <span key={p} className={cn('rounded-full px-3 py-1 text-sm', i === 0 && profile.courseInterest ? 'bg-gold-500 font-semibold text-navy-950' : 'bg-white/10 text-navy-100 ring-1 ring-white/15')}>
+                        <span key={p} className={cn('rounded-full px-3 py-1 text-sm', i < profile.courseInterests.length ? 'bg-gold-500 font-semibold text-navy-950' : 'bg-white/10 text-navy-100 ring-1 ring-white/15')}>
                           {p}
                         </span>
                       ))}
@@ -322,21 +324,21 @@ export function StudentLayout() {
                   )}
                 </NavLink>
               ))}
-            {/* The profile opens in a window over the current page. */}
-            <button
-              type="button"
-              onClick={() => setProfileOpen('view')}
-              className="ml-auto flex shrink-0 items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-semibold text-navy-200 transition hover:bg-white/10 hover:text-white"
+            <NavLink
+              to={PROFILE_PATH}
+              className={({ isActive }) =>
+                cn('ml-auto flex shrink-0 items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-semibold transition', isActive ? 'bg-[#F4F1EA] text-navy-900' : 'text-navy-200 hover:bg-white/10 hover:text-white')
+              }
               data-open-profile
             >
               <UserRound className="h-4 w-4" aria-hidden />
               My profile
-            </button>
+            </NavLink>
           </nav>
         </Container>
       </div>
 
-      <MobileNav sections={sections.filter((sec) => !sec.hidden)} onProfile={() => setProfileOpen('view')} />
+      <MobileNav sections={[...sections.filter((sec) => !sec.hidden), profileSection]} />
 
       <Container className="mt-6 sm:mt-8">
         {showWelcome && isOverview && (
@@ -355,7 +357,8 @@ export function StudentLayout() {
             </button>
           </div>
         )}
-        {!profileComplete && (
+        {/* On the Overview the progress card has its own "Complete your profile" button. */}
+        {!profileComplete && !onProfilePage && !isOverview && (
           <div role="status" className="mb-6 flex flex-col gap-4 rounded-2xl border border-gold-300 bg-gold-50 p-5 shadow-soft sm:flex-row sm:items-center" data-profile-banner>
             <UserRoundCheck className="h-6 w-6 shrink-0 text-gold-700" aria-hidden />
             <div className="flex-1 text-sm text-navy-800">
@@ -366,7 +369,7 @@ export function StudentLayout() {
                   : 'We use your education, English test and study plans to match you with the right counsellor. It takes about five minutes.'}
               </p>
             </div>
-            <Button size="sm" onClick={() => setProfileOpen('edit')}>Complete profile</Button>
+            <Button size="sm" onClick={() => navigate(PROFILE_PATH)}>Complete profile</Button>
           </div>
         )}
         <Outlet context={context} />
@@ -394,7 +397,7 @@ export function StudentLayout() {
               <Button
                 onClick={() => {
                   setNotYet(null);
-                  setProfileOpen('edit');
+                  navigate(PROFILE_PATH);
                 }}
               >
                 Complete profile
@@ -411,18 +414,6 @@ export function StudentLayout() {
             : `Thanks for completing your profile. We're matching you with a counsellor who knows ${profile.destination && profile.destination !== 'Not sure yet' ? profile.destination : 'your chosen country'}. You can book your first session as soon as they're assigned, and we'll email you when they are.`}
         </p>
       </Modal>
-
-      <ProfileModal
-        open={!!profileOpen}
-        startEditing={profileOpen === 'edit'}
-        completing={!profileComplete}
-        onClose={() => setProfileOpen(false)}
-        user={user}
-        profile={profile}
-        onSave={(p) => mutate(() => api.put('/me/profile', p), { silent: true }).then(() => undefined)}
-        passportLocked={applications.some((a) => a.state !== 'draft')}
-        counsellor={counsellor}
-      />
     </div>
   );
 }
@@ -433,7 +424,7 @@ export function StudentLayout() {
  * On phones the sections are a bar fixed to the bottom of the screen, like an app: Home, Applications, Documents and
  * Messages, with "More" for Sessions, Funding & visa, Travel (once they apply) and My profile.
  */
-function MobileNav({ sections, onProfile }: { sections: Section[]; onProfile: () => void }) {
+function MobileNav({ sections }: { sections: Section[] }) {
   const location = useLocation();
   const [more, setMore] = useState(false);
   const main = sections.filter((s) => s.short);
@@ -462,23 +453,11 @@ function MobileNav({ sections, onProfile }: { sections: Section[]; onProfile: ()
                 key={s.to}
                 to={s.to}
                 role="menuitem"
-                className={({ isActive }) => cn('flex items-center gap-3 border-b border-navy-100 px-4 py-3.5 text-sm font-semibold', isActive ? 'text-navy-900' : 'text-navy-700')}
+                className={({ isActive }) => cn('flex items-center gap-3 border-b border-navy-100 px-4 py-3.5 text-sm font-semibold last:border-b-0', isActive ? 'text-navy-900' : 'text-navy-700')}
               >
                 <s.icon className="h-5 w-5 text-navy-400" aria-hidden /> {s.label}
               </NavLink>
             ))}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setMore(false);
-                onProfile();
-              }}
-              className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-sm font-semibold text-navy-700"
-              data-open-profile-mobile
-            >
-              <UserRound className="h-5 w-5 text-navy-400" aria-hidden /> My profile
-            </button>
           </div>
         )}
         <nav className="grid grid-cols-5 border-t border-navy-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur" aria-label="Dashboard sections" data-mobile-nav>

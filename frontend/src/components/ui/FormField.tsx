@@ -78,6 +78,29 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(function TextF
   );
 });
 
+interface ComboProps extends InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+  error?: string;
+  hint?: string;
+  /** Suggestions shown as a dropdown while typing; any other value can still be typed. */
+  options: string[];
+}
+
+/** A text field with a dropdown of suggestions (the browser's own list), for answers that aren't from a fixed set. */
+export const ComboField = forwardRef<HTMLInputElement, ComboProps>(function ComboField({ options, ...rest }, ref) {
+  const listId = useId();
+  return (
+    <>
+      <TextField ref={ref} list={listId} autoComplete="off" {...rest} />
+      <datalist id={listId}>
+        {options.map((o) => (
+          <option key={o} value={o} />
+        ))}
+      </datalist>
+    </>
+  );
+});
+
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
   error?: string;

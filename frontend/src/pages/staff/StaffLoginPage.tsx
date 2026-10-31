@@ -12,7 +12,6 @@ import { homeFor } from '../../components/auth/RouteGuards';
 import { useAuth } from '../../context/AuthContext';
 import { staffLoginSchema, type StaffLoginForm } from '../../lib/validation';
 import { ApiError, type StaffChallenge } from '../../lib/api/types';
-import { DEMO_ACCOUNTS, showDemoHints } from '../../lib/demoAccounts';
 import { totpCode } from '../../lib/totp';
 
 /** DEMO: shows what the staff member's authenticator app would display, refreshing every 30 seconds. */
@@ -21,21 +20,14 @@ export function DemoAuthenticator({ secret, onUse }: { secret: string; onUse: (c
   const [left, setLeft] = useState(30);
 
   useEffect(() => {
-    let alive = true;
-    const tick = async () => {
+    const tick = () => {
       const now = Date.now();
-      const c = await totpCode(secret, now);
-      if (alive) {
-        setCode(c);
-        setLeft(30 - Math.floor((now / 1000) % 30));
-      }
+      setCode(totpCode(secret, now));
+      setLeft(30 - Math.floor((now / 1000) % 30));
     };
-    void tick();
+    tick();
     const t = setInterval(tick, 1000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
+    return () => clearInterval(t);
   }, [secret]);
 
   return (
@@ -69,14 +61,8 @@ export function StaffLoginPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<StaffLoginForm>({ resolver: zodResolver(staffLoginSchema), defaultValues: { email: state?.email ?? '', password: '' } });
-
-  const fill = (account: { email: string; password: string }) => {
-    setValue('email', account.email, { shouldValidate: true });
-    setValue('password', account.password, { shouldValidate: true });
-  };
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setError(null);
@@ -137,20 +123,6 @@ export function StaffLoginPage() {
 
           {!challenge ? (
             <>
-              {showDemoHints && <div className="mt-6">
-                <DemoHint title="Demo staff accounts">
-                  {[DEMO_ACCOUNTS.counsellor, DEMO_ACCOUNTS.admin, DEMO_ACCOUNTS.financeOfficer, DEMO_ACCOUNTS.visaOfficer].map((a) => (
-                    <p key={a.email} className="flex flex-wrap items-center justify-between gap-x-3">
-                      <span className="break-all">
-                        <span className="font-semibold">{a.label}:</span> {a.email} · {a.password}
-                      </span>
-                      <button type="button" onClick={() => fill(a)} className="font-semibold underline underline-offset-4">
-                        Use
-                      </button>
-                    </p>
-                  ))}
-                </DemoHint>
-              </div>}
               <form onSubmit={onSubmit} noValidate className="mt-6 space-y-5">
                 <TextField
                   label="Work email"

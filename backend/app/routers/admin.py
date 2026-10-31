@@ -18,6 +18,7 @@ from app.records import serialize_grant
 from app.routers.staff import agencies_with_counts
 from app.schemas import AgencyBody, GrantBody, StaffPasswordBody, StaffUpdateBody, StaffUserBody
 from app.services import notify
+from app.services.assignment import active_counsellor_loads
 from app.services.students import profile_out
 from app.services.team import waiting_for
 
@@ -88,11 +89,7 @@ async def overview(_: Admin):
 # ---------------------------------------------------------------- counsellor assignment
 
 
-async def _active_loads() -> tuple[list[dict], dict[str, int]]:
-    db = get_db()
-    counsellors = await db.users.find({"role": "counsellor", "status": "active"}).sort("_id", 1).to_list(None)
-    loads = {c["_id"]: await db.students.count_documents({"counsellorId": c["_id"], "stage": {"$ne": "settled"}}) for c in counsellors}
-    return counsellors, loads
+_active_loads = active_counsellor_loads
 
 
 def _waiting_out(s: dict) -> dict:
@@ -105,7 +102,10 @@ def _waiting_out(s: dict) -> dict:
         "mobile": s["mobile"],
         "registeredAt": iso(s["createdAt"]),
         "profileCompletedAt": iso(s["profileCompletedAt"]) if s.get("profileCompletedAt") else None,
-        "profile": {k: p.get(k, "") for k in ("courseInterest", "destination", "intake", "budget", "degree", "institution", "grade", "englishTest", "englishScore", "workExperience", "city")},
+        "profile": {
+            **{k: p.get(k, "") for k in ("courseInterest", "destination", "intake", "budget", "degree", "institution", "grade", "englishTest", "englishScore", "workExperience", "city", "gender")},
+            "courseInterests": p["courseInterests"],
+        },
         "fromEnquiry": bool(s.get("leadId")),
     }
 
@@ -120,7 +120,7 @@ async def assignment_queue(_: Admin):
     async for s in db.students.find({"counsellorId": None}).sort("createdAt", 1):
         out = _waiting_out(s)
         if profile_complete(s.get("profile")):
-            subject = matching.subject_for(out["profile"]["courseInterest"])
+            subject = matching.subject_of_profile(out["profile"])
             waiting.append({**out, "subject": matching.subject_label(subject) if subject else None, "matches": matching.rank(out["profile"], counsellors, loads)})
         else:
             incomplete.append(out)

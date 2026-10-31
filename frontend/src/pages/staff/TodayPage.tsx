@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { AlarmClock, ClipboardList, FileSearch, MessageSquare, ShieldCheck, UserPlus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlarmClock, ArrowRight, ClipboardList, FileSearch, MessageSquare, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFollowUps, useLeads, useMessages, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
-import { MessagesSection, SessionsTodaySection, Stat, TasksSection, firstTab, greeting, splitTasks, todayLabel, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
-import { areaOfRole, counsellorName } from '../../data/staff';
+import { MessagesSection, NotificationsSection, SessionsTodaySection, Stat, StatStrip, TasksSection, TodayColumns, TodayHeader, daySummary, firstTab, splitTasks, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
+import { areaOfRole, counsellorName, type StaffStudent } from '../../data/staff';
 import { isoDate } from '../../lib/scheduling';
-import { formatDate } from '../../lib/utils';
+import { formatDate, initials, relativeTime } from '../../lib/utils';
 import { OfficerTodayPage } from './OfficerTodayPage';
 
 /** Financial Aid and Visa Officers get a dashboard for their own part of the journey; everyone else the counsellor one. */
@@ -13,6 +14,40 @@ export function TodayPage() {
   const { user } = useAuth();
   const area = areaOfRole(user?.role ?? '');
   return area === 'finance' || area === 'visa' ? <OfficerTodayPage area={area} /> : <CounsellorToday />;
+}
+
+/** Students just assigned to the counsellor; each stays here until its record is opened. */
+function NewStudents({ students }: { students: StaffStudent[] }) {
+  return (
+    <section className="card overflow-hidden ring-1 ring-gold-300" aria-label="New students" data-new-students>
+      <header className="flex items-center justify-between gap-3 border-b border-gold-200 bg-gold-50 px-5 py-4">
+        <h2 className="flex items-center gap-2 font-sans text-sm font-semibold text-navy-900">
+          <UserPlus className="h-4 w-4 text-gold-700" aria-hidden /> New students · {students.length}
+        </h2>
+        <p className="hidden text-xs text-navy-500 sm:block">Assigned to you. Open each profile to get started.</p>
+      </header>
+      <ul className="divide-y divide-navy-100">
+        {students.map((s) => (
+          <li key={s.id}>
+            <Link to={`/staff/students/${s.id}`} className="group flex items-center gap-4 px-5 py-3.5 transition hover:bg-ivory/60" data-new-student={s.id}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-navy-900 text-xs font-bold text-gold-300">{initials(s.name)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="truncate text-sm font-semibold text-navy-900 group-hover:text-gold-700">{s.name}</span>
+                  <span className="text-xs text-navy-400">{s.reference}</span>
+                </span>
+                <span className="block truncate text-xs text-navy-500">{[s.goal, s.destination, s.intake].filter((x) => x && !/^(To be decided|Not decided)$/.test(x)).join(' · ')}</span>
+              </span>
+              {s.counsellorAssignedAt && <span className="hidden shrink-0 text-xs text-navy-400 sm:block">Assigned {relativeTime(s.counsellorAssignedAt)}</span>}
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-navy-700 group-hover:text-gold-700">
+                Open profile <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function CounsellorToday() {
@@ -34,6 +69,10 @@ function CounsellorToday() {
     .sort((a, b) => a.time.localeCompare(b.time));
   const nameOf = (id: string) => allStudents.find((s) => s.id === id)?.name ?? 'Student';
   const threads = unreadThreads(students, messages);
+  // Newly assigned to this counsellor and not opened yet (newest first).
+  const newStudents = students
+    .filter((s) => s.newForCounsellor && s.counsellorId === scope.myId)
+    .sort((a, b) => (b.counsellorAssignedAt ?? '').localeCompare(a.counsellorAssignedAt ?? ''));
 
   const tasks = splitTasks(followUps);
   const [tab, setTab] = useState<TaskTab | null>(null);
@@ -49,21 +88,15 @@ function CounsellorToday() {
 
   return (
     <>
-      <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-3xl">
-            {greeting()}, {user?.name.split(' ')[0] ?? ''}
-          </h1>
-          <p className="mt-1 text-sm text-navy-500">{todayLabel()}</p>
-        </div>
+      <TodayHeader name={user?.name ?? ''} summary={daySummary(tasks.overdue.length, tasks.today.length, todaysSessions.length)}>
         {scope.covering.map((g) => (
           <p key={g.id} role="status" className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3.5 py-1.5 text-xs font-semibold text-sky-800 ring-1 ring-sky-200" title={g.reason}>
             <ShieldCheck className="h-4 w-4" aria-hidden /> Covering {counsellorName(g.ownerId)} until {formatDate(g.until)}
           </p>
         ))}
-      </div>
+      </TodayHeader>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip>
         <Stat label="Overdue" value={tasks.overdue.length} icon={AlarmClock} tone="bg-red-50 text-red-600" onClick={() => showTasks('overdue')} />
         <Stat label="Due today" value={tasks.today.length} icon={ClipboardList} tone="bg-amber-50 text-amber-700" onClick={() => showTasks('today')} />
         <Stat label="Documents to check" value={docsToVerify} icon={FileSearch} tone="bg-navy-900 text-gold-300" href="/staff/students" />
@@ -72,17 +105,23 @@ function CounsellorToday() {
         ) : (
           <Stat label="Unread messages" value={threads.length} icon={MessageSquare} tone="bg-gold-50 text-gold-700" onClick={() => document.getElementById('messages')?.scrollIntoView({ behavior: 'smooth' })} />
         )}
-      </div>
+      </StatStrip>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-12">
-        <div className="min-w-0 xl:col-span-7">
-          <TasksSection tasks={tasks} current={current} onTab={setTab} showCounsellor={scope.isAdmin} />
-        </div>
-        <div className="min-w-0 space-y-6 xl:col-span-5">
-          <SessionsTodaySection sessions={todaysSessions} nameOf={nameOf} showCounsellor={scope.isAdmin} />
-          <MessagesSection threads={threads} />
-        </div>
-      </div>
+      <TodayColumns
+        main={
+          <>
+            {newStudents.length > 0 && <NewStudents students={newStudents} />}
+            <TasksSection tasks={tasks} current={current} onTab={setTab} showCounsellor={scope.isAdmin} />
+          </>
+        }
+        rail={
+          <>
+            <NotificationsSection />
+            <SessionsTodaySection sessions={todaysSessions} nameOf={nameOf} showCounsellor={scope.isAdmin} />
+            <MessagesSection threads={threads} />
+          </>
+        }
+      />
     </>
   );
 }

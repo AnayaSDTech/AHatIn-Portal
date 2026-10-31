@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="100" height="100" rx="22" fill="#0B1F3A"/>
-  <polygon points="44,41 56,41 78,82 66.5,82 50,51 33.5,82 22,82" fill="#FAF7F2"/>
-  <polygon points="38.5,63 61.5,63 64.6,69 35.4,69" fill="#FAF7F2"/>
-  <polygon points="38,37 50,42 62,37 62,44 50,49 38,44" fill="#A8851C"/>
-  <polygon points="50,17 82,30 50,43 18,30" fill="#C9A227"/>
-  <rect x="79.2" y="30" width="2.2" height="16" fill="#C9A227"/>
-  <polygon points="77.8,45 82.8,45 84,53 76.6,53" fill="#C9A227"/>
+  <g transform="translate(13 12) scale(1.156)">
+    <mask id="cut">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M1 50.5C17 56 41 54 63 39.5 45 58 16 61.5 1 50.5z" fill="#000" stroke="#000" stroke-width="3.6"/>
+    </mask>
+    <path d="M26.5 23h11L58 61H46.5L32 33.5 17.5 61H6z" fill="#FFFFFF" mask="url(#cut)"/>
+    <path d="M1 50.5C17 56 41 54 63 39.5 45 58 16 61.5 1 50.5z" fill="#C9A227"/>
+    <path d="M32 3 62 15.5 32 28 2 15.5z" fill="#C9A227"/>
+    <path d="M57.5 17.5v12" fill="none" stroke="#C9A227" stroke-width="2.4"/>
+    <path d="M55.2 29h4.6l1.3 7.5h-7.2z" fill="#C9A227"/>
+  </g>
 </svg>

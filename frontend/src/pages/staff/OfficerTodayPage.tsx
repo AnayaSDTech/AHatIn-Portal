@@ -4,7 +4,7 @@ import { AlarmClock, ChevronRight, FileSearch, FolderKanban, MessageSquare, User
 import { useAuth } from '../../context/AuthContext';
 import { useFollowUps, useMessages, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
 import { Pill } from '../../components/dashboard/Panel';
-import { AllClear, MessagesSection, Section, SessionsTodaySection, Stat, TasksSection, firstTab, greeting, splitTasks, todayLabel, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
+import { AllClear, MessagesSection, NotificationsSection, Section, SessionsTodaySection, Stat, StatStrip, TasksSection, TodayColumns, TodayHeader, daySummary, firstTab, splitTasks, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
 import { CASE_GROUPS, DESK, officerCase, type OfficerArea } from '../../lib/officerCase';
 import { isoDate } from '../../lib/scheduling';
 import { cn, initials } from '../../lib/utils';
@@ -59,13 +59,7 @@ export function OfficerTodayPage({ area }: { area: OfficerArea }) {
 
   return (
     <>
-      <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-3xl">
-            {greeting()}, {user?.name.split(' ')[0] ?? ''}
-          </h1>
-          <p className="mt-1 text-sm text-navy-500">{todayLabel()}</p>
-        </div>
+      <TodayHeader name={user?.name ?? ''} summary={daySummary(tasks.overdue.length, tasks.today.length, todaysSessions.length)}>
         <p className="inline-flex items-center gap-3 self-start rounded-2xl bg-navy-900 py-2 pl-2 pr-4 text-white sm:self-auto lg:hidden" data-desk={area}>
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-gold-500 text-navy-950">
             <desk.icon className="h-4 w-4" aria-hidden />
@@ -75,17 +69,18 @@ export function OfficerTodayPage({ area }: { area: OfficerArea }) {
             <span className="block text-[11px] text-navy-200">{desk.covers}</span>
           </span>
         </p>
-      </div>
+      </TodayHeader>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatStrip>
         <Stat label="Needs you" value={needsMe} icon={Users} tone="bg-navy-900 text-gold-300" onClick={() => { setFilter('action'); scrollTo('caseload'); }} />
         <Stat label="Documents to check" value={toVerify} icon={FileSearch} tone="bg-amber-50 text-amber-700" onClick={() => { setFilter('action'); scrollTo('caseload'); }} />
         <Stat label="Tasks due" value={tasks.overdue.length + tasks.today.length} icon={AlarmClock} tone={tasks.overdue.length ? 'bg-red-50 text-red-600' : 'bg-sky-50 text-sky-700'} onClick={() => showTasks(tasks.overdue.length ? 'overdue' : 'today')} />
         <Stat label="Unread messages" value={threads.length} icon={MessageSquare} tone="bg-gold-50 text-gold-700" onClick={() => scrollTo('messages')} />
-      </div>
+      </StatStrip>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-12">
-        <div className="min-w-0 space-y-6 xl:col-span-7">
+      <TodayColumns
+        main={
+          <>
           <Section
             id="caseload"
             title={`My caseload · ${cases.length}`}
@@ -155,12 +150,16 @@ export function OfficerTodayPage({ area }: { area: OfficerArea }) {
             )}
           </Section>
           <TasksSection tasks={tasks} current={current} onTab={setTab} showCounsellor={false} />
-        </div>
-        <div className="min-w-0 space-y-6 xl:col-span-5">
-          <SessionsTodaySection sessions={todaysSessions} nameOf={nameOf} showCounsellor={false} />
-          <MessagesSection threads={threads} />
-        </div>
-      </div>
+          </>
+        }
+        rail={
+          <>
+            <NotificationsSection />
+            <SessionsTodaySection sessions={todaysSessions} nameOf={nameOf} showCounsellor={false} />
+            <MessagesSection threads={threads} />
+          </>
+        }
+      />
     </>
   );
 }
