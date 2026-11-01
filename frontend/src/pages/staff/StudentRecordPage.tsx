@@ -35,7 +35,7 @@ import {
   type StaffStudent,
   type StudentApplication,
 } from '../../data/staff';
-import { documentsForCategory } from '../../data/documentOptions';
+import { STAGE_DOCUMENTS, documentsForCategory } from '../../data/documentOptions';
 import { computeServices, overallProgress, serviceValues } from '../../lib/journey';
 import { cn, formatDate, formatDateTime, relativeTime } from '../../lib/utils';
 
@@ -141,7 +141,9 @@ export function StudentRecordPage() {
 
   const requestDocument = () => {
     if (docName.trim().length < 3) return;
-    actions.requestDocument(docName.trim(), docCategory);
+    // From here there's no stage to go by: the one under way for this part of the checklist.
+    const stage = services.find((s) => s.status === 'in_progress' && STAGE_DOCUMENTS[s.code].category === docCategory)?.code;
+    actions.requestDocument(docName.trim(), docCategory, stage);
     setMessage(`${docName.trim()} added to the student's document checklist.`);
     setDocName('');
     setRequesting(false);
@@ -302,7 +304,7 @@ export function StudentRecordPage() {
                       </p>
                       {d.state === 'pending' && canEditDoc(d.category) && !hasOpened(d) && (
                         <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700" data-open-hint>
-                          <Eye className="h-3.5 w-3.5" aria-hidden /> Open the document to verify it
+                          <Eye className="h-3.5 w-3.5" aria-hidden /> Open the document to verify or reject it
                         </p>
                       )}
                     </div>
@@ -338,7 +340,7 @@ export function StudentRecordPage() {
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Verify
                           </button>
-                          <button type="button" onClick={() => setRejecting({ id: d.id, name: d.name })} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+                          <button type="button" onClick={() => setRejecting({ id: d.id, name: d.name })} disabled={!hasOpened(d)} title={hasOpened(d) ? undefined : 'Open the document first'} data-reject-doc={d.id} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-navy-50 disabled:text-navy-300 disabled:ring-navy-100">
                             <XCircle className="h-3.5 w-3.5" aria-hidden /> Reject
                           </button>
                         </div>
@@ -693,6 +695,11 @@ export function StudentRecordPage() {
           </>
         }
       >
+        {rejecting && (
+          <button type="button" onClick={() => void viewDocument(rejecting.id)} className="mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-navy-700 ring-1 ring-navy-200 transition hover:bg-navy-50" data-reject-view>
+            <Eye className="h-4 w-4" aria-hidden /> View document
+          </button>
+        )}
         <label htmlFor="reject-reason" className="mb-1.5 block text-sm font-medium text-navy-800">What should the student fix?</label>
         <textarea id="reject-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} className="input resize-none" placeholder="e.g. Signature missing; please upload a signed copy" />
         {reasonError && <p role="alert" className="mt-1.5 text-xs font-medium text-red-600">{reasonError}</p>}

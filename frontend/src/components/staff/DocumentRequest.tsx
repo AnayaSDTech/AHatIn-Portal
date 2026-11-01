@@ -35,7 +35,7 @@ export function DocumentNameField({ label, options, student, value, onChange }: 
 }
 
 /** Requests a document at one stage of the journey. Disabled along with the stage for staff who can only view it. */
-export function DocumentRequest({ stage, student, onRequest }: { stage: ServiceCode; student: StaffStudent; onRequest: (name: string, category: DocCategory) => void }) {
+export function DocumentRequest({ stage, student, onRequest }: { stage: ServiceCode; student: StaffStudent; onRequest: (name: string, category: DocCategory, stage: ServiceCode) => void }) {
   const { category, options } = STAGE_DOCUMENTS[stage];
   const [name, setName] = useState('');
   const [sent, setSent] = useState('');
@@ -46,7 +46,7 @@ export function DocumentRequest({ stage, student, onRequest }: { stage: ServiceC
     e.preventDefault();
     const clean = name.trim();
     if (clean.length < 3) return;
-    onRequest(clean, category);
+    onRequest(clean, category, stage);
     setSent(clean);
     setName('');
     setRound((r) => r + 1);

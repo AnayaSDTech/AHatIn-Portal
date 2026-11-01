@@ -83,6 +83,28 @@ export function StudentOverviewPage() {
     return status === 'in_progress' || status === 'completed';
   };
 
+  // Documents staff asked for at a stage and the student hasn't uploaded yet: a button on that stage.
+  const documentButtons = useMemo(() => {
+    const due: Partial<Record<ServiceCode, string[]>> = {};
+    record.documents.forEach((d) => {
+      if (d.requestedStage && (d.state === 'missing' || d.state === 'rejected')) (due[d.requestedStage] ??= []).push(d.name);
+    });
+    return Object.fromEntries(
+      Object.entries(due).map(([code, names]) => [code, { label: names.length === 1 ? `Upload ${names[0]}` : `Upload ${names.length} documents`, onClick: () => go('documents') }]),
+    ) as Partial<Record<ServiceCode, TrackerAction>>;
+  }, [record.documents, go]);
+
+  // Funding runs alongside the other stages: until a session is booked by anyone (a cancelled one doesn't count).
+  const fundingBooked = sessions.some((x) => x.studentId === record.id && x.type === 'Scholarship & funding' && x.status !== 'cancelled');
+  const bookingButtons: Partial<Record<ServiceCode, TrackerAction>> = {};
+  if (record.financeOfficerId && services.find((s) => s.code === 'S4')?.status === 'in_progress' && !fundingBooked) {
+    bookingButtons.S4 = { label: 'Book a session', onClick: () => openBooking('Scholarship & funding') };
+  }
+  // Until the first session is booked (cancelled ones count, as they do for the stage).
+  if (services.find((s) => s.code === 'S1')?.status === 'in_progress' && !record.journey.careerPlan && !sessions.some((x) => x.studentId === record.id)) {
+    bookingButtons.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };
+  }
+
   // Buttons in the progress tracker for steps that are waiting on the student.
   const trackerActions = useMemo(() => {
     const a: Partial<Record<ServiceCode, TrackerAction>> = {};
@@ -91,19 +113,18 @@ export function StudentOverviewPage() {
     const to = (target: string) => () => go(target);
     const { journey, applications, documents } = record;
 
-    // Until the first session is booked (cancelled ones count, as they do for the stage).
-    if (open('S1') && !journey.careerPlan && !sessions.some((x) => x.studentId === record.id)) a.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };
-
 
     const offers = applications.filter((x) => x.state === 'conditional_offer' || x.state === 'unconditional_offer');
     if (open('S3') && offers.length && !applications.some((x) => x.state === 'accepted')) a.S3 = { label: 'Reply to offer', onClick: to('applications') };
     else if (journey.shortlist?.status === 'shared') a.S3 = { label: 'Review shortlist', onClick: to('shortlist') };
-    else if (open('S3') && applications.length && applications.every((x) => x.state === 'draft') && applicationDocumentsDue(record))
+    else if (open('S3') && !documentButtons.S3 && applications.length && applications.every((x) => x.state === 'draft') && applicationDocumentsDue(record))
       a.S3 = { label: 'Upload documents', onClick: to('documents') };
 
     if (open('S4')) {
       const funds = documents.filter((d) => d.category === 'funds');
-      if (funds.some((d) => d.state === 'missing' || d.state === 'rejected')) a.S4 = { label: 'Upload proof of funds', onClick: to('documents') };
+      if (funds.some((d) => d.state === 'missing' || d.state === 'rejected')) {
+        if (!documentButtons.S4) a.S4 = { label: 'Upload proof of funds', onClick: to('documents') };
+      }
       else if (journey.funding.estimatedCost && journey.funding.sources.length === 0) a.S4 = { label: 'Add funding plan', onClick: to('funding') };
     }
 
@@ -111,7 +132,7 @@ export function StudentOverviewPage() {
 
     if (journey.departure.confirmedAt && !journey.arrival.arrivedAt) a.S7 = { label: 'Confirm arrival', onClick: to('departure') };
     return a;
-  }, [record, services, sessions, go, openBooking]);
+  }, [record, services, sessions, documentButtons, go, openBooking]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -120,6 +141,8 @@ export function StudentOverviewPage() {
             services={services}
             // Buttons for the student's next steps once the journey has started (profile complete, counsellor assigned).
             actions={journeyStarted ? trackerActions : {}}
+            documents={journeyStarted ? documentButtons : {}}
+            bookings={journeyStarted ? bookingButtons : {}}
             intro={
               !profileComplete ? (
                 <Button onClick={openProfile} className="w-full sm:w-auto" data-complete-profile>
@@ -263,7 +286,7 @@ function FundingNotStarted() {
   } else if (officer) {
     body = (
       <>
-        <p className="font-semibold text-navy-900">Not started yet</p>
+        <p className="font-semibold text-navy-900">Getting started</p>
         <p className="mt-1 text-sm text-navy-500">{officer.name}, your Financial Aid Officer, will set your estimated cost and suggest scholarships.</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Button size="sm" onClick={() => go('messages')}>

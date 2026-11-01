@@ -1,5 +1,5 @@
 import { isoDate } from '../lib/scheduling';
-import type { Journey } from '../lib/journey';
+import type { Journey, ServiceCode } from '../lib/journey';
 
 /**
  * Types and labels for the counsellor and admin areas. The records themselves come from the FastAPI backend.
@@ -223,6 +223,8 @@ export interface StudentDocument {
   fileName?: string;
   /** Who uploaded it, when that wasn't the student (a parent or sponsor). */
   uploadedBy?: string;
+  /** The stage of the journey staff requested it in (the starter documents have none). */
+  requestedStage?: ServiceCode;
   reason?: string;
   /** Staff who have opened the current file: a document can be verified only by someone who has opened it. */
   viewedBy?: string[];

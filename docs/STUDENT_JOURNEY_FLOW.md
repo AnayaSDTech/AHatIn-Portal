@@ -11,7 +11,7 @@ This guide follows one student from registration to settling in abroad. For each
 | **Financial Aid Officer** | 3. Scholarship & Financial Guidance | Automatically, the same one for every new student | When the student's profile is complete |
 | **Visa Officer** | 4. Visa Assistance, 5. Pre-Departure Support, 6. Post-Arrival Support | Automatically, the same one for every new student | When the student's profile is complete |
 
-Officers are assigned early, but **their stages only start when the student reaches them** (see the status rules below).
+**Funding runs alongside the first stages**, so the Financial Aid Officer can start as soon as they're assigned, without waiting for the applications. The Visa Officer is assigned at the same time, but their stages only start once an offer is accepted and funding is complete (see the status rules below).
 
 Once an officer is assigned, the counsellor can still **see** that officer's stages but can't change them. Each officer can change only their own stages. The admin can change anything.
 
@@ -21,10 +21,12 @@ If no counsellor has room, or the single officer is unavailable, nothing is assi
 
 ```
 Register → Verify email → Complete profile → Counsellor and both officers assigned automatically
-  → 1. Career counselling and university shortlist (plan recorded, shortlist shared)
-  → 2. Applications (shortlist approved, offer accepted)
-  → 3. Funding (plan covers the cost, proof of funds verified)
-  → 4. Visa (granted) → 5. Pre-departure (ready to travel) → 6. Post-arrival (settled)
+  → These run at the same time:
+       1. Career counselling and university shortlist (plan recorded, shortlist shared)
+          → 2. Applications (shortlist approved, offer accepted)
+       3. Funding (plan covers the cost, proof of funds verified)
+  → Once an offer is accepted and funding is complete:
+       4. Visa (granted) → 5. Pre-departure (ready to travel) → 6. Post-arrival (settled)
 ```
 
 The student's **progress tracker** shows these six stages.
@@ -41,8 +43,8 @@ There are four statuses: **Not started**, **In progress**, **Completed**, and **
 |---|---|---|---|
 | **1. Career Counselling & University Selection** | Until a counsellor is assigned | A **counsellor is assigned**. The student then sees "Next: Book a career counselling session" with a **Book a session** button | **Both** are done: the career plan is recorded **and** the shortlist is shared with the student |
 | **2. Application Assistance** | Until the student approves the shortlist. Once the shortlist is shared, the student sees "Next: Review and approve your shortlist" with a **Review shortlist** button | **Any** of these: the student approves the shortlist; an application exists | The student **accepts an offer** |
-| **3. Scholarship & Financial Guidance** | Until the student accepts an offer, even though the officer is already assigned | **Either** of these: an offer is accepted and a Financial Aid Officer is assigned; or funding work has begun (a funding source, a scholarship or a proof of funds upload) | The funding plan **covers the estimated cost and** every proof of funds document is verified. Scholarships are optional. There must be at least one proof of funds document |
-| **4. Visa Assistance** | Until funding is complete, even though the officer is already assigned | **Either** of these: funding is complete and a Visa Officer is assigned (the student sees "Waiting for your CAS or admission letter to arrive"); or the first visa step is recorded | The visa is **granted** |
+| **3. Scholarship & Financial Guidance** | Until the student has both a counsellor and a Financial Aid Officer. It doesn't wait for the other stages | **Either** of these: a counsellor and a Financial Aid Officer are assigned, which is the same moment as stage 1 for new students; or funding work has begun (a funding source, a scholarship or a proof of funds upload) | The funding plan **covers the estimated cost and** every proof of funds document is verified. Scholarships are optional. There must be at least one proof of funds document |
+| **4. Visa Assistance** | Until an offer is accepted and funding is complete, even though the officer is already assigned | **Either** of these: an offer is accepted, funding is complete and a Visa Officer is assigned (the student sees "Waiting for your CAS or admission letter to arrive"); or the first visa step is recorded | The visa is **granted** |
 | **5. Pre-Departure Support** | Until the visa is granted | The visa is granted | The Visa Officer clicks **Confirm ready to travel**, which needs all six tasks ticked |
 | **6. Post-Arrival Support** | Until the student confirms arrival | The student clicks **Confirm arrival** | The **final check-in** is recorded |
 
@@ -63,7 +65,7 @@ For real exceptions, the person responsible for a stage can click **Change statu
 
 - It replaces the automatic status until it's set back to automatic.
 - The student sees it, and it's kept in the history. Staff also see what the automatic status would have been.
-- Marking a stage Completed or Not needed lets the next stage start. Marking stage 1 this way also starts stage 2, and marking funding this way lets the visa stage start.
+- Marking a stage Completed or Not needed lets the next stage start. Marking stage 1 this way also starts stage 2. Marking funding this way counts as funding complete for the visa stage, which still needs an accepted offer.
 
 ### Overall progress
 
@@ -75,7 +77,7 @@ Under a stage, the tracker can show a **Next** line and a button when something 
 
 ### Stages staff see for each officer
 
-On an officer's **Today** page, students who haven't reached that officer's stage are listed under **Upcoming** and don't count towards **Needs you**. They move into the officer's working list when the stage starts.
+On an officer's **Today** page, students who haven't reached that officer's stage are listed under **Upcoming** and don't count towards **Needs you**. They move into the officer's working list when the stage starts. For the Financial Aid Officer that's as soon as the student has a counsellor, and for the Visa Officer it's once an offer is accepted and funding is complete.
 
 ### The record stage on staff screens
 
@@ -154,7 +156,7 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 | | |
 |---|---|
 | **Student** | Reviews the shortlist on **Applications**: for each option chooses **Apply** or **Remove** (with a reason), and can ask questions. Clicks **Approve** once every option is decided, with at least one to apply to. Uploads the documents asked for on **Documents** (PDF, JPG or PNG, 1–300 KB each), or invites a parent or sponsor to upload them. Re-uploads anything rejected. When an offer arrives, clicks **Accept** or **Decline** (only one offer can be accepted). |
-| **Counsellor** | Requests further documents. Checks each upload: **View**, then **Verify** or **Reject** with a reason (a document must be opened before it can be verified). Prepares and submits each application, then updates its status: Submitted, Under review, More information requested, Interview, Conditional offer, Unconditional offer, Rejected, Withdrawn. Uses **Correct it** (with a reason) for a mistake. Can book an **Application review** session. |
+| **Counsellor** | Requests further documents. Checks each upload: **View**, then **Verify** or **Reject** with a reason (a document must be opened before it can be verified or rejected). Prepares and submits each application, then updates its status: Submitted, Under review, More information requested, Interview, Conditional offer, Unconditional offer, Rejected, Withdrawn. Uses **Correct it** (with a reason) for a mistake. Can book an **Application review** session. |
 | **Portal** | On approval, creates a **draft application** for each chosen option. If the counsellor adds an option afterwards, the shortlist reopens for the student to decide on it. Gives the checker a "Verify uploaded document" task for each upload (one working day). Emails the student every status change. Reminds the counsellor 14, 7 and 2 days before a draft application's deadline, and alerts the admin at 2 days. |
 | **Status** | See the status rules above. **Completed** when the student accepts an offer. |
 
@@ -164,8 +166,8 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 |---|---|
 | **Financial Aid Officer** | Sets the **estimated total cost of study** (₹ lakh). Suggests **scholarships** and records the result. Requests **proof of funds** documents and verifies or rejects each upload. Holds **Scholarship & funding** sessions and answers questions in their own chat. |
 | **Counsellor** | Can see this stage but not change it, with one exception: they can **edit or delete** a suggested scholarship. The student is emailed, and the officer is notified. |
-| **Student** | Builds their **funding plan** on **Funding & visa**: adds each source (family savings, education loan, scholarship, sponsor, other) with its amount until it covers the cost. Marks a scholarship as **Applied**. Uploads proof of funds, or a parent or sponsor does. |
-| **Portal** | Shows **Funding & visa** in the student's navigation once this stage starts. Gives the officer the verify tasks. Reminds the officer and the student 14, 7 and 2 days before a scholarship deadline that hasn't been applied for. |
+| **Student** | Builds their **funding plan** on **Funding & visa**: adds each source (family savings, education loan, scholarship, sponsor, other) with its amount until it covers the cost. Marks a scholarship as **Applied**. Uploads proof of funds, or a parent or sponsor does. A **Book a session** button shows on this stage until a Scholarship & funding session is booked by the student or staff. |
+| **Portal** | Shows **Funding & visa** in the student's navigation once this stage starts, alongside stage 1. Gives the officer the verify tasks. Reminds the officer and the student 14, 7 and 2 days before a scholarship deadline that hasn't been applied for. |
 | **Status** | See the status rules above. **Completed** when the plan covers the cost and all proof of funds is verified. The officer can mark it **Not needed** with a reason. |
 
 ## 4. Visa Assistance (Visa Officer)
@@ -210,6 +212,8 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 **Documents**
 - Staff request documents with a dropdown under every stage of the student's journey, or choose **Other** to type a name. Documents already on the student's checklist aren't offered again.
 - Requests go to the part of the checklist for that stage: applications, proof of funds or visa. Each upload creates a "verify" task for the person responsible.
+- The student sees an **Upload** button on the stage where the document was requested, which opens **Documents**. It goes once everything requested there is uploaded, and comes back if a document is rejected.
+- Staff must open a document before they can verify or reject it. The reject window also has a **View document** button.
 - Files are stored privately. Links to view them work for a few minutes and only for the student and staff allowed to see them.
 
 **Parents and sponsors**

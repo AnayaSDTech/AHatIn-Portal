@@ -144,10 +144,20 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
       const funds = s.documents.filter((d) => d.category === 'funds');
       const verified = funds.filter((d) => d.state === 'verified').length;
       const covered = f.sources.reduce((n, x) => n + x.amount, 0);
+      const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Scholarship & funding');
+      const held = mine.find((x) => x.status === 'completed');
+      const booked = mine.find((x) => x.status === 'booked');
       return {
         steps: sequence(
           [
             { label: 'Financial Aid Officer assigned to you', done: !!s.financeOfficerId, skip: !s.financeOfficerId && !!f.estimatedCost },
+            {
+              label: held ? 'Scholarship & funding session held' : booked ? 'Scholarship & funding session booked' : 'Book a scholarship & funding session',
+              done: !!held || !!booked,
+              detail: on(held?.date ?? booked?.date),
+              // A session helps but isn't required: a finished stage doesn't show one as still to do.
+              skip: status === 'completed' && !held && !booked,
+            },
             { label: 'Estimated cost of study set', done: !!f.estimatedCost, detail: f.estimatedCost ? lakh(f.estimatedCost) : undefined },
             { label: 'Your funding plan covers the cost', done: !!f.estimatedCost && covered >= f.estimatedCost, detail: f.sources.length ? `${lakh(covered)} planned` : undefined },
             { label: 'Proof of funds uploaded and verified', done: funds.length > 0 && verified === funds.length, detail: funds.length ? `${verified} of ${funds.length} verified` : undefined },

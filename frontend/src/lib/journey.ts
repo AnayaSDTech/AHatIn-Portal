@@ -201,6 +201,9 @@ export function fundingComplete(s: StaffStudent) {
   return !!f.estimatedCost && f.sources.reduce((n, x) => n + x.amount, 0) >= f.estimatedCost && funds.length > 0 && funds.every((d) => d.state === 'verified');
 }
 
+/** The visa needs both an accepted offer and finished funding. Funding runs alongside the applications, so either can come first. */
+export const visaCanStart = (s: StaffStudent) => offerAccepted(s) && fundingComplete(s);
+
 /** A document for the applications (not funding or visa, which come later) is still to upload, or to upload again. */
 export const applicationDocumentsDue = (s: StaffStudent) => s.documents.some((d) => d.category !== 'funds' && d.category !== 'visa' && (d.state === 'missing' || d.state === 'rejected'));
 
@@ -268,14 +271,14 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       if (planned && allVerified) return { status: 'completed', summary: `Funding plan covers ${lakh(f.estimatedCost!)} · proof of funds verified` };
       const started = f.sources.length > 0 || f.scholarships.length > 0 || funds.some((d) => d.state !== 'missing');
       if (!started) {
-        // Starts after Application Assistance, with the student's Financial Aid Officer, who sets the estimated cost.
-        if (s.financeOfficerId && offerAccepted(s)) {
+        // Runs alongside the first stage rather than after the applications: both start when the team is assigned.
+        if (s.financeOfficerId && s.counsellorId) {
           return f.estimatedCost
             ? { status: 'in_progress', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' }
-            : { status: 'in_progress', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Book a session or message them about scholarships, loans or sponsors' };
+            : { status: 'in_progress', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Talk to your Financial Aid Officer' };
         }
         if (f.estimatedCost) return { status: 'not_started', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' };
-        if (!offerAccepted(s)) return { status: 'not_started', summary: 'Starts once you accept an offer' };
+        if (s.financeOfficerId) return { status: 'not_started', summary: 'Starts once your counsellor is assigned' };
         return { status: 'not_started', summary: 'Starts when your Financial Aid Officer is assigned' };
       }
       const toUpload = funds.find((d) => d.state === 'missing' || d.state === 'rejected');
@@ -298,8 +301,8 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
     }
     case 'S5': {
       const v = j.visa;
-      // Starts after funding, with the student's Visa Officer.
-      if (!v && s.visaOfficerId && fundingComplete(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
+      // Starts once there's an accepted offer and funding is complete, with the student's Visa Officer.
+      if (!v && s.visaOfficerId && visaCanStart(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
       if (!v) return { status: 'not_started', summary: !offerAccepted(s) ? 'Starts after you accept an offer' : s.visaOfficerId ? 'Starts once your funding is complete' : 'Starts when your CAS or admission letter arrives' };
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
       if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };

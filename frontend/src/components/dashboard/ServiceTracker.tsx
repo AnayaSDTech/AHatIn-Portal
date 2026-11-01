@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Circle, Loader, MinusCircle, Route } from 'lucide-react';
+import { ArrowRight, CalendarPlus, CheckCircle2, Circle, FileUp, Loader, MinusCircle, Route } from 'lucide-react';
 import { serviceStatusLabel, type ServiceCode, type ServiceStatus, type ServiceView } from '../../lib/journey';
 import { cn } from '../../lib/utils';
 import { Panel, Pill } from './Panel';
@@ -26,6 +26,8 @@ export function ServiceTracker({
   actions = {},
   details = {},
   links = {},
+  documents = {},
+  bookings = {},
   intro,
 }: {
   services: ServiceView[];
@@ -34,6 +36,10 @@ export function ServiceTracker({
   actions?: Partial<Record<ServiceCode, TrackerAction>>;
   /** A link shown beside a service's title, e.g. "View applications". */
   links?: Partial<Record<ServiceCode, TrackerAction>>;
+  /** Documents staff requested in a service: a button to the upload list. */
+  documents?: Partial<Record<ServiceCode, TrackerAction>>;
+  /** A session the student could book for a service, beside its other buttons. */
+  bookings?: Partial<Record<ServiceCode, TrackerAction>>;
   /** Extra detail under a service, e.g. the agreed career plan. */
   details?: Partial<Record<ServiceCode, ReactNode>>;
 }) {
@@ -86,8 +92,10 @@ export function ServiceTracker({
                 {details[s.code]}
                 {(() => {
                   const action = actions[s.code];
+                  const upload = documents[s.code];
+                  const booking = bookings[s.code];
                   const showNext = !!s.next && (s.status !== 'completed' || !!action);
-                  if (!showNext && !action) return null;
+                  if (!showNext && !action && !upload && !booking) return null;
                   return (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {showNext && <p className="inline-flex rounded-lg bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">Next: {s.next}</p>}
@@ -99,6 +107,26 @@ export function ServiceTracker({
                           data-service-action={s.code}
                         >
                           {action.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      )}
+                      {booking && (
+                        <button
+                          type="button"
+                          onClick={booking.onClick}
+                          className="inline-flex items-center gap-1 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
+                          data-service-booking={s.code}
+                        >
+                          <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> {booking.label}
+                        </button>
+                      )}
+                      {upload && (
+                        <button
+                          type="button"
+                          onClick={upload.onClick}
+                          className="inline-flex items-center gap-1 rounded-full bg-gold-500 px-3 py-1.5 text-xs font-semibold text-navy-950 transition hover:bg-gold-400"
+                          data-service-documents={s.code}
+                        >
+                          <FileUp className="h-3.5 w-3.5" aria-hidden /> {upload.label}
                         </button>
                       )}
                     </div>

@@ -66,7 +66,7 @@ export function useStudentActions(studentId: string | undefined) {
       setScholarshipStatus: (id: string, status: ScholarshipStatus) => act(() => api.patch(`${base}/funding/scholarships/${id}`, { status })),
 
       /* ---------- Documents (all services) ---------- */
-      requestDocument: (name: string, category: DocCategory) => act(() => api.post(`${base}/documents`, { name, category })),
+      requestDocument: (name: string, category: DocCategory, stage?: ServiceCode) => act(() => api.post(`${base}/documents`, { name, category, stage })),
       /** Counsellor removes a duplicate or mistaken request. Verified documents are kept. */
       removeDocument: (docId: string, _name: string, _hadFile: boolean) => act(() => api.delete(`${base}/documents/${docId}`)),
       /** Uploads the file; the promise rejects with the reason if it can't be accepted. */
