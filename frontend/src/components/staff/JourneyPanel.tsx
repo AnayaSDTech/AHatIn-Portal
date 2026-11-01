@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { CheckCircle2, Circle, Plus, Route, Send, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, Pencil, Plus, Route, Send, Trash2 } from 'lucide-react';
 import { ApiError } from '../../lib/api/types';
 import { Panel, Pill } from '../dashboard/Panel';
 import { Button } from '../ui/Button';
@@ -366,7 +366,83 @@ function ShortlistTab({ student, actions }: { student: StaffStudent; actions: Ac
   );
 }
 
-function FundingTab({ student, actions }: { student: StaffStudent; actions: Actions }) {
+type Scholarship = StaffStudent['journey']['funding']['scholarships'][number];
+
+/** One suggested scholarship. The counsellor can edit or delete it even once an officer looks after the rest of funding. */
+function ScholarshipRow({ scholarship: s, canEdit, actions }: { scholarship: Scholarship; canEdit: boolean; actions: Actions }) {
+  const [draft, setDraft] = useState<{ name: string; amount: string; deadline: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  if (draft) {
+    const ready = draft.name.trim().length >= 3 && !!draft.amount.trim() && !!draft.deadline;
+    return (
+      <li className="rounded-xl bg-ivory p-3" data-scholarship-edit={s.id}>
+        <form
+          className="grid gap-2 sm:grid-cols-[1fr_1fr_10rem_auto_auto]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!ready) return;
+            actions.editScholarship(s.id, draft.name.trim(), draft.amount.trim(), draft.deadline);
+            setDraft(null);
+          }}
+        >
+          <input aria-label="Scholarship name" value={draft.name} maxLength={150} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="input py-2" />
+          <input aria-label="Amount or coverage" value={draft.amount} maxLength={120} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} className="input py-2" />
+          <input aria-label="Deadline" type="date" value={draft.deadline} onChange={(e) => setDraft({ ...draft, deadline: e.target.value })} className="input py-2" />
+          <Button type="submit" size="sm" disabled={!ready}>Save</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex flex-col gap-2 rounded-xl bg-ivory px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between" data-scholarship={s.name}>
+      <span className="min-w-0">{s.name} · {s.amount} · by {formatDate(s.deadline)}</span>
+      <span className="flex shrink-0 items-center gap-2">
+        <label className="flex items-center gap-2 text-xs text-navy-500">
+          Status
+          <select value={s.status} disabled={!canEdit} onChange={(e) => actions.setScholarshipStatus(s.id, e.target.value as ScholarshipStatus)} className="rounded-lg border border-navy-100 bg-white px-2 py-1 text-xs disabled:opacity-70">
+            {Object.entries(scholarshipStatusLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={() => setDraft({ name: s.name, amount: s.amount, deadline: s.deadline })} className="grid h-8 w-8 place-items-center rounded-full text-navy-500 transition hover:bg-white hover:text-navy-900" aria-label={`Edit ${s.name}`} title="Edit">
+          <Pencil className="h-4 w-4" aria-hidden />
+        </button>
+        <button type="button" onClick={() => setDeleting(true)} className="grid h-8 w-8 place-items-center rounded-full text-navy-500 transition hover:bg-red-50 hover:text-red-600" aria-label={`Delete ${s.name}`} title="Delete">
+          <Trash2 className="h-4 w-4" aria-hidden />
+        </button>
+      </span>
+      <Modal
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        title="Delete this scholarship?"
+        description={`${s.name} · ${s.amount}`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleting(false)}>Keep it</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                actions.deleteScholarship(s.id);
+                setDeleting(false);
+              }}
+            >
+              Delete scholarship
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-navy-600">
+          It's removed from the student's funding page and they're emailed.
+          {s.status !== 'to_apply' && ` It's marked "${scholarshipStatusLabel[s.status]}", so that record goes too.`}
+        </p>
+      </Modal>
+    </li>
+  );
+}
+
+function FundingTab({ student, actions, canEdit, canEditScholarships }: { student: StaffStudent; actions: Actions; canEdit: boolean; canEditScholarships: boolean }) {
   const f = student.journey.funding;
   const [cost, setCost] = useState(f.estimatedCost ? String(f.estimatedCost) : '');
   const [costState, setCostState] = useState<{ saving?: boolean; saved?: number; error?: string }>({});
@@ -388,6 +464,7 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
 
   return (
     <div className="space-y-5">
+      <fieldset disabled={!canEdit} className="min-w-0">
       <form className="flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={saveCost} noValidate data-cost-form>
         <Field label="Estimated total cost of study (₹ lakh)" id="fd-cost">
           <input
@@ -416,6 +493,7 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
           </p>
         )}
       </form>
+      </fieldset>
 
       <div>
         <p className="text-sm font-semibold text-navy-900">Student's funding plan</p>
@@ -432,20 +510,19 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
       <div>
         <p className="text-sm font-semibold text-navy-900">Scholarships</p>
         <ul className="mt-2 space-y-2">
-          {f.scholarships.map((s) => (
-            <li key={s.id} className="flex flex-col gap-2 rounded-xl bg-ivory px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <span>{s.name} · {s.amount} · by {formatDate(s.deadline)}</span>
-              <label className="flex items-center gap-2 text-xs text-navy-500">
-                Status
-                <select value={s.status} onChange={(e) => actions.setScholarshipStatus(s.id, e.target.value as ScholarshipStatus)} className="rounded-lg border border-navy-100 bg-white px-2 py-1 text-xs">
-                  {Object.entries(scholarshipStatusLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </label>
-            </li>
-          ))}
+          {f.scholarships.map((s) =>
+            canEditScholarships ? (
+              <ScholarshipRow key={s.id} scholarship={s} canEdit={canEdit} actions={actions} />
+            ) : (
+              <li key={s.id} className="rounded-xl bg-ivory px-3 py-2 text-sm">
+                {s.name} · {s.amount} · by {formatDate(s.deadline)} · {scholarshipStatusLabel[s.status]}
+              </li>
+            ),
+          )}
         </ul>
+        <fieldset disabled={!canEdit} className="min-w-0">
         <form
-          className="mt-2 grid gap-2 sm:grid-cols-[1fr_8rem_10rem_auto]"
+          className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_10rem_auto]"
           onSubmit={(e) => {
             e.preventDefault();
             if (!sch.name.trim() || !sch.amount.trim() || !sch.deadline) return;
@@ -454,10 +531,11 @@ function FundingTab({ student, actions }: { student: StaffStudent; actions: Acti
           }}
         >
           <input aria-label="Scholarship name" value={sch.name} onChange={(e) => setSch((x) => ({ ...x, name: e.target.value }))} className="input py-2" placeholder="Scholarship name" />
-          <input aria-label="Amount" value={sch.amount} onChange={(e) => setSch((x) => ({ ...x, amount: e.target.value }))} className="input py-2" placeholder="Amount" />
+          <input aria-label="Amount or coverage" value={sch.amount} maxLength={120} onChange={(e) => setSch((x) => ({ ...x, amount: e.target.value }))} className="input py-2" placeholder="Amount or coverage, e.g. full tuition fees" />
           <input aria-label="Deadline" type="date" value={sch.deadline} onChange={(e) => setSch((x) => ({ ...x, deadline: e.target.value }))} className="input py-2" />
           <Button type="submit" size="sm" variant="outline">Suggest</Button>
         </form>
+        </fieldset>
       </div>
 
       <div>
@@ -661,11 +739,11 @@ export function JourneyPanel({ student, services, actions, role }: { student: St
         <p className="mt-4 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900" data-read-only>
           {area === 'counsellor'
             ? `${counsellorName(ownerId)}, the student's counsellor, looks after this part. You can view it.`
-            : `${counsellorName(ownerId)}, the student's ${teamTitle[area]}, looks after this part now. You can view it, but not change it.`}
+            : `${counsellorName(ownerId)}, the student's ${teamTitle[area]}, looks after this part now. You can view it, but not change it${tab === 'S4' && role === 'counsellor' ? ', except to edit or delete suggested scholarships' : ''}.`}
         </p>
       )}
-      {/* Read-only for anyone else: every control inside is disabled. */}
-      <fieldset disabled={!canEdit} className="min-w-0 disabled:opacity-80">
+      {/* Read-only for anyone else: every control inside is disabled. Funding handles this itself, as the counsellor can still edit scholarships. */}
+      <fieldset disabled={!canEdit && tab !== 'S4'} className="min-w-0 disabled:opacity-80">
       <div className="mt-4" role="tabpanel">
         {tab === 'S1' && (
           <div className="space-y-6">
@@ -680,12 +758,14 @@ export function JourneyPanel({ student, services, actions, role }: { student: St
           </div>
         )}
         {tab === 'S3' && <Hint>Applications are created when the student approves the shortlist. Update their status in <a href="#applications" className="font-semibold underline">Applications</a> below; the student accepts or declines offers on their dashboard.</Hint>}
-        {tab === 'S4' && <FundingTab student={student} actions={actions} />}
+        {tab === 'S4' && <FundingTab student={student} actions={actions} canEdit={canEdit} canEditScholarships={canEdit || role === 'counsellor'} />}
         {tab === 'S5' && <VisaTab student={student} actions={actions} />}
         {tab === 'S6' && <DepartureTab student={student} actions={actions} />}
         {tab === 'S7' && <ArrivalTab student={student} actions={actions} />}
       </div>
-      <DocumentRequest key={tab} stage={tab} student={student} onRequest={actions.requestDocument} />
+      <fieldset disabled={!canEdit} className="min-w-0">
+        <DocumentRequest key={tab} stage={tab} student={student} onRequest={actions.requestDocument} />
+      </fieldset>
       </fieldset>
 
       {overriding && <OverrideModal view={view} actions={actions} onClose={() => setOverriding(false)} />}

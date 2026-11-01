@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
-import type { StageSteps, StepState } from '../../lib/journeySteps';
+import type { StageSteps, Step, StepState } from '../../lib/journeySteps';
 import { cn } from '../../lib/utils';
 
 /** The marker on the step line: a tick when done, a pulsing dot for the current step, an empty ring for later ones. */
@@ -25,6 +25,41 @@ function Marker({ state }: { state: StepState }) {
 
 const stateText: Record<StepState, string> = { done: 'Done', now: 'In progress', next: 'Coming up' };
 
+/** Steps in order, each done, in progress or coming up. Shared by the journey stages and each application. */
+export function StepTimeline({ steps: list }: { steps: Step[] }) {
+  return (
+    <ol className="relative" aria-label="Steps">
+      {list.map((s, i) => {
+        const last = i === list.length - 1;
+        return (
+          <li key={s.label} className={cn('relative flex gap-3', !last && 'pb-4')} data-step-state={s.state}>
+            {!last && <span className={cn('absolute left-[9px] top-6 h-[calc(100%-1.25rem)] w-0.5 rounded-full', s.state === 'done' ? 'bg-emerald-200' : 'bg-navy-100')} aria-hidden />}
+            <span className="relative z-10 mt-0.5 shrink-0">
+              <Marker state={s.state} />
+            </span>
+            <div className={cn('min-w-0 flex-1', s.state === 'now' && '-my-1 rounded-xl bg-sky-50/70 px-3 py-1.5')}>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <p className={cn('text-sm leading-snug', s.state === 'next' ? 'text-navy-500' : 'font-medium text-navy-900')}>
+                  {s.label}
+                  <span className="sr-only"> ({stateText[s.state]})</span>
+                </p>
+                {s.state === 'now' ? (
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-700" aria-hidden>
+                    In progress
+                  </span>
+                ) : (
+                  s.detail && <span className="text-xs text-navy-400">{s.detail}</span>
+                )}
+              </div>
+              {s.state === 'now' && s.detail && <p className="text-xs text-sky-800/80">{s.detail}</p>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /**
  * "View details" under a stage of the student's progress tracker: the stage's steps in order (done, in progress,
  * coming up), plus anything that belongs to it, such as the career plan or the applications.
@@ -47,35 +82,7 @@ export function StageDetails({ code, steps, label = 'View details', extra }: { c
 
       {open && (
         <div className="mt-3 animate-fade-up rounded-2xl border border-navy-100 bg-white p-4 sm:p-5" data-stage-panel={code}>
-          <ol className="relative" aria-label="Steps">
-            {list.map((s, i) => {
-              const last = i === list.length - 1;
-              return (
-                <li key={s.label} className={cn('relative flex gap-3', !last && 'pb-4')} data-step-state={s.state}>
-                  {!last && <span className={cn('absolute left-[9px] top-6 h-[calc(100%-1.25rem)] w-0.5 rounded-full', s.state === 'done' ? 'bg-emerald-200' : 'bg-navy-100')} aria-hidden />}
-                  <span className="relative z-10 mt-0.5 shrink-0">
-                    <Marker state={s.state} />
-                  </span>
-                  <div className={cn('min-w-0 flex-1', s.state === 'now' && '-my-1 rounded-xl bg-sky-50/70 px-3 py-1.5')}>
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                      <p className={cn('text-sm leading-snug', s.state === 'next' ? 'text-navy-500' : 'font-medium text-navy-900')}>
-                        {s.label}
-                        <span className="sr-only"> ({stateText[s.state]})</span>
-                      </p>
-                      {s.state === 'now' ? (
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-700" aria-hidden>
-                          In progress
-                        </span>
-                      ) : (
-                        s.detail && <span className="text-xs text-navy-400">{s.detail}</span>
-                      )}
-                    </div>
-                    {s.state === 'now' && s.detail && <p className="text-xs text-sky-800/80">{s.detail}</p>}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          <StepTimeline steps={list} />
 
           {steps.list && (
             <div className="mt-5 border-t border-navy-100 pt-4">

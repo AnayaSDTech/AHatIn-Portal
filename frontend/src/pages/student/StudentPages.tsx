@@ -15,6 +15,8 @@ import { SessionsCard } from '../../components/dashboard/SessionsCard';
 import { MessagesCard } from '../../components/dashboard/MessagesCard';
 import { DepartureCard, FundingCard, ShortlistCard, VisaCard } from '../../components/dashboard/JourneyCards';
 import { DEPARTURE_TASKS, applicationDocumentsDue, type ServiceCode } from '../../lib/journey';
+import { DelegatesCard } from '../../components/dashboard/DelegatesCard';
+import { ReferralsPanel } from '../../components/referrals/ReferralsPanel';
 import { cn } from '../../lib/utils';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
@@ -89,7 +91,8 @@ export function StudentOverviewPage() {
     const to = (target: string) => () => go(target);
     const { journey, applications, documents } = record;
 
-    if (status('S1') === 'not_started') a.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };
+    // Until the first session is booked (cancelled ones count, as they do for the stage).
+    if (open('S1') && !journey.careerPlan && !sessions.some((x) => x.studentId === record.id)) a.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };
 
 
     const offers = applications.filter((x) => x.state === 'conditional_offer' || x.state === 'unconditional_offer');
@@ -108,7 +111,7 @@ export function StudentOverviewPage() {
 
     if (journey.departure.confirmedAt && !journey.arrival.arrivedAt) a.S7 = { label: 'Confirm arrival', onClick: to('departure') };
     return a;
-  }, [record, services, go, openBooking]);
+  }, [record, services, sessions, go, openBooking]);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -182,7 +185,12 @@ export function StudentApplicationsPage() {
 
 export function StudentDocumentsPage() {
   const { record, actions } = useStudent();
-  return <DocumentChecklist documents={record.documents} onUpload={actions.uploadDocument} onRemove={actions.removeUpload} />;
+  return (
+    <>
+      <DocumentChecklist documents={record.documents} onUpload={actions.uploadDocument} onRemove={actions.removeUpload} />
+      <DelegatesCard />
+    </>
+  );
 }
 
 /** Opens the Messages page on one person's chat. */
@@ -290,18 +298,23 @@ export function StudentFundingPage() {
   const { record, actions, services, showFunding } = useStudent();
   const f = record.journey.funding;
   const notNeeded = services.find((s) => s.code === 'S4')?.status === 'not_needed';
+  const visaWaiting = !record.journey.visa && services.find((s) => s.code === 'S5')?.status === 'in_progress';
   const started = !notNeeded && (!!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || record.documents.some((d) => d.category === 'funds'));
   if (!showFunding) return <Empty>Your funding plan starts after you accept an offer: we assign you a Financial Aid Officer, who sets your estimated cost and helps with scholarships and proof of funds. Your visa progress appears here later.</Empty>;
   return (
-    <div className={cn('grid grid-cols-1 gap-6', (record.journey.visa || record.visaOfficerId) && 'lg:grid-cols-2')}>
+    <div className={cn('grid grid-cols-1 gap-6', (record.journey.visa || visaWaiting) && 'lg:grid-cols-2')}>
       <div className="min-w-0">
         {started ? <FundingCard student={record} actions={actions} notNeeded={notNeeded} /> : <FundingNotStarted />}
       </div>
       <div className="min-w-0">
-        <VisaCard student={record} />
+        <VisaCard student={record} waiting={visaWaiting} />
       </div>
     </div>
   );
+}
+
+export function StudentReferPage() {
+  return <ReferralsPanel />;
 }
 
 export function StudentTravelPage() {

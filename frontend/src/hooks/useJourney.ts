@@ -6,8 +6,7 @@ import type { CareerPlanInput, ScholarshipStatus, ServiceCode, ServiceStatus, Sh
 import type { AppState, DocCategory } from '../data/staff';
 
 /** Sends a file for a document: get a short-lived upload URL, upload the file, then confirm. */
-async function uploadFile(studentId: string, docId: string, file: File) {
-  const base = `/students/${studentId}/documents/${docId}`;
+export async function uploadFile(base: string, file: File) {
   const target = await api.post<{ uploadId: string; url: string; method: string; headers: Record<string, string> }>(`${base}/upload-url`, {
     fileName: file.name,
     contentType: file.type,
@@ -62,6 +61,8 @@ export function useStudentActions(studentId: string | undefined) {
       addFundingSource: (kind: string, amount: number) => act(() => api.post(`${base}/funding/sources`, { kind, amount })),
       removeFundingSource: (id: string) => act(() => api.delete(`${base}/funding/sources/${id}`)),
       addScholarship: (name: string, amount: string, deadline: string) => act(() => api.post(`${base}/funding/scholarships`, { name, amount, deadline })),
+      editScholarship: (id: string, name: string, amount: string, deadline: string) => act(() => api.put(`${base}/funding/scholarships/${id}`, { name, amount, deadline })),
+      deleteScholarship: (id: string) => act(() => api.delete(`${base}/funding/scholarships/${id}`)),
       setScholarshipStatus: (id: string, status: ScholarshipStatus) => act(() => api.patch(`${base}/funding/scholarships/${id}`, { status })),
 
       /* ---------- Documents (all services) ---------- */
@@ -69,7 +70,7 @@ export function useStudentActions(studentId: string | undefined) {
       /** Counsellor removes a duplicate or mistaken request. Verified documents are kept. */
       removeDocument: (docId: string, _name: string, _hadFile: boolean) => act(() => api.delete(`${base}/documents/${docId}`)),
       /** Uploads the file; the promise rejects with the reason if it can't be accepted. */
-      uploadDocument: (docId: string, file: File) => mutate(() => uploadFile(studentId!, docId, file), { silent: true }),
+      uploadDocument: (docId: string, file: File) => mutate(() => uploadFile(`${base}/documents/${docId}`, file), { silent: true }),
       /** Student takes back a file uploaded by mistake, before it is checked. */
       removeUpload: (docId: string, _name: string) => act(() => api.delete(`${base}/documents/${docId}/file`)),
       verifyDocument: (docId: string, _name: string) => act(() => api.post(`${base}/documents/${docId}/verify`)),

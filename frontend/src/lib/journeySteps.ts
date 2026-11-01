@@ -1,5 +1,5 @@
 import { DEPARTURE_TASKS, VISA_PATH, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
-import { appStateLabel, type StaffStudent } from '../data/staff';
+import { appStateLabel, type AppState, type StaffStudent, type StudentApplication } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
 
@@ -42,6 +42,52 @@ function sequencer(started: boolean) {
         return { label: st.label, state, detail: st.detail };
       });
   };
+}
+
+/** How far along an application is. More information and interviews fall between review and the decision. */
+const APP_ORDER: Partial<Record<AppState, number>> = {
+  draft: 0,
+  submitted: 1,
+  under_review: 2,
+  more_info_requested: 3,
+  interview: 4,
+  conditional_offer: 5,
+  unconditional_offer: 5,
+  rejected: 5,
+  accepted: 6,
+  declined: 6,
+};
+
+/** Every step of one application, from its status history. Steps that are optional show only if they happened. */
+export function applicationSteps(a: StudentApplication): Step[] {
+  const history = a.history ?? [];
+  const reached = (state: AppState) => a.state === state || history.some((h) => h.to === state);
+  const when = (state: AppState) => on([...history].reverse().find((h) => h.to === state)?.at);
+  // Withdrawn: everything up to where the application had got to, then the withdrawal.
+  const withdrawn = a.state === 'withdrawn';
+  const last = withdrawn ? ([...history].reverse().find((h) => h.to === 'withdrawn')?.from ?? 'draft') : a.state;
+  const at = APP_ORDER[last] ?? 0;
+  // A step is behind the application once it has moved on, or once it stopped there by being withdrawn.
+  const past = (step: number) => at > step || (withdrawn && at >= step);
+  const offer: AppState | undefined = (['unconditional_offer', 'conditional_offer'] as const).find(reached);
+  const decided = at >= 5;
+  const decision = last === 'rejected' ? 'Application unsuccessful' : offer && decided ? `${appStateLabel[offer]} received` : 'University decision';
+  const replied = a.state === 'accepted' || a.state === 'declined';
+  return sequencer(true)([
+    { label: 'Application prepared by your counsellor', done: past(0), skip: withdrawn && at === 0 },
+    { label: 'Submitted to the university', done: at >= 1, detail: when('submitted'), skip: withdrawn && at < 1 },
+    { label: 'University reviews your application', done: past(2), detail: when('under_review'), skip: withdrawn && at < 2 },
+    { label: 'More information requested', done: past(3), detail: when('more_info_requested'), skip: !reached('more_info_requested') },
+    { label: 'Interview', done: past(4), detail: when('interview'), skip: !reached('interview') },
+    { label: decision, done: decided, detail: when(last === 'rejected' ? 'rejected' : (offer ?? 'rejected')), skip: withdrawn && !decided },
+    {
+      label: a.state === 'accepted' ? 'You accepted the offer' : a.state === 'declined' ? 'You declined the offer' : 'You accept or decline the offer',
+      done: replied,
+      detail: replied ? when(a.state) : undefined,
+      skip: last === 'rejected' || withdrawn,
+    },
+    { label: 'Application withdrawn', done: true, detail: when('withdrawn'), skip: !withdrawn },
+  ]);
 }
 
 /** `status` is the stage's status in the tracker (from computeServices). */

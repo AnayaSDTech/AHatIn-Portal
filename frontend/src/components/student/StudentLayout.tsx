@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { CalendarDays, FolderCheck, LayoutDashboard, Menu, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
+import { CalendarDays, FolderCheck, Gift, LayoutDashboard, Menu, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Container } from '../ui/Container';
@@ -67,6 +68,7 @@ const PAGE_FOR: Record<string, string> = {
   funding: 'funding',
   visa: 'funding',
   departure: 'travel',
+  refer: 'refer',
 };
 
 interface Section {
@@ -176,6 +178,10 @@ export function StudentLayout() {
     if (nav && active) nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.clientWidth) / 2;
   }, [location.pathname, record]);
 
+  // The space the site header keeps for the student's sections.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setHeaderSlot(document.getElementById('dashboard-nav')), []);
+
   // Links like /dashboard/applications#shortlist scroll to that section once it is on screen.
   useEffect(() => {
     if (location.hash && record) requestAnimationFrame(() => goToSection(location.hash.slice(1)));
@@ -187,7 +193,8 @@ export function StudentLayout() {
   const status = (code: string) => services.find((s) => s.code === code)?.status;
   const funds = documents.filter((d) => d.category === 'funds');
   const f = journey.funding;
-  const showFunding = !!journey.visa || !!record.visaOfficerId || (status('S4') !== 'not_needed' && (!!record.financeOfficerId || !!f.estimatedCost || f.sources.length > 0 || f.scholarships.length > 0 || funds.length > 0));
+  // Every new student has their officers from the start, so this follows the stages, not the assignment.
+  const showFunding = !!journey.visa || status('S5') === 'in_progress' || (status('S4') !== 'not_needed' && (status('S4') !== 'not_started' || !!f.estimatedCost || f.scholarships.length > 0 || funds.length > 0));
   const showTravel = journey.visa?.stage === 'granted' || !!journey.departure.confirmedAt;
 
   const unread = messages.filter((m) => m.studentId === record.id && m.from === 'staff' && !m.readAt).length;
@@ -204,6 +211,7 @@ export function StudentLayout() {
     { to: '/dashboard/messages', label: 'Messages', short: 'Messages', title: 'Messages', description: team.finance || team.visa ? 'Your chats with the people looking after you.' : `Your chat with ${counsellor?.name ?? 'your counsellor'}.`, icon: MessageSquare, badge: unread, urgent: unread > 0 },
     { to: '/dashboard/funding', label: 'Funding & visa', title: 'Funding & visa', description: 'Your funding plan, scholarships and visa progress.', icon: PiggyBank, hidden: !showFunding },
     { to: '/dashboard/travel', label: 'Travel', title: 'Travel & arrival', description: 'Get ready to travel, then tell us when you have arrived.', icon: Plane, hidden: !showTravel },
+    { to: '/dashboard/refer', label: 'Refer a friend', title: 'Refer a friend or family', description: 'Share AHat with someone planning to study abroad, and follow how far they get.', icon: Gift },
   ];
   const current =
     [...sections, profileSection].find((s) => (s.to === '/dashboard' ? location.pathname.replace(/\/$/, '') === '/dashboard' : location.pathname.startsWith(s.to))) ?? sections[0]!;
@@ -246,9 +254,39 @@ export function StudentLayout() {
   };
 
   return (
-    <div className="bg-[#F4F1EA] pb-28 pt-24 sm:pb-20">
+    <div className="bg-[#F4F1EA] pb-28 pt-24 sm:pb-20 xl:pt-[73px]">
+      {/* Large screens: the sections are in the site header. */}
+      {headerSlot &&
+        createPortal(
+          <nav className="flex items-center gap-1" aria-label="My dashboard" data-dashboard-nav>
+            {sections
+              .filter((s) => !s.hidden)
+              .map((s) => (
+                <NavLink
+                  key={s.to}
+                  to={s.to}
+                  end={s.to === '/dashboard'}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition after:absolute after:inset-x-3 after:-bottom-[13px] after:h-0.5 after:rounded-full",
+                      isActive ? 'font-semibold text-navy-950 after:bg-gold-500' : 'text-navy-600 hover:bg-navy-50 hover:text-navy-950 after:bg-transparent',
+                    )
+                  }
+                >
+                  {s.label}
+                  {!!s.badge && (
+                    <span className={cn('grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
+                      {s.badge}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+          </nav>,
+          headerSlot,
+        )}
+
       {/* Header band with the student navigation (on phones the navigation is the bar at the bottom) */}
-      <div className="bg-navy-950 pb-6 pt-6 sm:pb-0 sm:pt-10">
+      <div className="bg-navy-950 pb-6 pt-6 sm:pb-0 sm:pt-10 xl:pb-10">
         <Container>
           <div className="flex flex-col justify-between gap-5 sm:gap-8 md:flex-row md:items-center">
             {isOverview ? (
@@ -299,8 +337,8 @@ export function StudentLayout() {
             </div>
           </div>
 
-          {/* Student navigation: scrolls sideways on small screens */}
-          <nav ref={navRef} className="-mx-1 mt-8 hidden gap-1 overflow-x-auto px-1 sm:flex" aria-label="My dashboard">
+          {/* Tablets and small laptops: tabs that scroll sideways */}
+          <nav ref={navRef} className="-mx-1 mt-8 hidden gap-1 overflow-x-auto px-1 sm:flex xl:hidden" aria-label="My dashboard">
             {sections
               .filter((s) => !s.hidden)
               .map((s) => (

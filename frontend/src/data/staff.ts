@@ -221,6 +221,8 @@ export interface StudentDocument {
   category: DocCategory;
   uploadedAt?: string;
   fileName?: string;
+  /** Who uploaded it, when that wasn't the student (a parent or sponsor). */
+  uploadedBy?: string;
   reason?: string;
   /** Staff who have opened the current file: a document can be verified only by someone who has opened it. */
   viewedBy?: string[];

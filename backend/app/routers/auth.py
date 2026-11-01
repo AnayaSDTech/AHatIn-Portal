@@ -36,6 +36,7 @@ from app.schemas import (
     StudentLoginBody,
 )
 from app.services import notify
+from app.services.referrals import link_referral
 from app.services.students import create_student_record
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -150,6 +151,7 @@ async def register(body: RegisterBody, request: Request):
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"studentReference": record["reference"]}})
     user["studentReference"] = record["reference"]
     await audit(user, "student.registered", "students", record["_id"])
+    await link_referral(user, record, body.ref)
     return await _send_code(body.email, user, "verify")
 
 

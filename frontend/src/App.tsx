@@ -4,6 +4,7 @@ import { Layout } from './components/layout/Layout';
 import { StaffLayout } from './components/staff/StaffLayout';
 import { GuestOnly, RequireRole } from './components/auth/RouteGuards';
 import { HomePage } from './pages/HomePage';
+import { DelegateUploadPage } from './pages/DelegateUploadPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
@@ -15,6 +16,7 @@ import {
   StudentMessagesPage,
   StudentOverviewPage,
   StudentSessionsPage,
+  StudentReferPage,
   StudentTravelPage,
 } from './pages/student/StudentPages';
 import { ProfilePage as StudentProfilePage } from './pages/student/ProfilePage';
@@ -22,6 +24,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
 import { StaffSetupPage } from './pages/staff/StaffSetupPage';
 import { ErrorToast } from './components/ui/ErrorToast';
+import { ReferralsPage } from './pages/staff/ReferralsPage';
 import { TodayPage } from './pages/staff/TodayPage';
 import { SchedulePage } from './pages/staff/SchedulePage';
 import { LeadsPage } from './pages/staff/LeadsPage';
@@ -52,6 +55,11 @@ const router = createBrowserRouter([
       { path: '/forgot-password', element: <GuestOnly><ForgotPasswordPage /></GuestOnly> },
     ],
   },
+  // A parent or sponsor uploading from their private link (no account)
+  {
+    element: <Layout hideFooter />,
+    children: [{ path: '/upload/:token', element: <DelegateUploadPage /> }],
+  },
   // Student portal
   {
     element: <Layout />,
@@ -67,6 +75,7 @@ const router = createBrowserRouter([
           { path: 'messages', element: <StudentMessagesPage /> },
           { path: 'funding', element: <StudentFundingPage /> },
           { path: 'travel', element: <StudentTravelPage /> },
+          { path: 'refer', element: <StudentReferPage /> },
           { path: 'profile', element: <StudentProfilePage /> },
         ],
       },
@@ -87,6 +96,11 @@ const router = createBrowserRouter([
       { path: '/staff/students/:id', element: <StudentRecordPage /> },
       { path: '/staff/profile', element: <MyProfilePage /> },
     ],
+  },
+  // Referrals: counsellors their own, admins everyone's
+  {
+    element: <RequireRole roles={['counsellor', 'admin']}><StaffLayout /></RequireRole>,
+    children: [{ path: '/staff/referrals', element: <ReferralsPage /> }],
   },
   // Admin area
   {

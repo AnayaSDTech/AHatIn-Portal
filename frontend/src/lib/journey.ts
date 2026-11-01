@@ -189,6 +189,18 @@ export interface ServiceView {
 
 const lakh = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(1)} lakh`;
 
+/** Application Assistance is finished, so funding can start. */
+export const offerAccepted = (s: StaffStudent) => s.applications.some((a) => a.state === 'accepted') || ['completed', 'not_needed'].includes(s.journey.overrides.S3?.status ?? '');
+
+/** The funding plan covers the estimated cost and all proof of funds is verified (or staff marked it done), so the visa can start. */
+export function fundingComplete(s: StaffStudent) {
+  const override = s.journey.overrides.S4?.status;
+  if (override) return override === 'completed' || override === 'not_needed';
+  const f = s.journey.funding;
+  const funds = s.documents.filter((d) => d.category === 'funds');
+  return !!f.estimatedCost && f.sources.reduce((n, x) => n + x.amount, 0) >= f.estimatedCost && funds.length > 0 && funds.every((d) => d.state === 'verified');
+}
+
 /** A document for the applications (not funding or visa, which come later) is still to upload, or to upload again. */
 export const applicationDocumentsDue = (s: StaffStudent) => s.documents.some((d) => d.category !== 'funds' && d.category !== 'visa' && (d.state === 'missing' || d.state === 'rejected'));
 
@@ -214,7 +226,9 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       // Any session ever booked counts, so later sessions or a cancellation never move this step back.
       const mine = sessions.filter((x) => x.studentId === s.id);
       if (mine.length || preparing) return { status: 'in_progress', summary: 'Counselling under way', next: 'Your counsellor shares your career plan after your counselling session' };
-      return { status: 'not_started', summary: 'Starts with your first counselling session', next: 'Book a career counselling session' };
+      // Under way as soon as the student has a counsellor.
+      if (s.counsellorId) return { status: 'in_progress', summary: 'Your counsellor is ready to meet you', next: 'Book a career counselling session' };
+      return { status: 'not_started', summary: 'Starts once your counsellor is assigned' };
     }
     case 'S3': {
       const shortlistWaiting = j.shortlist?.status === 'shared';
@@ -229,7 +243,7 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
         return {
           status: 'in_progress',
           summary: `${sent.length} of ${apps.length} submitted · ${offers.length} ${offers.length === 1 ? 'offer' : 'offers'}`,
-          next: offers[0] ? `Reply to your offer from ${offers[0].university}` : newOption ?? drafts[0] ? `Your counsellor is preparing your ${drafts[0].university} application` : 'Waiting for university decisions',
+          next: offers[0] ? `Reply to your offer from ${offers[0].university}` : newOption ?? (drafts[0] ? `Your counsellor is preparing your ${drafts[0].university} application` : 'Waiting for university decisions'),
         };
       }
       // Under way as soon as the shortlist is approved: the counsellor is preparing the applications.
@@ -254,15 +268,14 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       if (planned && allVerified) return { status: 'completed', summary: `Funding plan covers ${lakh(f.estimatedCost!)} · proof of funds verified` };
       const started = f.sources.length > 0 || f.scholarships.length > 0 || funds.some((d) => d.state !== 'missing');
       if (!started) {
-        // Under way as soon as a Financial Aid Officer is assigned; they set the estimated cost.
-        if (s.financeOfficerId) {
+        // Starts after Application Assistance, with the student's Financial Aid Officer, who sets the estimated cost.
+        if (s.financeOfficerId && offerAccepted(s)) {
           return f.estimatedCost
             ? { status: 'in_progress', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' }
             : { status: 'in_progress', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Book a session or message them about scholarships, loans or sponsors' };
         }
         if (f.estimatedCost) return { status: 'not_started', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' };
-        // Starts after Application Assistance: the admin assigns a Financial Aid Officer.
-        if (!apps.some((a) => a.state === 'accepted')) return { status: 'not_started', summary: 'Starts once you accept an offer' };
+        if (!offerAccepted(s)) return { status: 'not_started', summary: 'Starts once you accept an offer' };
         return { status: 'not_started', summary: 'Starts when your Financial Aid Officer is assigned' };
       }
       const toUpload = funds.find((d) => d.state === 'missing' || d.state === 'rejected');
@@ -285,9 +298,9 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
     }
     case 'S5': {
       const v = j.visa;
-      // Under way as soon as a Visa Officer is assigned.
-      if (!v && s.visaOfficerId) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
-      if (!v) return { status: 'not_started', summary: apps.some((a) => a.state === 'accepted') ? 'Starts when your CAS or admission letter arrives' : 'Starts after you accept an offer' };
+      // Starts after funding, with the student's Visa Officer.
+      if (!v && s.visaOfficerId && fundingComplete(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
+      if (!v) return { status: 'not_started', summary: !offerAccepted(s) ? 'Starts after you accept an offer' : s.visaOfficerId ? 'Starts once your funding is complete' : 'Starts when your CAS or admission letter arrives' };
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
       if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };
       const i = VISA_PATH.indexOf(v.stage);

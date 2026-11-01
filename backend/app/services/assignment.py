@@ -1,5 +1,6 @@
 """Assigning a counsellor to a student: automatically when the profile is complete (the best match with room), or by the
-admin from the Assignments page. Both go through assign_counsellor, so the record, history and emails are the same."""
+admin from the Assignments page. Both go through assign_counsellor, so the record, history and emails are the same.
+The single Financial Aid Officer and Visa Officer are given to every new student at the same moment."""
 
 from app import matching
 from app.config import get_settings
@@ -7,6 +8,7 @@ from app.core.audit import audit
 from app.core.clock import now
 from app.core.locks import lock
 from app.db import get_db
+from app.domain import OFFICER_FIELD, OFFICER_ROLE, OFFICER_TITLE
 from app.records import add_note
 from app.services import notify
 from app.services.students import profile_out
@@ -14,6 +16,29 @@ from app.services.workflow import close_follow_ups
 
 # Shown as who assigned the counsellor when it was done automatically.
 AUTOMATIC = "AHat (automatic)"
+
+
+async def assign_default_officers(sid: str) -> None:
+    """Gives a student whose profile is now complete the single Financial Aid Officer and Visa Officer. Their stages of
+    the journey still start when they are reached. The officer gets a notification, not an email, for each student."""
+    s = get_settings()
+    if not s.auto_assign_officers:
+        return
+    db = get_db()
+    student = await db.students.find_one({"_id": sid})
+    if not student:
+        return
+    for area, email in (("finance", s.default_finance_officer_email), ("visa", s.default_visa_officer_email)):
+        field = OFFICER_FIELD[area]
+        officer = await db.users.find_one({"email": email, "role": OFFICER_ROLE[area], "status": "active"})
+        if student.get(field) or not officer:
+            continue
+        t = now()
+        entry = {"at": t, "by": AUTOMATIC, "role": area, "from": "", "to": officer["_id"], "reason": "Assigned automatically to every new student"}
+        await db.students.update_one({"_id": sid}, {"$set": {field: officer["_id"], "updatedAt": t}, "$push": {"officerHistory": entry}})
+        await add_note(sid, AUTOMATIC, f"Assigned {OFFICER_TITLE[area]}: {officer['name']}.")
+        await audit(None, f"student.{area}_officer", "students", sid, {"to": officer["_id"], "automatic": True})
+        await notify.alert_staff(officer["_id"], f"New student assigned: {student['name']}", f"You are now their {OFFICER_TITLE[area]} ({student['reference']}).", path=f"/staff/students/{sid}", kind="assigned")
 
 
 async def active_counsellor_loads() -> tuple[list[dict], dict[str, int]]:

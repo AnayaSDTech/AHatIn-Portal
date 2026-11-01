@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, Circle, School } from 'lucide-react';
 import type { AppState, StudentApplication } from '../../data/staff';
+import { applicationSteps } from '../../lib/journeySteps';
 import { cn, daysUntil, formatDate } from '../../lib/utils';
 import { Panel, Pill } from './Panel';
+import { StepTimeline } from './StageDetails';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
@@ -21,7 +23,7 @@ const statusMeta: Record<AppState, { label: string; tone: 'green' | 'blue' | 'am
 };
 
 const describe: Partial<Record<AppState, string>> = {
-  draft: 'Your counsellor is preparing this application. Make sure your documents are uploaded.',
+  draft: 'Your counsellor is preparing this application.',
   submitted: 'Submitted to the university. Decisions usually take 2–6 weeks.',
   under_review: 'The university is reviewing your application. We will tell you as soon as there is news.',
   more_info_requested: 'The university has asked for more information. Your counsellor will contact you.',
@@ -100,12 +102,17 @@ export function ApplicationsCard({ applications, onDecide, updated }: Props) {
                         </span>
                       )}
                     </span>
-                    <ChevronDown className={cn('h-4 w-4 shrink-0 text-navy-400 transition-transform', open && 'rotate-180')} aria-hidden />
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-navy-600 underline underline-offset-2" data-app-details>
+                      {open ? 'Hide details' : 'View details'}
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} aria-hidden />
+                    </span>
                   </span>
                 </button>
 
                 {open && (
-                  <div className="mt-4 animate-fade-up rounded-2xl bg-ivory p-4 text-sm">
+                  <div className="mt-4 animate-fade-up rounded-2xl border border-navy-100 bg-white p-4 text-sm sm:p-5" data-app-panel={a.university}>
+                    <StepTimeline steps={applicationSteps(a)} />
+                    <div className="mt-4 border-t border-navy-100 pt-4">
                     {isOffer(a.state) || a.state === 'accepted' ? (
                       <>
                         {conditions.length > 0 && (
@@ -139,6 +146,7 @@ export function ApplicationsCard({ applications, onDecide, updated }: Props) {
                     ) : (
                       <p className="text-navy-600">{describe[a.state]}</p>
                     )}
+                    </div>
                   </div>
                 )}
               </li>

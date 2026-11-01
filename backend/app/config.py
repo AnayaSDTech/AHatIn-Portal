@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     mail_from: str = "AHat <no-reply@ahat.example>"
     admin_alert_emails: str = ""
 
+    # The single Financial Aid Officer and Visa Officer given to every new student once their profile is complete.
+    # If either is missing or inactive, the admin assigns one from the Assignments page instead.
+    auto_assign_officers: bool = True
+    default_finance_officer_email: str = "kavya.i@ahatin.example"
+    default_visa_officer_email: str = "sneha.p@ahatin.example"
+
     # Demo accounts (emails at DEMO_EMAIL_DOMAIN) get their sign-in code and authenticator secret on screen,
     # even in production, so the demo can be tried. Everyone else gets codes by email only.
     demo_logins: bool = False

@@ -20,6 +20,8 @@ export interface RegisterPayload {
   mobile: string;
   password: string;
   consent: boolean;
+  /** The code from a referral link. */
+  ref?: string;
 }
 
 /** Response after a 6-digit code is emailed (to verify an email, or to reset a password). */

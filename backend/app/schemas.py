@@ -97,6 +97,8 @@ class RegisterBody(EmailBody):
     destination: str | None = None
     intake: str | None = None
     consent: bool
+    # The code from a referral link, when they came from one.
+    ref: str = Field(default="", max_length=20)
 
     @field_validator("consent")
     @classmethod
@@ -167,6 +169,36 @@ class EnquiryBody(EmailBody):
     def consented(cls, v: bool) -> bool:
         if not v:
             raise ValueError("Please agree so we can contact you.")
+        return v
+
+
+# ---------------------------------------------------------------- inviting someone
+
+DELEGATE_RELATIONS = ["Parent", "Guardian", "Sponsor", "Other"]
+REFERRAL_RELATIONS = ["Friend", "Family", "Colleague", "Other"]
+
+
+class DelegateBody(EmailBody):
+    name: Name
+    relation: str
+
+    @field_validator("relation")
+    @classmethod
+    def known_relation(cls, v: str) -> str:
+        if v not in DELEGATE_RELATIONS:
+            raise ValueError("Choose an option from the list.")
+        return v
+
+
+class ReferralBody(EmailBody):
+    name: Name
+    relation: str
+
+    @field_validator("relation")
+    @classmethod
+    def known_relation(cls, v: str) -> str:
+        if v not in REFERRAL_RELATIONS:
+            raise ValueError("Choose an option from the list.")
         return v
 
 
@@ -462,7 +494,8 @@ class FundingSourceBody(Body):
 
 class ScholarshipBody(Body):
     name: str = Field(min_length=3, max_length=150)
-    amount: str = Field(default="", max_length=40)
+    # An amount, or what it covers, e.g. "Full tuition fees and an annual living grant".
+    amount: str = Field(default="", max_length=120)
     deadline: str = ""
 
     @field_validator("deadline")

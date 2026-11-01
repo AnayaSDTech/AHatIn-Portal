@@ -1,10 +1,11 @@
 """Who looks after which part of a student's journey, and the handovers between them.
 
 - Counsellor: services 1-3 (career counselling, shortlist, applications). Stays the student's main contact.
-- Financial Aid Officer: service 4. The admin assigns one once Application Assistance is complete (offer accepted).
-- Visa Officer: services 5-7. The admin assigns one once Scholarship & Financial Guidance is complete
-  (proof of funds verified, or the service marked "Not needed").
-Once an officer is assigned, their services are read-only for the counsellor. Until then the counsellor can act on them
+- Financial Aid Officer: service 4, once Application Assistance is complete (offer accepted).
+- Visa Officer: services 5-7, once Scholarship & Financial Guidance is complete (proof of funds verified, or the
+  service marked "Not needed").
+New students get both officers when their profile is complete (services/assignment.py). For anyone without one, the
+admin assigns one when that part of the journey is reached. Once an officer is assigned, their services are read-only for the counsellor. Until then the counsellor can act on them
 (students who were already under way before officers existed keep working as before).
 """
 

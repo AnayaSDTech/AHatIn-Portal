@@ -22,7 +22,7 @@ from app.domain import DEPARTURE_TASKS, blank_profile, empty_journey, mobile_dig
 from app.services import storage
 from app.services.students import profile_in
 
-BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks", "staff_alerts"]
+BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks", "staff_alerts", "delegates", "referrals"]
 
 COUNSELLORS = [
     ("c1", "Priya Desai", "demo.counsellor@ahatin.example", "+91 98000 11111", "https://meet.google.com/juz-bodt-wbd", 40),
@@ -154,7 +154,7 @@ async def seed_users() -> None:
         )
     # Specialist officers: funding (service 4), then visa, pre-departure and arrival (services 5-7).
     await upsert_user({"_id": "u6", "role": "finance_officer", "name": "Kavya Iyer", "email": "kavya.i@ahatin.example", "mobile": "+919800044444", "counsellorProfile": {"phone": "+91 98000 44444"}, "lastLoginAt": minutes_from_now(-90)}, DEFAULT_STAFF_PASSWORD)
-    await upsert_user({"_id": "u7", "role": "visa_officer", "name": "Aditya Rao", "email": "aditya.r@ahatin.example", "mobile": "+919800055555", "counsellorProfile": {"phone": "+91 98000 55555"}, "lastLoginAt": minutes_from_now(-150)}, DEFAULT_STAFF_PASSWORD)
+    await upsert_user({"_id": "u7", "role": "visa_officer", "name": "Sneha Patil", "email": "sneha.p@ahatin.example", "mobile": "+919800055555", "counsellorProfile": {"phone": "+91 98000 55555"}, "lastLoginAt": minutes_from_now(-150)}, DEFAULT_STAFF_PASSWORD)
     await upsert_user({"_id": "u5", "role": "officer", "name": "Sameer Khan", "email": "sameer.k@ahatin.example", "mobile": "", "lastLoginAt": minutes_from_now(-120)}, DEFAULT_STAFF_PASSWORD)
     for uid, name, email, mobile, ref in [
         ("demo-student-1", "Ananya Sharma", "demo.student@ahatin.example", "+919800000000", "AH-2026-00042"),
@@ -495,7 +495,7 @@ async def seed_schedule() -> None:
         [
             session("ss1", "s1", "c1", "Application review", workday(3, True), "16:00", 45, "online", "booked", "student", "Ananya Sharma", studentNote="Want to discuss the Manchester offer conditions."),
             session("ss2", "s2", "c1", "Visa preparation", today_iso, "17:00", 45, "online", "booked", "counsellor", "Priya Desai"),
-            session("ss3", "s4", "u7", "Post-arrival check-in", today_iso, "11:00", 45, "online", "booked", "counsellor", "Aditya Rao"),
+            session("ss3", "s4", "u7", "Post-arrival check-in", today_iso, "11:00", 45, "online", "booked", "counsellor", "Sneha Patil"),
             session("ss4", "s3", "c2", "Career counselling", workday(2, True), "12:00", 30, "online", "booked", "student", "Fatima Sheikh"),
             session("ss5", "s5", "c3", "Visa preparation", workday(2), "11:00", 60, "office", "booked", "student", "Nikhil Bose"),
             session("ss6", "s2", "c1", "Scholarship & funding", past(5), "15:00", 45, "office", "completed", "student", "Arjun Mehta", outcomeNotes="Confirmed sponsor funds; bank letter to be uploaded."),

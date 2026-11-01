@@ -27,6 +27,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "users": [
         IndexModel([("email", ASCENDING)], unique=True),
         IndexModel([("role", ASCENDING), ("status", ASCENDING)]),
+        IndexModel([("referralCode", ASCENDING)], unique=True, partialFilterExpression={"referralCode": {"$type": "string"}}),
     ],
     "students": [
         IndexModel([("userId", ASCENDING)], unique=True, partialFilterExpression={"userId": {"$type": "string"}}),
@@ -78,6 +79,8 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("status", ASCENDING), ("sendAfter", ASCENDING)]),
         IndexModel([("dedupeKey", ASCENDING)], unique=True, partialFilterExpression={"dedupeKey": {"$type": "string"}}),
     ],
+    "delegates": [IndexModel([("tokenHash", ASCENDING)], unique=True), IndexModel([("studentId", ASCENDING), ("createdAt", DESCENDING)])],
+    "referrals": [IndexModel([("referrerId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("email", ASCENDING)]), IndexModel([("studentId", ASCENDING)])],
     "staff_alerts": [IndexModel([("userId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("key", ASCENDING)]), IndexModel([("userId", ASCENDING), ("studentId", ASCENDING)])],
     "audit_log": [IndexModel([("entity", ASCENDING), ("entityId", ASCENDING), ("at", DESCENDING)]), IndexModel([("actorId", ASCENDING), ("at", DESCENDING)])],
 }

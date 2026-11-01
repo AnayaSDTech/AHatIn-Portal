@@ -62,7 +62,7 @@ from app.schemas import (
     VisaBody,
 )
 from app.services import notify, storage
-from app.services.assignment import assign_counsellor, auto_assign
+from app.services.assignment import assign_counsellor, assign_default_officers, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
 from app.services.team import assign_officer, check_handover, owner_for, require_area, team_of
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
@@ -155,6 +155,9 @@ async def save_profile(body: ProfileBody, user: CurrentUser):
         updates["profileCompletedAt"] = now()
     await get_db().students.update_one({"_id": record["_id"]}, {"$set": updates})
     sid = record["_id"]
+
+    if complete and not was_complete:
+        await assign_default_officers(sid)
 
     if complete and not was_complete and not record.get("counsellorId"):
         # The best-matched counsellor with room is assigned straight away.
@@ -625,6 +628,58 @@ async def add_scholarship(sid: str, body: ScholarshipBody, user: Staff):
     return await load_student(sid)
 
 
+async def _changed_scholarship(student: dict, user: dict, sch_id: str, title: str, text: str) -> None:
+    """Records a suggestion being edited or deleted, and tells the student and (if someone else did it) the officer."""
+    sid = student["_id"]
+    await close_follow_ups(f"deadline:sch:{sch_id}:")
+    await add_note(sid, user["name"], text)
+    await audit(user, "scholarship.changed", "students", sid, {"scholarship": sch_id, "change": title})
+    await notify.email_student(student, title, text)
+    officer = owner_for(student, "finance")
+    if officer != user["_id"]:
+        await notify.alert_staff(officer, f"{title}: {student['name']}", f"{text} By {user['name']}.", path=f"/staff/students/{sid}")
+
+
+def _require_scholarship_editor(user: dict, student: dict) -> None:
+    """Besides the Financial Aid Officer, the student's counsellor can correct or remove a suggestion."""
+    if user["role"] != "counsellor":
+        require_area(user, student, "finance")
+
+
+@router.put("/students/{sid}/funding/scholarships/{sch_id}")
+async def edit_scholarship(sid: str, sch_id: str, body: ScholarshipBody, user: Staff):
+    student = await student_for(user, sid, who="staff")
+    _require_scholarship_editor(user, student)
+
+    def fn(j, _):
+        sch = next((x for x in j["funding"]["scholarships"] if x["id"] == sch_id), None)
+        if not sch:
+            raise not_found("Scholarship not found.")
+        sch.update(name=body.name, amount=body.amount, deadline=body.deadline)
+
+    await _journey(sid, fn)
+    await _changed_scholarship(student, user, sch_id, "Scholarship updated", f"Updated the suggested scholarship: {body.name}.")
+    return await load_student(sid)
+
+
+@router.delete("/students/{sid}/funding/scholarships/{sch_id}")
+async def delete_scholarship(sid: str, sch_id: str, user: Staff):
+    student = await student_for(user, sid, who="staff")
+    _require_scholarship_editor(user, student)
+    names: list[str] = []
+
+    def fn(j, _):
+        sch = next((x for x in j["funding"]["scholarships"] if x["id"] == sch_id), None)
+        if not sch:
+            raise not_found("Scholarship not found.")
+        names.append(sch["name"])
+        j["funding"]["scholarships"] = [x for x in j["funding"]["scholarships"] if x["id"] != sch_id]
+
+    await _journey(sid, fn)
+    await _changed_scholarship(student, user, sch_id, "Scholarship removed", f"Removed the suggested scholarship: {names[0]}.")
+    return await load_student(sid)
+
+
 @router.patch("/students/{sid}/funding/scholarships/{sch_id}")
 async def set_scholarship_status(sid: str, sch_id: str, body: ScholarshipStatusBody, user: CurrentUser):
     student = await student_for(user, sid)
@@ -650,7 +705,7 @@ async def set_scholarship_status(sid: str, sch_id: str, body: ScholarshipStatusB
 # ---------------------------------------------------------------- documents (all services)
 
 
-async def _document(sid: str, doc_id: str) -> dict:
+async def document_of(sid: str, doc_id: str) -> dict:
     d = await get_db().documents.find_one({"_id": doc_id, "studentId": sid, "deletedAt": None})
     if not d:
         raise not_found("Document not found.")
@@ -671,7 +726,7 @@ async def request_document(sid: str, body: DocumentRequestBody, user: Staff):
 async def remove_document(sid: str, doc_id: str, user: Staff):
     """Removes a duplicate or mistaken request (and any uploaded file). Verified documents are kept."""
     student = await student_for(user, sid, who="staff")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     require_area(user, student, DOC_AREA.get(d.get("category", "general"), "counsellor"))
     if d["state"] == "verified":
         raise ApiError(400, "Verified documents can't be removed.")
@@ -685,11 +740,9 @@ async def remove_document(sid: str, doc_id: str, user: Staff):
     return await load_student(sid)
 
 
-@router.post("/students/{sid}/documents/{doc_id}/upload-url")
-async def document_upload_url(sid: str, doc_id: str, body: UploadUrlBody, user: CurrentUser):
+async def prepare_upload(sid: str, doc_id: str, body: UploadUrlBody) -> dict:
     """Step 1 of an upload: a short-lived URL the browser sends the file to."""
-    await student_for(user, sid, who="student")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     if d["state"] not in ("missing", "rejected"):
         raise ApiError(400, "This document is already uploaded.")
     if body.contentType not in storage.ALLOWED_TYPES:
@@ -706,15 +759,15 @@ async def document_upload_url(sid: str, doc_id: str, body: UploadUrlBody, user: 
     return {"uploadId": upload_id, **storage.upload_url(key, body.contentType, body.size)}
 
 
-@router.post("/students/{sid}/documents/{doc_id}/upload-complete")
-async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBody, user: CurrentUser):
-    """Step 2: checks the stored file (size, real file type, virus scan) and sends it for review."""
-    student = await student_for(user, sid, who="student")
+async def finish_upload(student: dict, doc_id: str, body: UploadCompleteBody, *, actor: dict | None, by: str, uploaded_by: str | None = None) -> None:
+    """Step 2: checks the stored file (size, real file type, virus scan) and sends it for review. `by` is who uploaded
+    it, for the student's history; `uploaded_by` is set when that wasn't the student."""
+    sid = student["_id"]
     db = get_db()
     up = await db.uploads.find_one({"_id": body.uploadId, "studentId": sid, "documentId": doc_id})
     if not up:
         raise ApiError(400, "The upload has expired. Please try again.")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     if d["state"] not in ("missing", "rejected"):
         raise ApiError(400, "This document is already uploaded.")
     found = await storage.head(up["key"])
@@ -723,20 +776,20 @@ async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBo
         raise ApiError(400, "The file didn't upload correctly, or isn't a real PDF, JPG or PNG. Please try again.")
     if await storage.scan(up["key"]) != "clean":
         await storage.delete(up["key"])
-        await audit(user, "document.infected", "documents", doc_id)
+        await audit(actor, "document.infected", "documents", doc_id)
         raise ApiError(400, "This file failed our security check. Please upload a different copy.")
     previous_key = d.get("fileKey")
     await db.documents.update_one(
         {"_id": doc_id},
         {
-            "$set": {"state": "pending", "fileName": up["fileName"], "fileKey": up["key"], "contentType": up["contentType"], "size": up["size"], "uploadedAt": now(), "viewedBy": []},
+            "$set": {"state": "pending", "fileName": up["fileName"], "fileKey": up["key"], "contentType": up["contentType"], "size": up["size"], "uploadedAt": now(), "viewedBy": [], "uploadedBy": uploaded_by},
             "$unset": {"reason": ""},
         },
     )
     await db.uploads.delete_one({"_id": up["_id"]})
     if previous_key and previous_key != up["key"]:
         await storage.delete(previous_key)
-    await add_note(sid, actor_name(user), f"Uploaded “{up['fileName']}” for {d['name']}.")
+    await add_note(sid, by, f"Uploaded “{up['fileName']}” for {d['name']}.")
     await create_follow_up(
         counsellor_id=owner_for(student, DOC_AREA.get(d.get("category", "general"), "counsellor")),
         person=student["name"],
@@ -749,9 +802,21 @@ async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBo
         source_event=f"doc:{doc_id}:{up['_id']}",
     )
     await notify.alert_staff(
-        owner_for(student, DOC_AREA.get(d.get("category", "general"), "counsellor")), f"{student['name']} uploaded a document", f"{d['name']} is ready to check.",
+        owner_for(student, DOC_AREA.get(d.get("category", "general"), "counsellor")), f"{student['name']} uploaded a document", f"{d['name']} is ready to check.{f' Uploaded by {uploaded_by}.' if uploaded_by else ''}",
         path=f"/staff/students/{sid}", kind="document", key=f"doc:{doc_id}",
     )
+
+
+@router.post("/students/{sid}/documents/{doc_id}/upload-url")
+async def document_upload_url(sid: str, doc_id: str, body: UploadUrlBody, user: CurrentUser):
+    await student_for(user, sid, who="student")
+    return await prepare_upload(sid, doc_id, body)
+
+
+@router.post("/students/{sid}/documents/{doc_id}/upload-complete")
+async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBody, user: CurrentUser):
+    student = await student_for(user, sid, who="student")
+    await finish_upload(student, doc_id, body, actor=user, by=actor_name(user))
     return await load_student(sid)
 
 
@@ -759,7 +824,7 @@ async def document_upload_complete(sid: str, doc_id: str, body: UploadCompleteBo
 async def remove_upload(sid: str, doc_id: str, user: CurrentUser):
     """The student takes back a file uploaded by mistake, before it is checked."""
     await student_for(user, sid, who="student")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     if d["state"] != "pending":
         raise ApiError(400, "Only files waiting for review can be removed.")
     await get_db().documents.update_one(
@@ -777,7 +842,7 @@ async def remove_upload(sid: str, doc_id: str, user: CurrentUser):
 @router.post("/students/{sid}/documents/{doc_id}/verify")
 async def verify_document(sid: str, doc_id: str, user: Staff):
     student = await student_for(user, sid, who="staff")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     require_area(user, student, DOC_AREA.get(d.get("category", "general"), "counsellor"))
     if d["state"] != "pending":
         raise ApiError(400, "Only uploaded documents waiting for review can be verified.")
@@ -796,7 +861,7 @@ async def verify_document(sid: str, doc_id: str, user: Staff):
 @router.post("/students/{sid}/documents/{doc_id}/reject")
 async def reject_document(sid: str, doc_id: str, body: RejectBody, user: Staff):
     student = await student_for(user, sid, who="staff")
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     require_area(user, student, DOC_AREA.get(d.get("category", "general"), "counsellor"))
     if d["state"] != "pending":
         raise ApiError(400, "Only uploaded documents waiting for review can be rejected.")
@@ -812,7 +877,7 @@ async def reject_document(sid: str, doc_id: str, body: RejectBody, user: Staff):
 @router.get("/students/{sid}/documents/{doc_id}/download-url")
 async def document_download_url(sid: str, doc_id: str, user: CurrentUser):
     await student_for(user, sid)
-    d = await _document(sid, doc_id)
+    d = await document_of(sid, doc_id)
     if not d.get("fileKey"):
         raise not_found("No file has been uploaded for this document.")
     if is_staff(user["role"]):

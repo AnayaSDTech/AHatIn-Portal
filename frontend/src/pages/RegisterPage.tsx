@@ -20,6 +20,8 @@ export function RegisterPage() {
   // Registration links from counsellors are no longer used: everyone registers here.
   const [params] = useSearchParams();
   const oldInviteLink = params.has('invite');
+  // From someone's referral link: they are credited when this person registers.
+  const referralCode = params.get('ref') ?? undefined;
 
   const {
     register,
@@ -34,7 +36,7 @@ export function RegisterPage() {
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
     try {
-      const result = await registerStudent({ name: data.name, email: data.email, mobile: `+91${data.mobile}`, password: data.password, consent: data.consent });
+      const result = await registerStudent({ name: data.name, email: data.email, mobile: `+91${data.mobile}`, password: data.password, consent: data.consent, ref: referralCode });
       setSent({ email: data.email, result });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -81,6 +83,11 @@ export function RegisterPage() {
         </>
       }
     >
+      {referralCode && (
+        <p role="status" className="mb-6 rounded-2xl bg-gold-50 p-4 text-sm text-navy-800" data-referred>
+          You've been referred to AHat. Create your free account to get started.
+        </p>
+      )}
       {oldInviteLink && (
         <p role="status" className="mb-6 rounded-2xl bg-sky-50 p-4 text-sm text-sky-900">
           Registration links are no longer needed. Fill in your details below to create your account.

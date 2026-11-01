@@ -4,7 +4,7 @@ import os
 from datetime import timedelta
 
 from app.config import get_settings
-from app.core.clock import today
+from app.core.clock import now, today
 from app.core.security import hash_password
 from app.db import get_db
 from app.services.scheduling import slots_for, working_dates
@@ -620,10 +620,10 @@ async def test_officer_handovers_and_access(make_api):
     assert "s2" in {s["id"] for s in (await admin.get("/admin/assignments")).json()["waitingVisa"]}
     assert (await admin.post("/students/s2/officer", {"kind": "visa", "officerId": "u7"})).status_code == 200
     assert (await counsellor.post("/students/s2/visa", {"stage": "documents_verified"})).status_code == 403
-    aditya = await make_api()
-    await aditya.staff_login("aditya.r@ahatin.example")
-    assert (await aditya.post("/students/s2/visa", {"stage": "documents_verified"})).status_code == 200
-    assert (await aditya.put("/students/s2/funding/estimated-cost", {"lakh": 20})).status_code == 403
+    sneha = await make_api()
+    await sneha.staff_login("sneha.p@ahatin.example")
+    assert (await sneha.post("/students/s2/visa", {"stage": "documents_verified"})).status_code == 200
+    assert (await sneha.put("/students/s2/funding/estimated-cost", {"lakh": 20})).status_code == 403
 
     # Students book each kind of session with the person who looks after it.
     student = await make_api()
@@ -723,7 +723,9 @@ async def test_staff_change_own_name(make_api):
     assert (await student.put("/staff/me/name", {"name": "Someone Else"})).status_code == 403
 
 
-async def test_full_student_journey(make_api, bucket):
+async def test_full_student_journey(make_api, bucket, monkeypatch):
+    # Officers assigned by the admin: what happens if the single officers aren't available.
+    monkeypatch.setattr(get_settings(), "auto_assign_officers", False)
     """One new student from registration to the final post-arrival check-in, through every hand-over.
     With JOURNEY_SNAPSHOTS set, the student's view at each step is saved there (to check the dashboard's status rules)."""
     import json
@@ -735,11 +737,11 @@ async def test_full_student_journey(make_api, bucket):
     student = await make_api()
     await student.register_student("Journey Tester", "journey@example.com", "9811188888")
     sid = (await student.get("/me/record")).json()["record"]["id"]
-    admin, priya, kavya, aditya = [await make_api() for _ in range(4)]
+    admin, priya, kavya, sneha = [await make_api() for _ in range(4)]
     await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
     await priya.staff_login()
     await kavya.staff_login("kavya.i@ahatin.example")
-    await aditya.staff_login("aditya.r@ahatin.example")
+    await sneha.staff_login("sneha.p@ahatin.example")
 
     async def snap(label):
         mine = (await student.get("/me/record")).json()
@@ -841,21 +843,21 @@ async def test_full_student_journey(make_api, bucket):
     assert (await kavya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 403
     assert (await priya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 403
     assert (await student.put(f"/students/{sid}/departure/tasks/flight", {"done": True})).status_code == 400  # not before the visa
-    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/visa", {"stage": "cas_received"})).status_code == 200
     await snap("CAS received")
-    rec = (await aditya.post(f"/students/{sid}/documents", {"name": "Visa photograph", "category": "visa"})).json()
+    rec = (await sneha.post(f"/students/{sid}/documents", {"name": "Visa photograph", "category": "visa"})).json()
     visa_doc = doc_named(rec, "Visa photograph")["id"]
     await upload(visa_doc)
     assert (await kavya.post(f"/students/{sid}/documents/{visa_doc}/verify")).status_code == 403
-    assert (await aditya.get(f"/students/{sid}/documents/{visa_doc}/download-url")).status_code == 200  # opened before verifying
-    assert (await aditya.post(f"/students/{sid}/documents/{visa_doc}/verify")).status_code == 200
+    assert (await sneha.get(f"/students/{sid}/documents/{visa_doc}/download-url")).status_code == 200  # opened before verifying
+    assert (await sneha.post(f"/students/{sid}/documents/{visa_doc}/verify")).status_code == 200
     for stage in ("documents_verified", "fees_paid"):
-        assert (await aditya.post(f"/students/{sid}/visa", {"stage": stage})).status_code == 200
-    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "submitted", "reference": "GWF012345678"})).status_code == 200
+        assert (await sneha.post(f"/students/{sid}/visa", {"stage": stage})).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/visa", {"stage": "submitted", "reference": "GWF012345678"})).status_code == 200
     rec = await snap("Visa submitted")
     assert rec["stage"] == "visa_filed" and await open_follow_up(f"visa:{sid}:submitted")
-    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "biometrics"})).status_code == 200
-    assert (await aditya.post(f"/students/{sid}/visa", {"stage": "granted"})).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/visa", {"stage": "biometrics"})).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/visa", {"stage": "granted"})).status_code == 200
     rec = await snap("Visa granted")
     assert rec["stage"] == "visa_granted" and not await open_follow_up(f"visa:{sid}:submitted")
     d3, slot3 = await _free_slot("u7")
@@ -868,12 +870,12 @@ async def test_full_student_journey(make_api, bucket):
     for key in tasks[:3]:
         assert (await student.put(f"/students/{sid}/departure/tasks/{key}", {"done": True})).status_code == 200
     await snap("Pre-departure half done")
-    assert (await aditya.post(f"/students/{sid}/departure/confirm")).status_code == 400  # tasks left
+    assert (await sneha.post(f"/students/{sid}/departure/confirm")).status_code == 400  # tasks left
     for key in tasks[3:]:
         assert (await student.put(f"/students/{sid}/departure/tasks/{key}", {"done": True})).status_code == 200
     await snap("Pre-departure tasks done")
     assert (await priya.post(f"/students/{sid}/departure/confirm")).status_code == 403
-    assert (await aditya.post(f"/students/{sid}/departure/confirm")).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/departure/confirm")).status_code == 200
     await snap("Ready to travel")
 
     # 7. Post-arrival Support: the student confirms arrival, the Visa Officer records the final check-in.
@@ -881,14 +883,14 @@ async def test_full_student_journey(make_api, bucket):
     rec = await snap("Arrived")
     assert rec["stage"] == "arrived"
     assert await db.follow_ups.find_one({"sourceEvent": f"arrival:{sid}", "counsellorId": "u7", "done": False})
-    assert (await aditya.post(f"/students/{sid}/final-check-in", {"note": "Settled in well, classes started."})).status_code == 200
+    assert (await sneha.post(f"/students/{sid}/final-check-in", {"note": "Settled in well, classes started."})).status_code == 200
     rec = await snap("Final check-in")
     assert rec["stage"] == "settled" and not await open_follow_up(f"arrival:{sid}")
 
     # Nothing is left waiting for the admin, and each person looking after the student can open the record.
     queue = (await admin.get("/admin/assignments")).json()
     assert sid not in {s["id"] for k in ("waiting", "waitingFinance", "waitingVisa") for s in queue[k]}
-    for api in (priya, kavya, aditya):
+    for api in (priya, kavya, sneha):
         assert sid in {s["id"] for s in (await api.get("/students")).json()}
 
     if path := os.environ.get("JOURNEY_SNAPSHOTS"):
@@ -978,6 +980,195 @@ async def test_profile_address_and_school_details(make_api):
     assert (p["state"], p["pincode"], p["sscBoard"], p["hscStream"], p["graduationYear"], p["degreeSubject"], p["addressLine2"]) == (
         "Maharashtra", "411001", "CBSE", "Science (PCM)", "2023", "Computer Science", "Near the station",
     )
+
+
+async def test_new_students_get_the_single_officers(make_api, monkeypatch):
+    student = await make_api()
+    await student.register_student("Nina Rao", "nina.rao@example.com", "9811133344")
+    sid = (await student.get("/me/record")).json()["record"]["id"]
+    # Not until the profile is complete.
+    assert (await get_db().students.find_one({"_id": sid})).get("financeOfficerId") is None
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    rec = await get_db().students.find_one({"_id": sid})
+    assert rec["financeOfficerId"] == "u6" and rec["visaOfficerId"] == "u7" and rec["counsellorId"]
+    assert [h["role"] for h in rec["officerHistory"]] == ["finance", "visa"]
+    # Each officer is told, and sees the student.
+    kavya = await make_api()
+    await kavya.staff_login("kavya.i@ahatin.example")
+    assert [n["kind"] for n in await _notes(kavya)] == ["assigned"]
+    assert (await kavya.get(f"/students/{sid}")).status_code == 200
+    # Saving the profile again changes nothing.
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    assert len((await get_db().students.find_one({"_id": sid}))["officerHistory"]) == 2
+
+    # If the officer can't be used, the student is left for the admin rather than given to someone else.
+    await get_db().users.update_one({"_id": "u6"}, {"$set": {"status": "deactivated"}})
+    other = await make_api()
+    await other.register_student("Rina Das", "rina.das@example.com", "9811133345")
+    assert (await other.put("/me/profile", PROFILE)).status_code == 200
+    rec = await get_db().students.find_one({"email": "rina.das@example.com"})
+    assert rec.get("financeOfficerId") is None and rec["visaOfficerId"] == "u7"
+
+
+async def _delegate_link(student, email="papa.rao@example.com", relation="Parent"):
+    r = await student.post("/me/delegates", {"name": "Papa Rao", "email": email, "relation": relation})
+    assert r.status_code == 200, r.text
+    return r.json()["id"], r.json()["demoLink"].rsplit("/", 1)[1]
+
+
+async def test_parent_can_only_upload_through_their_link(make_api, bucket):
+    student = await make_api()
+    await student.student_login()
+    delegate_id, token = await _delegate_link(student)
+    # Listed for the student, without the link itself.
+    [listed] = (await student.get("/me/delegates")).json()
+    assert listed["name"] == "Papa Rao" and "tokenHash" not in listed and "demoLink" not in listed
+    assert (await student.post("/me/delegates", {"name": "Papa Rao", "email": "papa.rao@example.com", "relation": "Parent"})).status_code == 409
+    assert (await student.post("/me/delegates", {"name": "Me Myself", "email": "demo.student@ahatin.example", "relation": "Parent"})).status_code == 400
+
+    parent = await make_api()  # no account
+    view = (await parent.get(f"/delegate-access/{token}")).json()
+    assert set(view) == {"studentName", "name", "expiresAt", "documents"} and view["studentName"] == "Ananya"
+    assert {d["state"] for d in view["documents"]} <= {"missing", "rejected"}
+    doc = next(d for d in view["documents"] if d["id"] == "d8")
+    assert set(doc) <= {"id", "name", "state", "reason"}
+
+    pdf = b"%PDF-1.4 sample" + b"." * 2048
+    up = await parent.post(f"/delegate-access/{token}/documents/d8/upload-url", {"fileName": "cv.pdf", "contentType": "application/pdf", "size": len(pdf)})
+    assert up.status_code == 200, up.text
+    bucket.put_url(up.json()["url"], pdf)
+    r = await parent.post(f"/delegate-access/{token}/documents/d8/upload-complete", {"uploadId": up.json()["uploadId"]})
+    assert r.status_code == 200 and r.json() == {"ok": True}
+
+    # It goes through the same review, and says who uploaded it.
+    priya = await make_api()
+    await priya.staff_login()
+    d8 = next(d for d in (await priya.get("/students/s1")).json()["documents"] if d["id"] == "d8")
+    assert d8["state"] == "pending" and d8["uploadedBy"] == "Papa Rao (Parent)"
+    assert "Papa Rao (Parent)" in next(n["text"] for n in await _notes(priya) if n["kind"] == "document")
+    assert not any(d["id"] == "d8" for d in (await parent.get(f"/delegate-access/{token}")).json()["documents"])
+    assert (await student.get("/me/delegates")).json()[0]["uploads"] == 1
+
+    # Nothing else is open to them: a document that isn't the student's, or anything needing an account.
+    assert (await parent.post(f"/delegate-access/{token}/documents/not-theirs/upload-url", {"fileName": "x.pdf", "contentType": "application/pdf", "size": 2048})).status_code == 404
+    for path in ("/students/s1", "/me/record", "/students/s1/documents/d8/download-url", "/messages"):
+        assert (await parent.get(path)).status_code == 401, path
+    assert (await parent.get("/delegate-access/wrong-token")).status_code == 404
+
+    # Cancelled or expired: the link stops working.
+    assert (await student.delete(f"/me/delegates/{delegate_id}")).status_code == 204
+    assert (await parent.get(f"/delegate-access/{token}")).status_code == 404
+    assert (await student.get("/me/delegates")).json() == []
+    _, token2 = await _delegate_link(student, "sponsor@example.com", "Sponsor")
+    await get_db().delegates.update_one({"email": "sponsor@example.com"}, {"$set": {"expiresAt": now() - timedelta(minutes=1)}})
+    assert (await parent.get(f"/delegate-access/{token2}")).status_code == 404
+
+    # Staff don't invite, and one student can't remove another's.
+    assert (await priya.get("/me/delegates")).status_code == 403
+    other_id, _ = await _delegate_link(student, "third@example.com", "Guardian")
+    fresh = await make_api()
+    await fresh.student_login("new.student@ahatin.example")
+    assert (await fresh.delete(f"/me/delegates/{other_id}")).status_code == 404
+
+
+async def test_referrals_track_people_through_the_journey(make_api):
+    student = await make_api()
+    await student.student_login()
+    mine = (await student.get("/referrals")).json()
+    assert mine["totals"]["referred"] == 0 and mine["link"].endswith(f"/register?ref={mine['code']}") and len(mine["code"]) == 8
+    assert (await student.get("/referrals")).json()["code"] == mine["code"]  # stays the same
+
+    r = await student.post("/referrals", {"name": "Riya Shah", "email": "riya.shah@example.com", "relation": "Friend"})
+    assert r.status_code == 200 and r.json()["status"] == "invited", r.text
+    assert (await student.post("/referrals", {"name": "Riya Shah", "email": "riya.shah@example.com", "relation": "Friend"})).status_code == 409
+    assert (await student.post("/referrals", {"name": "Priya Desai", "email": "demo.counsellor@ahatin.example", "relation": "Friend"})).status_code == 409
+    assert (await student.post("/referrals", {"name": "Me Myself", "email": "demo.student@ahatin.example", "relation": "Friend"})).status_code == 400
+    invite = await get_db().notifications.find_one({"to": "riya.shah@example.com"})
+    assert mine["link"] in invite["body"]
+
+    # Invited by email: counted even if they register without the link.
+    riya = await make_api()
+    await riya.register_student("Riya Shah", "riya.shah@example.com", "9811144401")
+    mine = (await student.get("/referrals")).json()
+    assert mine["totals"] == {"referred": 1, "registered": 1, "applied": 0, "accepted": 0} and mine["items"][0]["status"] == "registered"
+    assert (await riya.put("/me/profile", PROFILE)).status_code == 200
+    assert (await student.get("/referrals")).json()["items"][0]["status"] == "profile"
+    # The referrer sees progress only, not the person's email or record.
+    assert set(mine["items"][0]) <= {"id", "name", "relation", "source", "status", "at", "registeredAt"}
+    sid = (await riya.get("/me/record")).json()["record"]["id"]
+    await get_db().applications.insert_one({"_id": "app-r", "studentId": sid, "university": "Leeds", "course": "MSc", "state": "submitted"})
+    assert (await student.get("/referrals")).json()["items"][0]["status"] == "applied"
+    await get_db().applications.update_one({"_id": "app-r"}, {"$set": {"state": "accepted"}})
+    assert (await student.get("/referrals")).json()["totals"]["accepted"] == 1
+
+    # A counsellor's link: credited from the code, and they are told.
+    priya = await make_api()
+    await priya.staff_login()
+    code = (await priya.get("/referrals")).json()["code"]
+    viaapi = await make_api()
+    body = {"name": "Kabir Sen", "email": "kabir.sen@example.com", "mobile": "9811144402", "password": "Welcome123", "consent": True, "ref": code.lower()}
+    assert (await viaapi.post("/auth/register", body)).status_code == 200
+    theirs = (await priya.get("/referrals")).json()
+    assert [(i["name"], i["source"], i["status"]) for i in theirs["items"]] == [("Kabir Sen", "link", "registered")]
+    assert any("Kabir Sen registered" in n["title"] for n in await _notes(priya))
+    assert (await student.get("/referrals")).json()["totals"]["referred"] == 1  # not mixed up with anyone else's
+
+    # An unknown code is ignored; your own link doesn't count; officers have no referrals; the admin sees everyone's.
+    nobody = await make_api()
+    assert (await nobody.post("/auth/register", {**body, "email": "no.ref@example.com", "mobile": "9811144403", "ref": "NOPE"})).status_code == 200
+    assert await get_db().referrals.count_documents({"email": "no.ref@example.com"}) == 0
+    kavya = await make_api()
+    await kavya.staff_login("kavya.i@ahatin.example")
+    assert (await kavya.get("/referrals")).status_code == 403
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    everyone = (await admin.get("/referrals")).json()
+    assert {i["referrer"] for i in everyone["items"]} == {"Ananya Sharma", "Priya Desai"}
+
+
+async def test_counsellor_can_edit_and_delete_suggested_scholarships(make_api):
+    student = await make_api()
+    await student.student_login()
+    priya, kavya = await make_api(), await make_api()
+    await priya.staff_login()
+    await kavya.staff_login("kavya.i@ahatin.example")
+    await get_db().students.update_one({"_id": "s1"}, {"$set": {"financeOfficerId": "u6"}})
+    r = await kavya.post("/students/s1/funding/scholarships", {"name": "Chevening", "amount": "Full tuition", "deadline": "2027-02-01"})
+    assert r.status_code == 200, r.text
+    sch = r.json()["journey"]["funding"]["scholarships"][-1]
+    await kavya.post("/staff/notifications/read-all")
+    base = f"/students/s1/funding/scholarships/{sch['id']}"
+    changed = {"name": "Chevening Award", "amount": "Full tuition fees and a generous annual living grant", "deadline": "2027-03-01"}
+
+    # The counsellor can correct it, though the officer has the rest of the stage.
+    assert (await priya.put("/students/s1/funding/estimated-cost", {"lakh": 20})).status_code == 403
+    assert (await priya.post("/students/s1/funding/scholarships", changed)).status_code == 403
+    assert (await priya.patch(base, {"status": "awarded"})).status_code == 403
+    r = await priya.put(base, changed)
+    assert r.status_code == 200, r.text
+    saved = r.json()["journey"]["funding"]["scholarships"][-1]
+    assert saved == {**sch, **changed}  # the id and status stay
+    assert (await priya.put(base, {**changed, "name": "x"})).status_code == 422
+    # The officer is told, and the student is emailed.
+    assert any("Scholarship updated" in n["title"] for n in await _notes(kavya))
+    assert await get_db().notifications.find_one({"to": "demo.student@ahatin.example", "subject": "Scholarship updated"})
+
+    # Not the student, and not a counsellor who can't see them.
+    assert (await student.put(base, changed)).status_code == 403
+    assert (await student.delete(base)).status_code == 403
+    assert (await kavya.put(base, {**changed, "amount": "£25,000"})).status_code == 200
+    visa = await make_api()
+    await visa.staff_login("sneha.p@ahatin.example")
+    await get_db().students.update_one({"_id": "s1"}, {"$set": {"visaOfficerId": "u7"}})
+    assert (await visa.delete(base)).status_code == 403
+    neha = await make_api()
+    await neha.staff_login("neha.j@ahatin.example")
+    assert (await neha.delete(base)).status_code == 404
+
+    r = await priya.delete(base)
+    assert r.status_code == 200, r.text
+    assert sch["id"] not in {s["id"] for s in r.json()["journey"]["funding"]["scholarships"]}
+    assert (await priya.delete(base)).status_code == 404
 
 
 async def test_english_score_report_is_only_on_request(make_api):

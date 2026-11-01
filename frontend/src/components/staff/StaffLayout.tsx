@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Building2, CalendarCheck, CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserCheck, UserCog, UserRoundPen, Users, UsersRound } from 'lucide-react';
+import { Building2, CalendarCheck, CalendarDays, Gift, LayoutDashboard, LogOut, Menu, Settings, UserCheck, UserCog, UserRoundPen, Users, UsersRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +30,7 @@ const counsellorNav: NavItem[] = [
   { to: '/staff/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/staff/leads', label: 'Leads', icon: UsersRound },
   { to: '/staff/students', label: 'Students', icon: Users },
+  { to: '/staff/referrals', label: 'Referrals', icon: Gift, more: true },
   // The counsellor's matching profile (countries, subjects, capacity), used to suggest them for new students.
   { to: '/staff/profile', label: 'My profile', short: 'Profile', icon: UserRoundPen },
 ];
@@ -47,6 +48,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/users', label: 'Staff users', icon: UserCog, more: true },
   { to: '/admin/agencies', label: 'Partner agencies', icon: Building2, more: true },
   { to: '/admin/settings', label: 'Settings', icon: Settings, more: true },
+  { to: '/staff/referrals', label: 'Referrals', icon: Gift, more: true },
   { to: '/staff/schedule', label: 'Schedule', icon: CalendarDays, more: true },
   { to: '/staff/leads', label: 'Leads', icon: UsersRound },
   { to: '/staff/students', label: 'Students', icon: Users },

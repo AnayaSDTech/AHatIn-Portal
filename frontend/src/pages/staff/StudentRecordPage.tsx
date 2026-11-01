@@ -297,7 +297,7 @@ export function StudentRecordPage() {
                         {categoryLabel[d.category] && <span className="ml-2 rounded-full bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">{categoryLabel[d.category]}</span>}
                       </p>
                       <p className="text-xs text-navy-500">
-                        {d.state === 'missing' ? 'Waiting for the student to upload' : `Uploaded ${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}${d.fileName ? ` · ${d.fileName}` : ''}`}
+                        {d.state === 'missing' ? 'Waiting for the student to upload' : `Uploaded ${d.uploadedBy ? `by ${d.uploadedBy} ` : ''}${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}${d.fileName ? ` · ${d.fileName}` : ''}`}
                         {d.reason && <span className="text-red-600"> · {d.reason}</span>}
                       </p>
                       {d.state === 'pending' && canEditDoc(d.category) && !hasOpened(d) && (

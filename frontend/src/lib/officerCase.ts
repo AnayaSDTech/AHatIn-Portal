@@ -1,5 +1,5 @@
 import { PiggyBank, Plane, type LucideIcon } from 'lucide-react';
-import { DEPARTURE_TASKS, VISA_PATH, visaStageLabel } from './journey';
+import { DEPARTURE_TASKS, VISA_PATH, fundingComplete, offerAccepted, visaStageLabel } from './journey';
 import type { StaffStudent } from '../data/staff';
 
 /*
@@ -38,12 +38,14 @@ export interface OfficerCase {
 
 export const CASE_GROUPS: Record<OfficerArea, { value: string; label: string }[]> = {
   finance: [
+    { value: 'upcoming', label: 'Upcoming' },
     { value: 'setup', label: 'To set up' },
     { value: 'planning', label: 'Planning' },
     { value: 'proof', label: 'Proof of funds' },
     { value: 'done', label: 'Complete' },
   ],
   visa: [
+    { value: 'upcoming', label: 'Upcoming' },
     { value: 'visa', label: 'Visa' },
     { value: 'departure', label: 'Pre-departure' },
     { value: 'abroad', label: 'Abroad' },
@@ -75,6 +77,10 @@ function financeCase(s: StaffStudent): OfficerCase {
     return { ...base, phase: 'Complete', group: 'done', tone: 'green', next: s.visaOfficerId ? 'Handed over to the Visa Officer' : 'Waiting for a Visa Officer to be assigned', urgency: 0, progress: 1 };
   }
   if (toVerify) return { ...base, phase: 'Proof of funds', group: 'proof', tone: 'amber', next: `Verify ${plural(toVerify, 'document')}`, urgency: 2, progress: 0.75 };
+  // Every new student has their officer from the start; nothing is needed until funding is reached.
+  if (!offerAccepted(s) && !cost && !f.sources.length && !f.scholarships.length) {
+    return { ...base, detail: undefined, phase: 'Upcoming', group: 'upcoming', tone: 'grey', next: 'Starts once the student accepts an offer', urgency: 0, progress: 0 };
+  }
   if (!cost) return { ...base, phase: 'To set up', group: 'setup', tone: 'grey', next: 'Set the estimated cost of study', urgency: 2, progress: 0 };
   if (covered < cost) {
     return {
@@ -129,6 +135,9 @@ function visaCase(s: StaffStudent): OfficerCase {
     };
   }
   const v = j.visa;
+  if (!v && !fundingComplete(s) && !verifyNext) {
+    return { phase: 'Upcoming', group: 'upcoming', tone: 'grey', next: offerAccepted(s) ? 'Starts once funding is complete' : 'Starts once the student accepts an offer', urgency: 0, progress: 0, toVerify };
+  }
   if (!v) {
     return { phase: 'Visa', group: 'visa', tone: 'grey', ...(verifyNext ?? { next: 'Record the CAS or admission letter', urgency: 2 as const }), detail: 'Not started', progress: 0, toVerify };
   }

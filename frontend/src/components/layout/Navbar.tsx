@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
+import { ChevronDown, Globe, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
 import { ButtonLink, Button } from '../ui/Button';
@@ -34,6 +34,8 @@ export function Navbar() {
   }, [menu]);
 
   const isHome = pathname === '/';
+  // In the student's dashboard the header holds their sections (placed here by StudentLayout), not the website's links.
+  const inDashboard = !!user && !isStaff(user.role) && pathname.startsWith('/dashboard');
   const transparent = isHome && !scrolled && !open;
 
   useEffect(() => {
@@ -78,17 +80,21 @@ export function Navbar() {
       <Container className="flex items-center justify-between gap-6">
         <Logo light={transparent} />
 
-        <nav className="hidden items-center gap-8 lg:flex" aria-label="Main">
-          {navLinks.map((l) => (
-            <Link
-              key={l.href}
-              to={`/${l.href}`}
-              className={cn('link-underline text-sm font-medium transition', transparent ? 'text-white/90 hover:text-white' : 'text-navy-700 hover:text-navy-950')}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        {inDashboard ? (
+          <div id="dashboard-nav" className="hidden min-w-0 flex-1 justify-center xl:flex" />
+        ) : (
+          <nav className="hidden items-center gap-8 lg:flex" aria-label="Main">
+            {navLinks.map((l) => (
+              <Link
+                key={l.href}
+                to={`/${l.href}`}
+                className={cn('link-underline text-sm font-medium transition', transparent ? 'text-white/90 hover:text-white' : 'text-navy-700 hover:text-navy-950')}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         <div className="hidden items-center gap-3 lg:flex">
           {user ? (
@@ -115,9 +121,20 @@ export function Navbar() {
                     <p className="truncate text-xs text-navy-500">{user.email}</p>
                   </div>
                   <div className="p-1.5">
-                    <Link role="menuitem" to={homeFor(user.role)} onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
-                      <LayoutDashboard className="h-4 w-4 text-navy-500" aria-hidden /> {isStaff(user.role) ? 'Staff portal' : 'My dashboard'}
-                    </Link>
+                    {inDashboard ? (
+                      <>
+                        <Link role="menuitem" to="/dashboard/profile" onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory" data-menu-profile>
+                          <UserRound className="h-4 w-4 text-navy-500" aria-hidden /> My profile
+                        </Link>
+                        <Link role="menuitem" to="/" onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
+                          <Globe className="h-4 w-4 text-navy-500" aria-hidden /> Back to website
+                        </Link>
+                      </>
+                    ) : (
+                      <Link role="menuitem" to={homeFor(user.role)} onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
+                        <LayoutDashboard className="h-4 w-4 text-navy-500" aria-hidden /> {isStaff(user.role) ? 'Staff portal' : 'My dashboard'}
+                      </Link>
+                    )}
                     <button role="menuitem" type="button" onClick={handleLogout} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium hover:bg-ivory">
                       <LogOut className="h-4 w-4 text-navy-500" aria-hidden /> Log out
                     </button>

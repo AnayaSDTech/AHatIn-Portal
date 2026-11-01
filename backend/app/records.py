@@ -22,6 +22,8 @@ def serialize_document(d: dict) -> dict:
         out["uploadedAt"] = iso_or(d["uploadedAt"])
     if d.get("fileName"):
         out["fileName"] = d["fileName"]
+    if d.get("uploadedBy"):
+        out["uploadedBy"] = d["uploadedBy"]
     if d.get("reason"):
         out["reason"] = d["reason"]
     # Staff who have opened the current file (a document is verified only after being opened).

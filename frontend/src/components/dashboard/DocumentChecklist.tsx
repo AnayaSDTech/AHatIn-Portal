@@ -21,6 +21,15 @@ const ALLOWED = ['application/pdf', 'image/jpeg', 'image/png'];
 const MIN_BYTES = 1024;
 const MAX_BYTES = 300 * 1024;
 
+/** Why a file can't be uploaded, if it can't. */
+export function uploadProblem(file: File) {
+  if (!ALLOWED.includes(file.type)) return 'Please upload a PDF, JPG or PNG file.';
+  if (file.size < MIN_BYTES || file.size > MAX_BYTES) {
+    return `Files must be between 1 KB and 300 KB. “${file.name}” is ${Math.round(file.size / 1024)} KB${file.size > MAX_BYTES ? ': try compressing it or scanning at a lower resolution.' : '.'}`;
+  }
+  return null;
+}
+
 type Filter = 'all' | 'action' | 'verified';
 
 interface Props {
@@ -49,13 +58,9 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
   const onFile = (file: File | undefined) => {
     const id = targetId.current;
     if (!file || !id) return;
-    if (!ALLOWED.includes(file.type)) {
-      setMessage({ tone: 'error', text: 'Please upload a PDF, JPG or PNG file.' });
-    } else if (file.size < MIN_BYTES || file.size > MAX_BYTES) {
-      setMessage({
-        tone: 'error',
-        text: `Files must be between 1 KB and 300 KB. “${file.name}” is ${Math.round(file.size / 1024)} KB${file.size > MAX_BYTES ? ': try compressing it or scanning at a lower resolution.' : '.'}`,
-      });
+    const problem = uploadProblem(file);
+    if (problem) {
+      setMessage({ tone: 'error', text: problem });
     } else {
       // Uploaded to secure storage and checked (file type and virus scan) before the counsellor sees it.
       setMessage({ tone: 'ok', text: `Uploading “${file.name}”…` });
@@ -99,7 +104,7 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
         </p>
       )}
 
-      <p className="mt-4 text-xs text-navy-500">PDF, JPG or PNG · 1–300 KB</p>
+      <p className="mt-4 text-xs text-navy-500">PDF, JPG or PNG · Maximum file size: 300 KB</p>
 
       <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
 
@@ -108,7 +113,7 @@ export function DocumentChecklist({ documents: docs, onUpload, onRemove }: Props
           const m = meta[d.state];
           const Icon = m.icon;
           const canUpload = d.state === 'missing' || d.state === 'rejected';
-          const note = d.state === 'rejected' ? d.reason : d.state === 'pending' ? `${d.fileName ? `“${d.fileName}” · ` : ''}uploaded ${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}` : undefined;
+          const note = d.state === 'rejected' ? d.reason : d.state === 'pending' ? `${d.fileName ? `“${d.fileName}” · ` : ''}uploaded ${d.uploadedBy ? `by ${d.uploadedBy} ` : ''}${d.uploadedAt ? relativeTime(d.uploadedAt) : ''}` : undefined;
           const tag = categoryLabel[d.category];
           return (
             <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5" data-doc={d.name}>

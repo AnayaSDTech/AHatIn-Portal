@@ -345,9 +345,9 @@ export function FundingCard({ student, actions, notNeeded }: { student: StaffStu
 
 /* ------------------------------ Visa ------------------------------ */
 
-export function VisaCard({ student }: { student: StaffStudent }) {
+export function VisaCard({ student, waiting = false }: { student: StaffStudent; /** The stage has started, but there's no visa step yet. */ waiting?: boolean }) {
   const v = student.journey.visa;
-  if (!v && student.visaOfficerId) {
+  if (!v && waiting) {
     return (
       <Panel id="visa" title="Visa" icon={<Stamp className="h-4 w-4" aria-hidden />} action={<Pill tone="blue">In progress</Pill>}>
         <p className="text-sm text-navy-600" data-visa-waiting>
