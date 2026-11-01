@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from app.domain import APP_LABELS, DEPARTURE_TASKS, DOC_CATEGORIES, GENDERS, INDIAN_STATES, MAX_COURSES, SCHOLARSHIP_STATUSES, SESSION_TYPES, STAGES
+from app.domain import APP_LABELS, DEPARTURE_TASKS, DOC_CATEGORIES, GENDERS, INDIAN_STATES, MAX_COURSES, SCHOLARSHIP_STATUSES, SERVICE_TITLES, SESSION_TYPES, STAGES
 
 NAME_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ .'-])*$", re.UNICODE)
 HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -518,12 +518,21 @@ class ScholarshipStatusBody(Body):
 class DocumentRequestBody(Body):
     name: str = Field(min_length=3, max_length=150)
     category: str = "general"
+    # The stage of the journey it was requested in: the student gets an upload button there.
+    stage: str | None = None
 
     @field_validator("category")
     @classmethod
     def known(cls, v: str) -> str:
         if v not in DOC_CATEGORIES:
             raise ValueError("Unknown category.")
+        return v
+
+    @field_validator("stage")
+    @classmethod
+    def known_stage(cls, v: str | None) -> str | None:
+        if v and v not in SERVICE_TITLES:
+            raise ValueError("Unknown stage.")
         return v
 
 

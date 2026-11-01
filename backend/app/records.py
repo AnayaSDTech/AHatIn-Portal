@@ -2,7 +2,7 @@
 
 from app.core.clock import iso, now
 from app.db import get_db, new_id
-from app.domain import stage_index
+from app.domain import DOC_STAGE, stage_index
 
 
 def _clean(d: dict, drop: tuple[str, ...] = ()) -> dict:
@@ -24,6 +24,9 @@ def serialize_document(d: dict) -> dict:
         out["fileName"] = d["fileName"]
     if d.get("uploadedBy"):
         out["uploadedBy"] = d["uploadedBy"]
+    # Requested by staff (the starter documents aren't): the stage it belongs to. Older requests go by their category.
+    if d.get("requestedBy"):
+        out["requestedStage"] = d.get("requestedStage") or DOC_STAGE.get(d.get("category", "general"), "S3")
     if d.get("reason"):
         out["reason"] = d["reason"]
     # Staff who have opened the current file (a document is verified only after being opened).

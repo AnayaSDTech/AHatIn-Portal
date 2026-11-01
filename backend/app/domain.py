@@ -96,6 +96,8 @@ AREA_OF_ROLE = {"finance_officer": "finance", "visa_officer": "visa"}
 OFFICER_TITLE = {"finance": "Financial Aid Officer", "visa": "Visa Officer"}
 # Documents and sessions belong to the person looking after their service.
 DOC_AREA = {"general": "counsellor", "funds": "finance", "visa": "visa"}
+# The stage a requested document belongs to when the request doesn't name one.
+DOC_STAGE = {"general": "S3", "funds": "S4", "visa": "S5"}
 SESSION_AREA = {"Scholarship & funding": "finance", "Visa preparation": "visa", "Pre-departure briefing": "visa", "Post-arrival check-in": "visa"}
 SERVICE_STATUS_LABELS = {"not_started": "Not started", "in_progress": "In progress", "completed": "Completed", "not_needed": "Not needed"}
 

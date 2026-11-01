@@ -22,6 +22,7 @@ from app.domain import (
     APP_TRANSITIONS,
     DEPARTURE_TASKS,
     DOC_AREA,
+    DOC_STAGE,
     OFFICER_ROLE,
     OFFICER_TITLE,
     OFFER_STATES,
@@ -716,7 +717,9 @@ async def document_of(sid: str, doc_id: str) -> dict:
 async def request_document(sid: str, body: DocumentRequestBody, user: Staff):
     student = await student_for(user, sid, who="staff")
     require_area(user, student, DOC_AREA.get(body.category, "counsellor"))
-    await get_db().documents.insert_one({"_id": new_id(), "studentId": sid, "name": body.name, "state": "missing", "category": body.category, "createdAt": now(), "requestedBy": user["name"]})
+    await get_db().documents.insert_one(
+        {"_id": new_id(), "studentId": sid, "name": body.name, "state": "missing", "category": body.category, "createdAt": now(), "requestedBy": user["name"], "requestedStage": body.stage or DOC_STAGE[body.category]}
+    )
     await add_note(sid, user["name"], f"Requested document: {body.name}.")
     await notify.email_student(student, f"Please upload: {body.name}", f"{user['name']} asked you to upload: {body.name}.", dedupe_key=None)
     return await load_student(sid)
@@ -865,6 +868,8 @@ async def reject_document(sid: str, doc_id: str, body: RejectBody, user: Staff):
     require_area(user, student, DOC_AREA.get(d.get("category", "general"), "counsellor"))
     if d["state"] != "pending":
         raise ApiError(400, "Only uploaded documents waiting for review can be rejected.")
+    if user["_id"] not in (d.get("viewedBy") or []):
+        raise ApiError(400, "Open the document and check it before rejecting it.")
     await get_db().documents.update_one({"_id": doc_id}, {"$set": {"state": "rejected", "reason": body.reason, "rejectedAt": now(), "rejectedBy": user["_id"]}})
     await close_follow_ups(f"doc:{doc_id}:")
     await notify.clear_alerts(f"doc:{doc_id}")
@@ -881,7 +886,7 @@ async def document_download_url(sid: str, doc_id: str, user: CurrentUser):
     if not d.get("fileKey"):
         raise not_found("No file has been uploaded for this document.")
     if is_staff(user["role"]):
-        # Remembered so the document can be verified (only by someone who has opened it).
+        # Remembered so the document can be verified or rejected (only by someone who has opened it).
         await get_db().documents.update_one({"_id": doc_id, "fileKey": d["fileKey"]}, {"$addToSet": {"viewedBy": user["_id"]}})
     await audit(user, "document.viewed", "documents", doc_id)
     return {"url": storage.download_url(d["fileKey"], d.get("contentType", "application/octet-stream"), d.get("fileName", "document"))}

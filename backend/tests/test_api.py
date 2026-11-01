@@ -177,6 +177,10 @@ async def test_document_upload_review_cycle(make_api, bucket):
     await staff.staff_login()
     url = (await staff.get("/students/s1/documents/d8/download-url")).json()["url"]
     assert bucket.get_url(url) == pdf
+    other = await make_api()
+    await other.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    r = await other.post("/students/s1/documents/d8/reject", {"reason": "Please add your latest job"})
+    assert r.status_code == 400 and "Open the document" in r.json()["detail"]  # only someone who has opened it
     r = await staff.post("/students/s1/documents/d8/reject", {"reason": "Please add your latest job"})
     assert r.status_code == 200
     assert not await get_db().follow_ups.find_one({"personId": "s1", "action": "Verify uploaded document: Updated CV", "done": False})
@@ -1171,6 +1175,21 @@ async def test_counsellor_can_edit_and_delete_suggested_scholarships(make_api):
     assert (await priya.delete(base)).status_code == 404
 
 
+async def test_a_requested_document_remembers_its_stage(make_api):
+    staff = await make_api()
+    await staff.staff_login()
+    doc = lambda rec, name: next(d for d in rec["documents"] if d["name"] == name)  # noqa: E731
+    rec = (await staff.post("/students/s1/documents", {"name": "Work experience letter", "category": "general", "stage": "S1"})).json()
+    assert doc(rec, "Work experience letter")["requestedStage"] == "S1"
+    # Without one it goes by the part of the checklist.
+    rec = (await staff.post("/students/s1/documents", {"name": "TB test certificate", "category": "visa"})).json()
+    assert doc(rec, "TB test certificate")["requestedStage"] == "S5"
+    assert (await staff.post("/students/s1/documents", {"name": "Bad stage", "stage": "S2"})).status_code == 422
+    # The starter documents weren't requested at any stage.
+    await staff.get("/students/s1")
+    assert "requestedStage" not in doc(rec, "Updated CV")
+
+
 async def test_english_score_report_is_only_on_request(make_api):
     student = await make_api()
     await student.register_student("Nina Rao", "nina.rao@example.com", "9811133344")
@@ -1315,6 +1334,7 @@ async def test_staff_notifications(make_api, bucket):
     assert (await student.post("/students/s1/documents/d8/upload-complete", {"uploadId": up["uploadId"]})).status_code == 200
     [upload] = await _notes(priya)
     assert upload["kind"] == "document"
+    assert (await priya.get("/students/s1/documents/d8/download-url")).status_code == 200  # opened before rejecting
     assert (await priya.post("/students/s1/documents/d8/reject", {"reason": "Please send a clearer copy"})).status_code == 200
     assert await _notes(priya) == []
 
