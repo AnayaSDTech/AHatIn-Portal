@@ -172,6 +172,21 @@ class EnquiryBody(EmailBody):
         return v
 
 
+# ---------------------------------------------------------------- Feedback Mode (temporary)
+
+
+class FeedbackEditBody(Body):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class FeedbackBody(Body):
+    text: str = Field(min_length=1, max_length=1000)
+    path: str = Field(min_length=1, max_length=300)
+    x: float = Field(ge=0, le=20000)
+    y: float = Field(ge=0, le=100000)
+    viewportWidth: float = Field(gt=0, le=20000)
+
+
 # ---------------------------------------------------------------- inviting someone
 
 DELEGATE_RELATIONS = ["Parent", "Guardian", "Sponsor", "Other"]

@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     mail_from: str = "AHat <no-reply@ahat.example>"
     admin_alert_emails: str = ""
 
+    feedback_mode: bool = False
+
     # The single Financial Aid Officer and Visa Officer given to every new student once their profile is complete.
     # If either is missing or inactive, the admin assigns one from the Assignments page instead.
     auto_assign_officers: bool = True
@@ -93,6 +95,11 @@ class Settings(BaseSettings):
     def show_demo_codes(self, email: str) -> bool:
         """Development: everyone. Elsewhere, with DEMO_LOGINS on, only the demo accounts."""
         return self.expose_dev_codes or (self.demo_logins and email.lower().endswith("@" + self.demo_email_domain))
+
+    @property
+    def feedback_enabled(self) -> bool:
+        """Temporary Feedback Mode: on in development, elsewhere only with FEEDBACK_MODE=true."""
+        return self.is_dev or self.feedback_mode
 
     @property
     def can_send_email(self) -> bool:

@@ -16,7 +16,7 @@ from app.config import get_settings
 from app.core import errors
 from app.core.auth import csrf_middleware
 from app.db import client, ensure_indexes
-from app.routers import admin, auth, delegates, messages, public, referrals, schedule, staff, students
+from app.routers import admin, auth, delegates, feedback, messages, public, referrals, schedule, staff, students
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -74,7 +74,7 @@ if settings.allowed_origins:
     )
 
 api = APIRouter(prefix="/api/v1")
-for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router):
+for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router, feedback.router):
     api.include_router(r)
 app.include_router(api)
 

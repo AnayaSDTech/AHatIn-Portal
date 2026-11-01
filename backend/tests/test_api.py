@@ -1190,6 +1190,66 @@ async def test_a_requested_document_remembers_its_stage(make_api):
     assert "requestedStage" not in doc(rec, "Updated CV")
 
 
+async def test_feedback_mode(make_api, monkeypatch):
+    guest = await make_api()
+    pin = {"text": "This button is confusing", "path": "/login", "x": 120.5, "y": 2400, "viewportWidth": 1280}
+    r = await guest.post("/feedback", pin)
+    assert r.status_code == 200 and r.json()["by"] == "Guest", r.text
+    student = await make_api()
+    await student.student_login()
+    r = await student.post("/feedback", {**pin, "path": "/dashboard"})
+    assert r.json()["by"] == "Ananya Sharma"
+
+    # Saved, and fetched per page.
+    assert [c["text"] for c in (await guest.get("/feedback", params={"path": "/login"})).json()] == [pin["text"]]
+    assert (await guest.get("/feedback", params={"path": "/dashboard"})).json()[0]["x"] == 120.5
+    assert (await guest.get("/feedback", params={"path": "/nowhere"})).json() == []
+    assert len((await guest.get("/feedback")).json()) == 2
+
+    # Secret links and query strings aren't kept, even if they are sent.
+    r = await guest.post("/feedback", {**pin, "path": "/upload/secret-token-123"})
+    assert r.json()["path"] == "/upload/(private link)"
+    r = await guest.post("/feedback", {**pin, "path": "/staff/setup/secret-token-456?a=1"})
+    assert r.json()["path"] == "/staff/setup/(private link)"
+    r = await guest.post("/feedback", {**pin, "path": "/register?ref=ABC#top"})
+    assert r.json()["path"] == "/register"
+    stored = await get_db().feedback.find({}).to_list(None)
+    assert not any("secret-token" in c["path"] for c in stored)
+
+    for bad in ({"text": ""}, {"text": "x" * 1001}, {"x": -1}, {"viewportWidth": 0}):
+        assert (await guest.post("/feedback", {**pin, **bad})).status_code == 422, bad
+
+    # Off outside development, unless switched on.
+    monkeypatch.setattr(get_settings(), "app_env", "production")
+    monkeypatch.setattr(get_settings(), "feedback_mode", False)
+    assert (await guest.get("/feedback")).status_code == 404
+    assert (await guest.post("/feedback", pin)).status_code == 404
+    monkeypatch.setattr(get_settings(), "feedback_mode", True)
+    assert (await guest.get("/feedback")).status_code == 200
+
+    # If switched on live: the author or staff can change a comment, and nobody else.
+    mine = next(c for c in (await student.get("/feedback", params={"path": "/dashboard"})).json())
+    theirs = next(c for c in (await student.get("/feedback", params={"path": "/login"})).json())
+    assert mine["canChange"] is True and theirs["canChange"] is False
+    other = await make_api()
+    await other.student_login("new.student@ahatin.example")
+    for api in (guest, other):
+        assert (await api.put(f"/feedback/{mine['id']}", {"text": "Changed"})).status_code == 403
+        assert (await api.delete(f"/feedback/{mine['id']}")).status_code == 403
+    r = await student.put(f"/feedback/{mine['id']}", {"text": "Changed by me"})
+    assert r.status_code == 200 and r.json()["text"] == "Changed by me"
+    assert (await student.put(f"/feedback/{mine['id']}", {"text": ""})).status_code == 422
+    assert (await student.delete(f"/feedback/{mine['id']}")).status_code == 204
+    assert (await student.delete(f"/feedback/{mine['id']}")).status_code == 404
+    staff = await make_api()
+    await staff.staff_login()
+    assert (await staff.delete(f"/feedback/{theirs['id']}")).status_code == 204
+
+    # Off again: no changes either.
+    monkeypatch.setattr(get_settings(), "feedback_mode", False)
+    assert (await staff.delete("/feedback/anything")).status_code == 404
+
+
 async def test_english_score_report_is_only_on_request(make_api):
     student = await make_api()
     await student.register_student("Nina Rao", "nina.rao@example.com", "9811133344")
