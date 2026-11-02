@@ -66,6 +66,14 @@ async def alert_staff(user_id: str | None, title: str, text: str, *, path: str =
         await alerts.insert_one({"_id": new_id(), "userId": user_id, **doc})
 
 
+async def alert_student(student_id: str, title: str, text: str = "", *, target: str = "progress", kind: str = "update") -> None:
+    """Adds to the student's Updates on their Overview, until they open it or mark it as read. `target` is the part of
+    their dashboard it opens. Separate from any email about the same thing."""
+    await get_db().student_alerts.insert_one(
+        {"_id": new_id(), "studentId": student_id, "title": title, "text": " ".join(text.split())[:300], "target": target, "kind": kind, "createdAt": now()}
+    )
+
+
 async def clear_alerts(key: str) -> None:
     """The thing a notification was about has been dealt with, so it no longer needs reading."""
     await get_db().staff_alerts.delete_many({"key": key})

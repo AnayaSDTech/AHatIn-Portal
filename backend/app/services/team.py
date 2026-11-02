@@ -130,6 +130,7 @@ async def assign_officer(student: dict, area: str, officer: dict, by: dict, reas
         await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": previous}, {"$set": {"counsellorId": officer["_id"]}})
         await db.staff_alerts.delete_many({"userId": previous, "studentId": sid})
     await add_note(sid, by["name"], f"{'Changed' if previous else 'Assigned'} {title}: {officer['name']}. {reason}")
+    await notify.alert_student(sid, f"{officer['name']} is your {title}", target="counsellor", kind="team")
     first = officer["name"].split(" ")[0]
     what = "scholarships, your funding plan and proof of funds" if area == "finance" else "your visa, getting ready to travel and settling in after you arrive"
     await notify.email_counsellor(

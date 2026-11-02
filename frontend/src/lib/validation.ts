@@ -166,7 +166,6 @@ export const profileSchema = z
       .max(3),
     destination: z.string().min(1, 'Choose a destination.'),
     intake: z.string().min(1, 'Choose an intake.'),
-    budget: z.string().min(1, 'Choose a budget range.'),
   })
   .superRefine((d, ctx) => {
     const need = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });

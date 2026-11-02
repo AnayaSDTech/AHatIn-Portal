@@ -1,10 +1,12 @@
-import { Bell, BellRing, CalendarClock, FileUp, FileWarning, ListChecks, Mail, MapPin, MessageSquare, PartyPopper, PiggyBank, UserRound } from 'lucide-react';
+import { Bell, BellRing, CalendarClock, Check, FileUp, FileWarning, ListChecks, Mail, MapPin, MessageSquare, PartyPopper, PiggyBank, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isProfileComplete, type StudentProfile } from '../../data/dashboard';
 import { appStateLabel, type ApplicationUpdate, type Message, type StaffStudent } from '../../data/staff';
+import { api } from '../../lib/api/client';
+import { act, useApi } from '../../lib/api/store';
 import type { Session } from '../../lib/scheduling';
 import { DEPARTURE_TASKS, type ServiceView } from '../../lib/journey';
-import { cn, daysUntil, goToSection as goTo } from '../../lib/utils';
+import { cn, daysUntil, goToSection as goTo, relativeTime } from '../../lib/utils';
 
 interface Item {
   key: string;
@@ -94,7 +96,34 @@ export function buildNotifications(
   return items.sort((a, b) => a.rank - b.rank);
 }
 
+export interface StudentUpdate {
+  id: string;
+  title: string;
+  text: string;
+  target: string;
+  kind: string;
+  at: string;
+}
+
+const updateIcon: Record<string, LucideIcon> = {
+  team: UserRound,
+  session: CalendarClock,
+  plan: ListChecks,
+  shortlist: ListChecks,
+  application: Mail,
+  funding: PiggyBank,
+  document: FileUp,
+  visa: BellRing,
+  travel: MapPin,
+  profile: UserRound,
+};
+
+const NO_UPDATES: StudentUpdate[] = [];
+
 export function NotificationsCard({ items, onOpenProfile, onGo = goTo }: { items: Item[]; onOpenProfile: () => void; /** Opens the section an item points to. */ onGo?: (target: string) => void }) {
+  const [updates] = useApi<StudentUpdate[]>('/me/updates', NO_UPDATES, { pollMs: 30_000 });
+  const read = (id: string) => act(() => api.post(`/me/updates/${id}/read`));
+  const total = items.length + updates.length;
   const urgent = items.filter((i) => i.urgent).length;
   return (
     <section id="notifications" className="card overflow-hidden" aria-labelledby="notifications-title">
@@ -102,23 +131,71 @@ export function NotificationsCard({ items, onOpenProfile, onGo = goTo }: { items
         <h2 id="notifications-title" className="flex items-center gap-2.5 font-sans text-base font-semibold text-navy-900">
           <span className="relative grid h-8 w-8 place-items-center rounded-lg bg-navy-50 text-navy-700">
             <Bell className="h-4 w-4" aria-hidden />
-            {items.length > 0 && (
+            {total > 0 && (
               <span className={cn('absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold text-white', urgent ? 'bg-red-500' : 'bg-gold-600')} aria-hidden>
-                {items.length}
+                {total}
               </span>
             )}
           </span>
           Notifications
         </h2>
-        {items.length > 0 && <span className="sr-only">{plural(items.length, 'item')}{urgent ? `, ${urgent} urgent` : ''}</span>}
+        {total > 0 && <span className="sr-only">{plural(total, 'item')}{urgent ? `, ${urgent} urgent` : ''}</span>}
       </header>
 
-      {items.length === 0 ? (
+      {/* What staff have done: stays until opened or marked as read. */}
+      {updates.length > 0 && (
+        <div className="px-2 pb-2" data-student-updates>
+          <div className="flex items-center justify-between gap-3 px-3 pb-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-navy-400">Updates</p>
+            <button type="button" onClick={() => act(() => api.post('/me/updates/read-all'))} className="text-xs font-semibold text-navy-500 hover:text-navy-900" data-updates-read-all>
+              Mark all as read
+            </button>
+          </div>
+          <ul className="max-h-80 overflow-y-auto" aria-label="Updates">
+            {updates.map((u) => {
+              const Icon = updateIcon[u.kind] ?? BellRing;
+              return (
+                <li key={u.id} className="flex items-start gap-1 rounded-xl transition hover:bg-ivory" data-update={u.kind}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      read(u.id);
+                      if (u.target === 'profile') onOpenProfile();
+                      else onGo(u.target);
+                    }}
+                    className="flex min-w-0 flex-1 items-start gap-3 rounded-xl px-3 py-2.5 text-left"
+                  >
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gold-700" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium leading-snug text-navy-900">{u.title}</span>
+                      {u.text && <span className="mt-0.5 line-clamp-2 text-xs text-navy-500">{u.text}</span>}
+                      <span className="mt-0.5 block text-[11px] text-navy-400">{relativeTime(u.at)}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => read(u.id)}
+                    className="mr-2 mt-2 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-navy-100 text-navy-500 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700"
+                    aria-label={`Mark as read: ${u.title}`}
+                    title="Mark as read"
+                  >
+                    <Check className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {items.length > 0 && updates.length > 0 && <p className="px-5 pb-1 text-xs font-semibold uppercase tracking-wider text-navy-400">To do</p>}
+
+      {total === 0 ? (
         <p className="flex items-center gap-2.5 px-5 pb-5 text-sm text-emerald-800">
           <PartyPopper className="h-4 w-4 text-emerald-600" aria-hidden /> All caught up
         </p>
       ) : (
-        <ul className="px-2 pb-2">
+        items.length > 0 && <ul className="px-2 pb-2">
           {items.map((item) => {
             const Icon = item.icon;
             return (

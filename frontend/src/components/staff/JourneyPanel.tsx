@@ -677,6 +677,28 @@ function ArrivalTab({ student, actions }: { student: StaffStudent; actions: Acti
   );
 }
 
+/** What the counsellor should do next on the applications, as they move on. */
+function ApplicationsHint({ student }: { student: StaffStudent }) {
+  const sl = student.journey.shortlist;
+  const apps = student.applications;
+  const link = <a href="#applications" className="font-semibold underline">Applications</a>;
+  const accepted = apps.find((a) => a.state === 'accepted');
+  if (accepted) return <Hint>The student accepted the offer from {accepted.university}. Keep the status up to date in {link} below.</Hint>;
+  if (!sl?.firstApprovedAt) {
+    return <Hint>{sl?.status === 'shared' ? "The shortlist is with the student to review." : 'Share the shortlist with the student first.'} Applications are created when they approve it.</Hint>;
+  }
+  const drafts = apps.filter((a) => a.state === 'draft').length;
+  const approved = `The student approved the shortlist on ${formatDate(sl.firstApprovedAt)}.`;
+  const offers = apps.some((a) => a.state === 'conditional_offer' || a.state === 'unconditional_offer');
+  return (
+    <Hint>
+      {approved} {drafts > 0 ? <>{drafts === 1 ? '1 application is' : `${drafts} applications are`} ready to prepare and submit. Update each status in {link} below.</> : <>Update each status in {link} below as it changes.</>}
+      {offers && ' The student accepts or declines offers on their dashboard.'}
+      {sl.status === 'shared' && ' A new option is waiting for the student to decide on.'}
+    </Hint>
+  );
+}
+
 /* ------------------------------ Panel ------------------------------ */
 
 export function JourneyPanel({ student, services, actions, role }: { student: StaffStudent; services: ServiceView[]; actions: Actions; /** The viewer's role. */ role: string }) {
@@ -757,7 +779,7 @@ export function JourneyPanel({ student, services, actions, role }: { student: St
             </div>
           </div>
         )}
-        {tab === 'S3' && <Hint>Applications are created when the student approves the shortlist. Update their status in <a href="#applications" className="font-semibold underline">Applications</a> below; the student accepts or declines offers on their dashboard.</Hint>}
+        {tab === 'S3' && <ApplicationsHint student={student} />}
         {tab === 'S4' && <FundingTab student={student} actions={actions} canEdit={canEdit} canEditScholarships={canEdit || role === 'counsellor'} />}
         {tab === 'S5' && <VisaTab student={student} actions={actions} />}
         {tab === 'S6' && <DepartureTab student={student} actions={actions} />}

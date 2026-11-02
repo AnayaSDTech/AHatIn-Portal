@@ -121,7 +121,7 @@ Someone who isn't ready to register can send an enquiry from the home page (name
 
 | | |
 |---|---|
-| **Student** | Fills in **My profile**: date of birth, mobile, gender (optional), permanent address; courses of interest (up to 3), preferred destination, intake and budget; English test and score (or "Not taken yet"); work experience (optional). |
+| **Student** | Fills in **My profile**: date of birth, mobile, gender (optional), permanent address; courses of interest (up to 3), preferred destination and intake; English test and score (or "Not taken yet"); work experience (optional). |
 | **Highest qualification** | Chosen from a dropdown, and the fields follow the choice. For **12th / HSC** the student gives their board, school or junior college and year, with stream and result optional. For any other qualification they give the college or university and year, with specialisation and result optional. **Other** lets them type the qualification's name. |
 | **Other qualifications** | Optional. **Add qualification** adds their 12th or diploma and their 10th, each of which can be removed again. |
 | **Admin** | Sees students who haven't finished under **Assignments → Profile incomplete** and can click **Send reminder** (at most once a day). |
@@ -175,7 +175,7 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 | | |
 |---|---|
 | **Visa Officer** | Requests visa documents and verifies or rejects each upload. Records each step with an optional note: 1. CAS or admission letter received, 2. Visa documents checked, 3. Visa fee and health surcharge paid, 4. Visa application submitted (with the reference), 5. Biometrics appointment done. Then records **Visa granted**, or **Visa refused** with the reason (the student sees it) and restarts from "Visa documents checked" if they reapply. Holds **Visa preparation** sessions. |
-| **Student** | Uploads visa documents, pays fees and attends biometrics as guided, and books sessions and messages the officer. |
+| **Student** | Uploads visa documents, pays fees and attends biometrics as guided, and books sessions and messages the officer. A **Book a session** button shows on this stage until a Visa preparation session is booked by the student or staff. |
 | **Portal** | Emails the student at every step. Gives the officer a "Check visa decision status" task 15 days after submission. |
 | **Status** | See the status rules above. **Completed** when the visa is granted. |
 
@@ -228,7 +228,7 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 - Referrers see progress only, not the person's email or record.
 
 **Notifications and tasks**
-- The student's **Notifications** card lists what's waiting on them.
+- The student's **Notifications** card has two parts. **Updates** lists everything staff have done on the student's journey, such as a document verified, a visa step or a session moved. Each update goes once it's opened or marked as read. **To do** lists what's waiting on the student, and each item goes once it's done. New messages show under To do. Private staff notes, staff tasks and draft shortlists aren't shown.
 - Staff see a **Notifications** card on **Today** (admins on **Overview**) with their own updates: students assigned, sessions, messages, documents, shortlist and offer decisions. Each one goes once it's opened or marked as read, and some clear by themselves once dealt with.
 - Staff tasks are on **Today**. A task that becomes overdue alerts the administrators by email once.
 - Admin alert emails go to info@ahat.in.

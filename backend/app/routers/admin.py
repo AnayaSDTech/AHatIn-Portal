@@ -103,7 +103,7 @@ def _waiting_out(s: dict) -> dict:
         "registeredAt": iso(s["createdAt"]),
         "profileCompletedAt": iso(s["profileCompletedAt"]) if s.get("profileCompletedAt") else None,
         "profile": {
-            **{k: p.get(k, "") for k in ("courseInterest", "destination", "intake", "budget", "degree", "institution", "grade", "englishTest", "englishScore", "workExperience", "city", "gender")},
+            **{k: p.get(k, "") for k in ("courseInterest", "destination", "intake", "degree", "institution", "grade", "englishTest", "englishScore", "workExperience", "city", "gender")},
             "courseInterests": p["courseInterests"],
         },
         "fromEnquiry": bool(s.get("leadId")),

@@ -172,9 +172,19 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
       const v = j.visa;
       const reached = (stage: string) => !!v && (v.stage === 'granted' || v.history.some((h) => h.stage === stage) || VISA_PATH.indexOf(v.stage as never) >= VISA_PATH.indexOf(stage as never));
       const when = (stage: string) => on(v?.history.find((h) => h.stage === stage)?.at);
+      const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Visa preparation');
+      const held = mine.find((x) => x.status === 'completed');
+      const booked = mine.find((x) => x.status === 'booked');
       return { steps: sequence(
         [
           { label: 'Visa Officer assigned to you', done: !!s.visaOfficerId, skip: !s.visaOfficerId && !!j.visa },
+          {
+            label: held ? 'Visa preparation session held' : booked ? 'Visa preparation session booked' : 'Book a visa preparation session',
+            done: !!held || !!booked,
+            detail: on(held?.date ?? booked?.date),
+            // A session helps but isn't required: a finished stage doesn't show one as still to do.
+            skip: status === 'completed' && !held && !booked,
+          },
           ...VISA_PATH.map((stage) => ({ label: visaStageLabel[stage], done: reached(stage), detail: when(stage) })),
           { label: v?.stage === 'refused' ? 'Visa refused' : 'Visa decision', done: v?.stage === 'granted', detail: v?.stage === 'granted' ? when('granted') : v?.stage === 'refused' ? v.refusalReason : undefined },
         ],

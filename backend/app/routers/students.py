@@ -35,7 +35,7 @@ from app.domain import (
     format_mobile,
     profile_complete,
 )
-from app.records import actor_name, add_note, advance_stage, iso_or, load_student, load_students
+from app.records import actor_name, add_note, advance_stage, iso_or, load_student, load_students, serialize_student_alert
 from app.schemas import (
     AppCorrectBody,
     AppStatusBody,
@@ -69,6 +69,8 @@ from app.services.team import assign_officer, check_handover, owner_for, require
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
 
 router = APIRouter(tags=["students"])
+
+SCHOLARSHIP_LABELS = {"to_apply": "To apply", "applied": "Applied", "awarded": "Awarded", "not_awarded": "Not awarded"}
 
 
 def lakh(n: float) -> str:
@@ -116,6 +118,26 @@ async def my_record(user: CurrentUser):
         "team": await team_of(record),
         "seen": seen,
     }
+
+
+@router.get("/me/updates")
+async def my_updates(user: CurrentUser):
+    """What staff have done on the student's journey, newest first, until opened or marked as read."""
+    if is_staff(user["role"]):
+        return []
+    record = await own_record(user)
+    found = await get_db().student_alerts.find({"studentId": record["_id"]}).sort("createdAt", -1).to_list(100)
+    return [serialize_student_alert(a) for a in found]
+
+
+@router.post("/me/updates/read-all", status_code=204)
+async def read_all_updates(user: CurrentUser):
+    await get_db().student_alerts.delete_many({"studentId": (await own_record(user))["_id"]})
+
+
+@router.post("/me/updates/{update_id}/read", status_code=204)
+async def read_update(update_id: str, user: CurrentUser):
+    await get_db().student_alerts.delete_one({"_id": update_id, "studentId": (await own_record(user))["_id"]})
 
 
 @router.post("/me/seen/{section}", status_code=204)
@@ -248,6 +270,7 @@ async def profile_reminder(sid: str, user: Admin):
         dedupe_key=f"profile-reminder:{sid}:{now():%Y-%m-%d}",
     )
     await add_note(sid, user["name"], "Sent a reminder to complete the profile.")
+    await notify.alert_student(sid, "Please complete your profile", "We need it to match you with the right counsellor.", target="profile", kind="profile")
 
 
 @router.post("/students/{sid}/reassign")
@@ -272,6 +295,7 @@ async def reassign(sid: str, body: ReassignBody, user: Admin):
     await db.follow_ups.update_many({"personId": sid, "done": False}, {"$set": {"counsellorId": target["_id"]}})
     await add_note(sid, user["name"], f"Reassigned from {old['name'] if old else 'Unassigned'} to {target['name']}: {body.reason}")
     await db.staff_alerts.delete_many({"userId": student["counsellorId"], "studentId": sid})
+    await notify.alert_student(sid, f"{target['name']} is now your counsellor", target="counsellor", kind="team")
     await audit(user, "student.reassigned", "students", sid, {"from": student["counsellorId"], "to": target["_id"], "reason": body.reason})
     await notify.email_counsellor(target["_id"], f"New student assigned: {student['name']}", f"{student['name']} ({student['reference']}) is now assigned to you. Reason: {body.reason}", path=f"/staff/students/{sid}", kind="assigned")
     return await load_student(sid)
@@ -342,6 +366,7 @@ async def record_plan(sid: str, user: dict, body: CareerPlanBody) -> None:
     updated = await _journey(sid, fn)
     notes = f" Notes: {body.notes}" if body.notes else ""
     await add_note(sid, user["name"], f"Career plan {'updated' if updated else 'shared'}: {summary}.{notes}")
+    await notify.alert_student(sid, "Your career plan was updated" if updated else "Your career plan is ready", summary, kind="plan")
 
 
 # ---------------------------------------------------------------- 2. shortlist
@@ -369,6 +394,7 @@ async def add_shortlist_item(sid: str, body: ShortlistItemBody, user: Staff):
         extra = "; the student is asked to review it again" if before == "approved" else ""
         await add_note(sid, user["name"], f"Added {body.university} ({body.course}) to the shared shortlist{extra}.")
         record = await get_db().students.find_one({"_id": sid})
+        await notify.alert_student(sid, "A new option was added to your shortlist", f"{body.university} · {body.course}", target="shortlist", kind="shortlist")
         await notify.email_student(record, "A new option was added to your shortlist", f"{user['name']} added {body.university} ({body.course}) to your shortlist. Please review it.")
     return await load_student(sid)
 
@@ -379,10 +405,14 @@ async def remove_shortlist_item(sid: str, item_id: str, user: Staff):
 
     def fn(j, _):
         sl = _shortlist(j)
-        _item(sl, item_id)
+        item = _item(sl, item_id)
         sl["items"] = [i for i in sl["items"] if i["id"] != item_id]
+        return sl["status"], item
 
-    await _journey(sid, fn)
+    status, item = await _journey(sid, fn)
+    # A draft the student hasn't seen is the counsellor's own work.
+    if status != "draft":
+        await notify.alert_student(sid, "An option was removed from your shortlist", f"{item['university']} · {item['course']}", target="shortlist", kind="shortlist")
     return await load_student(sid)
 
 
@@ -400,6 +430,7 @@ async def share_shortlist(sid: str, user: Staff):
     await _journey(sid, fn)
     await advance_stage(sid, "documents_shortlist")
     await add_note(sid, user["name"], "Shortlist shared with the student for review.")
+    await notify.alert_student(sid, "Your university shortlist is ready", "Please review each option and approve it.", target="shortlist", kind="shortlist")
     await notify.email_student(student, "Your university shortlist is ready", f"{user['name']} has shared your university shortlist. Please review each option and approve it.")
     return await load_student(sid)
 
@@ -414,6 +445,7 @@ async def revise_shortlist(sid: str, user: Staff):
 
     await _journey(sid, fn)
     await add_note(sid, user["name"], "Started a revised shortlist.")
+    await notify.alert_student(sid, "Your counsellor is revising your shortlist", target="shortlist", kind="shortlist")
     return await load_student(sid)
 
 
@@ -435,6 +467,7 @@ async def comment_on_item(sid: str, item_id: str, body: TextBody, user: CurrentU
         await notify.email_counsellor(student["counsellorId"], f"{student['name']} asked about {item['university']}", body.text, path=f"/staff/students/{sid}")
     else:
         await notify.email_student(student, f"Your counsellor replied about {item['university']}", body.text, dedupe_key=None)
+        await notify.alert_student(sid, f"Your counsellor replied about {item['university']}", body.text, target="shortlist", kind="shortlist")
     return await load_student(sid)
 
 
@@ -522,6 +555,7 @@ async def set_application_state(sid: str, app_id: str, body: AppStatusBody, user
     if body.to == "submitted":
         await advance_stage(sid, "applications_submitted")
     await add_note(sid, user["name"], f"{a['university']}: {APP_LABELS[a['state']]} → {APP_LABELS[body.to]}.")
+    await notify.alert_student(sid, f"{a['university']}: {APP_LABELS[body.to]}", a["course"], target="applications", kind="application")
     await audit(user, "application.status", "applications", app_id, {"from": a["state"], "to": body.to})
     text = f"Your application to {a['university']} ({a['course']}) is now: {APP_LABELS[body.to]}."
     if body.to in OFFER_STATES:
@@ -542,6 +576,7 @@ async def correct_application_state(sid: str, app_id: str, body: AppCorrectBody,
     entry = {"at": now(), "by": user["name"], "from": a["state"], "to": body.to, "reason": body.reason}
     await get_db().applications.update_one({"_id": app_id}, {"$set": {"state": body.to, "updatedAt": now()}, "$push": {"history": entry}})
     await add_note(sid, user["name"], f"Corrected {a['university']}: {APP_LABELS[a['state']]} → {APP_LABELS[body.to]} ({body.reason}).")
+    await notify.alert_student(sid, f"{a['university']}: corrected to {APP_LABELS[body.to]}", body.reason, target="applications", kind="application")
     await check_handover(sid)
     await audit(user, "application.corrected", "applications", app_id, {"from": a["state"], "to": body.to, "reason": body.reason})
     return await load_student(sid)
@@ -580,6 +615,7 @@ async def set_estimated_cost(sid: str, body: CostBody, user: Staff):
 
     await _journey(sid, fn)
     await add_note(sid, user["name"], f"Estimated cost of study set to ₹{lakh(value)} lakh.")
+    await notify.alert_student(sid, "Your estimated cost of study was set", f"₹{lakh(value)} lakh", target="funding", kind="funding")
     await check_handover(sid)
     return await load_student(sid)
 
@@ -598,6 +634,8 @@ async def add_funding_source(sid: str, body: FundingSourceBody, user: CurrentUse
     await add_note(sid, actor_name(user), f"Funding plan: added {body.kind} (₹{lakh(amount)} lakh).")
     if not is_staff(user["role"]):
         await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} updated their funding plan", f"Added {body.kind} (₹{lakh(amount)} lakh).", path=f"/staff/students/{sid}", key=f"funding:{sid}")
+    else:
+        await notify.alert_student(sid, "Your funding plan was updated", f"Added {body.kind} (₹{lakh(amount)} lakh).", target="funding", kind="funding")
     await check_handover(sid)
     return await load_student(sid)
 
@@ -614,6 +652,8 @@ async def remove_funding_source(sid: str, source_id: str, user: CurrentUser):
     await _journey(sid, fn)
     if not is_staff(user["role"]):
         await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} updated their funding plan", "Removed a funding source.", path=f"/staff/students/{sid}", key=f"funding:{sid}")
+    else:
+        await notify.alert_student(sid, "Your funding plan was updated", "A funding source was removed.", target="funding", kind="funding")
     return await load_student(sid)
 
 
@@ -626,6 +666,7 @@ async def add_scholarship(sid: str, body: ScholarshipBody, user: Staff):
 
     await _journey(sid, fn)
     await add_note(sid, user["name"], f"Suggested scholarship: {body.name}.")
+    await notify.alert_student(sid, "New scholarship suggested for you", " · ".join(x for x in (body.name, body.amount) if x), target="funding", kind="funding")
     return await load_student(sid)
 
 
@@ -636,6 +677,7 @@ async def _changed_scholarship(student: dict, user: dict, sch_id: str, title: st
     await add_note(sid, user["name"], text)
     await audit(user, "scholarship.changed", "students", sid, {"scholarship": sch_id, "change": title})
     await notify.email_student(student, title, text)
+    await notify.alert_student(sid, title, text, target="funding", kind="funding")
     officer = owner_for(student, "finance")
     if officer != user["_id"]:
         await notify.alert_staff(officer, f"{title}: {student['name']}", f"{text} By {user['name']}.", path=f"/staff/students/{sid}")
@@ -700,6 +742,8 @@ async def set_scholarship_status(sid: str, sch_id: str, body: ScholarshipStatusB
     await _journey(sid, fn)
     if not is_staff(user["role"]):
         await notify.alert_staff(owner_for(student, "finance"), f"{student['name']} applied for a scholarship", f"Marked {names[0]} as applied.", path=f"/staff/students/{sid}")
+    else:
+        await notify.alert_student(sid, f"{names[0]}: {SCHOLARSHIP_LABELS.get(body.status, body.status)}", "Your scholarship was updated.", target="funding", kind="funding")
     return await load_student(sid)
 
 
@@ -721,6 +765,7 @@ async def request_document(sid: str, body: DocumentRequestBody, user: Staff):
         {"_id": new_id(), "studentId": sid, "name": body.name, "state": "missing", "category": body.category, "createdAt": now(), "requestedBy": user["name"], "requestedStage": body.stage or DOC_STAGE[body.category]}
     )
     await add_note(sid, user["name"], f"Requested document: {body.name}.")
+    await notify.alert_student(sid, f"Please upload: {body.name}", f"Requested by {user['name']}.", target="documents", kind="document")
     await notify.email_student(student, f"Please upload: {body.name}", f"{user['name']} asked you to upload: {body.name}.", dedupe_key=None)
     return await load_student(sid)
 
@@ -739,6 +784,7 @@ async def remove_document(sid: str, doc_id: str, user: Staff):
         await storage.delete(d["fileKey"])
     await close_follow_ups(f"doc:{doc_id}:")
     await add_note(sid, user["name"], f"Removed document request: {d['name']}{' (including the uploaded file)' if had_file else ''}.")
+    await notify.alert_student(sid, f"You no longer need to upload: {d['name']}", target="documents", kind="document")
     await check_handover(sid)
     return await load_student(sid)
 
@@ -855,6 +901,7 @@ async def verify_document(sid: str, doc_id: str, user: Staff):
     await close_follow_ups(f"doc:{doc_id}:")
     await notify.clear_alerts(f"doc:{doc_id}")
     await add_note(sid, user["name"], f"Verified document: {d['name']}.")
+    await notify.alert_student(sid, f"{d['name']} was verified", target="documents", kind="document")
     await audit(user, "document.verified", "documents", doc_id)
     if d.get("category") == "funds":
         await check_handover(sid)
@@ -874,6 +921,7 @@ async def reject_document(sid: str, doc_id: str, body: RejectBody, user: Staff):
     await close_follow_ups(f"doc:{doc_id}:")
     await notify.clear_alerts(f"doc:{doc_id}")
     await add_note(sid, user["name"], f"Rejected document: {d['name']} ({body.reason}).")
+    await notify.alert_student(sid, f"Please re-upload: {d['name']}", body.reason, target="documents", kind="document")
     await audit(user, "document.rejected", "documents", doc_id, {"reason": body.reason})
     await notify.email_student(student, f"Please re-upload: {d['name']}", f"{d['name']} needs to be uploaded again: {body.reason}")
     return await load_student(sid)
@@ -928,6 +976,7 @@ async def set_visa_stage(sid: str, body: VisaBody, user: Staff):
     await add_note(sid, user["name"], f"Visa: {VISA_LABELS[body.stage]}{ref}{f'. {body.note}' if body.note else '.'}")
     await audit(user, "visa.stage", "students", sid, {"stage": body.stage})
     await notify.email_student(student, f"Visa update: {VISA_LABELS[body.stage]}", f"Your visa progress was updated: {VISA_LABELS[body.stage]}.")
+    await notify.alert_student(sid, f"Visa update: {VISA_LABELS[body.stage]}", body.note or "", target="visa", kind="visa")
     return await load_student(sid)
 
 
@@ -967,6 +1016,7 @@ async def confirm_departure(sid: str, user: Staff):
 
     await _journey(sid, fn)
     await add_note(sid, user["name"], f"Confirmed ready to travel (all {len(DEPARTURE_TASKS)} pre-departure tasks done).")
+    await notify.alert_student(sid, "You're confirmed ready to travel", "Tell us when you've arrived safely.", target="departure", kind="travel")
     return await load_student(sid)
 
 
@@ -1005,6 +1055,7 @@ async def record_final(sid: str, user: dict, note: str) -> None:
     await advance_stage(sid, "settled")
     await close_follow_ups(f"arrival:{sid}")
     await add_note(sid, user["name"], f"Final post-arrival check-in: {note}")
+    await notify.alert_student(sid, "Your final check-in is complete", "Your journey with us is complete.", kind="travel")
 
 
 @router.post("/students/{sid}/final-check-in")
@@ -1038,6 +1089,9 @@ async def set_override(sid: str, code: str, body: OverrideBody, user: Staff):
         else f"{SERVICE_TITLES[code]} returned to automatic progress: {body.reason}"
     )
     await add_note(sid, user["name"], text)
+    await notify.alert_student(
+        sid, f"{SERVICE_TITLES[code]}: {SERVICE_STATUS_LABELS[body.status]}" if body.status else f"{SERVICE_TITLES[code]} was updated", body.reason, kind="stage",
+    )
     await audit(user, "service.override", "students", sid, {"code": code, "status": body.status, "reason": body.reason})
     if code in ("S3", "S4"):
         await check_handover(sid)

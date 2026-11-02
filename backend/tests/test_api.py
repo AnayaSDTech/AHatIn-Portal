@@ -371,7 +371,7 @@ async def test_profile_updates_record(make_api):
     profile = {
         **{k: v for k, v in PROFILE.items() if k.startswith(("ssc", "hsc", "address", "state", "pincode", "graduation"))},
         "dateOfBirth": "2002-01-05", "city": "Mumbai", "degree": "B.Com", "institution": "Demo College", "grade": "72%", "englishTest": "IELTS", "englishScore": "7",
-        "workExperience": "", "courseInterest": "MSc Finance", "destination": "Ireland", "intake": "January 2028", "budget": "₹15–25 lakh",
+        "workExperience": "", "courseInterest": "MSc Finance", "destination": "Ireland", "intake": "January 2028",
     }
     r = await api.put("/me/profile", {**profile, "englishScore": "7.3"})
     assert r.status_code == 422
@@ -489,7 +489,7 @@ PROFILE = {
     "hscBoard": "State Board", "hscStream": "Science (PCM)", "hscCollege": "Demo Junior College", "hscYear": "2019", "hscScore": "82%",
     "graduationYear": "2023", "degree": "B.Tech Computer Science", "institution": "Demo Institute", "grade": "8.1 CGPA",
     "englishTest": "IELTS", "englishScore": "7", "workExperience": "", "courseInterest": "MSc Artificial Intelligence", "destination": "United Kingdom",
-    "intake": "September 2027", "budget": "₹25–35 lakh",
+    "intake": "September 2027",
 }
 
 
@@ -1248,6 +1248,80 @@ async def test_feedback_mode(make_api, monkeypatch):
     # Off again: no changes either.
     monkeypatch.setattr(get_settings(), "feedback_mode", False)
     assert (await staff.delete("/feedback/anything")).status_code == 404
+
+
+async def test_student_is_told_about_every_staff_action(make_api, bucket):
+    student = await make_api()
+    await student.student_login()
+    priya = await make_api()
+    await priya.staff_login()
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+
+    async def updates():
+        r = await student.get("/me/updates")
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    async def told(result, *words, target=None):
+        """The action worked, and the newest update says so."""
+        assert result.status_code in (200, 204), result.text
+        latest = (await updates())[0]
+        assert all(w in latest["title"] for w in words), latest
+        if target:
+            assert latest["target"] == target, latest
+
+    assert await updates() == []
+    await told(await priya.post("/students/s1/documents", {"name": "Work experience letter", "category": "general", "stage": "S3"}), "Please upload", target="documents")
+    doc = next(d for d in (await priya.get("/students/s1")).json()["documents"] if d["name"] == "Work experience letter")
+    await told(await priya.delete(f"/students/s1/documents/{doc['id']}"), "no longer need", target="documents")
+    plan = {"direction": "computing", "course": "Data Science & Analytics", "level": "masters", "destinations": ["United Kingdom"], "notes": ""}
+    await told(await priya.post("/students/s1/career-plan", plan), "career plan", target="progress")
+    await told(await admin.put("/students/s1/overrides/S4", {"status": "not_needed", "reason": "Self funded student"}), "Not needed", target="progress")
+    await told(await admin.put("/students/s1/overrides/S4", {"status": None, "reason": "Set back to automatic"}), "was updated")
+    await told(await admin.put("/students/s1/funding/estimated-cost", {"lakh": 40}), "estimated cost", target="funding")
+    await told(await admin.post("/students/s1/funding/sources", {"kind": "Sponsor", "amount": 1}), "funding plan", target="funding")
+    sch = await admin.post("/students/s1/funding/scholarships", {"name": "Chevening", "amount": "Full tuition fees", "deadline": "2027-02-01"})
+    await told(sch, "New scholarship", target="funding")
+    sch_id = sch.json()["journey"]["funding"]["scholarships"][-1]["id"]
+    await told(await admin.patch(f"/students/s1/funding/scholarships/{sch_id}", {"status": "awarded"}), "Chevening", "Awarded", target="funding")
+    await told(await priya.delete(f"/students/s1/funding/scholarships/{sch_id}"), "Scholarship removed", target="funding")
+    await told(await admin.post("/students/s1/visa", {"stage": "cas_received"}), "Visa update", target="visa")
+    d, slot = await _free_slot("c1")
+    booked = await priya.post("/sessions", {"studentId": "s1", "type": "Application review", "date": d, "time": slot["time"], "mode": slot["modes"][0]})
+    await told(booked, "booked a session", target="sessions")
+    await told(await priya.post(f"/sessions/{booked.json()['id']}/cancel", {"reason": "I am unwell today"}), "cancelled", target="sessions")
+    await told(await admin.post("/students/s1/reassign", {"counsellorId": "c2", "reason": "Testing it"}), "now your counsellor", target="counsellor")
+
+    # The student's own actions and private staff notes aren't updates.
+    before = len(await updates())
+    assert (await student.post("/students/s1/funding/sources", {"kind": "Other", "amount": 1})).status_code == 200
+    assert (await admin.post("/students/s1/notes", {"text": "Private note"})).status_code == 200
+    assert len(await updates()) == before
+
+    # Separate per student, and they go when read.
+    other = await make_api()
+    await other.student_login("new.student@ahatin.example")
+    assert (await other.get("/me/updates")).json() == []
+    first = (await updates())[0]
+    assert (await other.post(f"/me/updates/{first['id']}/read")).status_code == 204  # not theirs: no effect
+    assert len(await updates()) == before
+    assert (await student.post(f"/me/updates/{first['id']}/read")).status_code == 204
+    assert len(await updates()) == before - 1
+    assert (await student.post("/me/updates/read-all")).status_code == 204
+    assert await updates() == []
+
+
+async def test_budget_is_no_longer_part_of_the_profile(make_api):
+    student = await make_api()
+    await student.register_student("Nina Rao", "nina.rao@example.com", "9811133344")
+    assert "budget" not in PROFILE
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    mine = (await student.get("/me/record")).json()
+    assert mine["profileComplete"] is True and "budget" not in mine["profile"]
+    # An older version of the app sending one is ignored.
+    assert (await student.put("/me/profile", {**PROFILE, "budget": "₹25–35 lakh"})).status_code == 200
+    assert "budget" not in (await student.get("/me/record")).json()["profile"]
 
 
 async def test_english_score_report_is_only_on_request(make_api):

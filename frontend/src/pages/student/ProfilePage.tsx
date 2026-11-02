@@ -22,7 +22,6 @@ const genders = toOptions(GENDERS);
 const englishTests = toOptions(['IELTS', 'PTE', 'TOEFL', 'Duolingo', 'Not taken yet']);
 const destinations = toOptions(['United Kingdom', 'Germany', 'Ireland', 'France', 'Not sure yet']);
 const intakes = toOptions(['January 2027', 'September 2027', 'January 2028', 'September 2028']);
-const budgets = toOptions(['Under ₹15 lakh', '₹15–25 lakh', '₹25–35 lakh', '₹35–50 lakh', 'Above ₹50 lakh']);
 const states = toOptions(INDIAN_STATES);
 const sscBoards = toOptions(SSC_BOARDS);
 const hscBoards = toOptions(HSC_BOARDS);
@@ -186,7 +185,6 @@ export function ProfilePage() {
             </Row>
             <Row label="Preferred destination">{profile.destination}</Row>
             <Row label="Preferred intake">{profile.intake}</Row>
-            <Row label="Budget (total)">{profile.budget}</Row>
           </Section>
 
           <Section id="profile-education" title="Education and tests" icon={GraduationCap} onEdit={() => setEditing(true, 'education')}>
@@ -469,7 +467,6 @@ function toForm(p: StudentProfile): ProfileForm {
     courseInterests: (p.courseInterests.length ? p.courseInterests : ['']).map((value) => ({ value })),
     destination: p.destination,
     intake: p.intake,
-    budget: p.budget,
   };
 }
 
@@ -688,7 +685,6 @@ function ProfileEditor({
           </fieldset>
           <SelectField label="Preferred destination" required placeholder="Choose a destination" options={destinations} error={errors.destination?.message} {...register('destination')} />
           <SelectField label="Preferred intake" required placeholder="Choose an intake" options={intakes} error={errors.intake?.message} {...register('intake')} />
-          <SelectField label="Budget (total)" required placeholder="Choose a budget" options={budgets} error={errors.budget?.message} {...register('budget')} />
         </div>
       </Panel>
 

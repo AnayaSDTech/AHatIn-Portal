@@ -259,7 +259,6 @@ class ProfileBody(Body):
     courseInterest: str = ""
     destination: str = Field(min_length=1, max_length=60)
     intake: str = Field(min_length=1, max_length=60)
-    budget: str = Field(min_length=1, max_length=60)
 
     @model_validator(mode="before")
     @classmethod

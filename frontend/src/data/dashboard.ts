@@ -47,7 +47,6 @@ export interface StudentProfile {
   courseInterest: string;
   destination: string;
   intake: string;
-  budget: string;
 }
 
 export const GENDERS = ['Female', 'Male', 'Other', 'Prefer not to say'];
@@ -84,7 +83,6 @@ export const demoProfile: StudentProfile = {
   courseInterest: 'MSc Data Science',
   destination: 'United Kingdom',
   intake: 'September 2027',
-  budget: '₹25–35 lakh',
 };
 
 /** Starting profile for any other student: they fill it in themselves. */
@@ -119,7 +117,6 @@ export const blankProfile: StudentProfile = {
   courseInterest: '',
   destination: '',
   intake: '',
-  budget: '',
 };
 
 /**
@@ -127,7 +124,7 @@ export const blankProfile: StudentProfile = {
  * and the passport is added by staff. The student's journey starts, and a counsellor is assigned, once it is complete.
  */
 export function isProfileComplete(p: StudentProfile) {
-  const required = ['dateOfBirth', 'city', 'degree', 'institution', 'englishTest', 'courseInterest', 'destination', 'intake', 'budget'] as const;
+  const required = ['dateOfBirth', 'city', 'degree', 'institution', 'englishTest', 'courseInterest', 'destination', 'intake'] as const;
   if (required.some((k) => !p[k]?.trim())) return false;
   return p.englishTest === 'Not taken yet' || !!p.englishScore.trim();
 }

@@ -166,6 +166,10 @@ def serialize_alert(a: dict) -> dict:
     return {"id": a["_id"], "title": a["title"], "text": a["text"], "path": a["path"], "kind": a["kind"], "at": iso(a["createdAt"])}
 
 
+def serialize_student_alert(a: dict) -> dict:
+    return {"id": a["_id"], "title": a["title"], "text": a["text"], "target": a["target"], "kind": a["kind"], "at": iso(a["createdAt"])}
+
+
 def serialize_grant(g: dict) -> dict:
     out = {"id": g["_id"], "granteeId": g["granteeId"], "ownerId": g["ownerId"], "until": g["until"], "reason": g["reason"], "grantedBy": g["grantedBy"]}
     if g.get("revoked"):

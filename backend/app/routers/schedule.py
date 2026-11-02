@@ -167,6 +167,7 @@ async def book_session(body: SessionBody, user: CurrentUser):
 
     if staff:
         await _send_invites(session, student, counsellor, f"Session booked: {body.type}", f"{user['name']} booked a session for you.", notify_counsellor=counsellor_id != user["_id"])
+        await notify.alert_student(student["_id"], f"{user['name']} booked a session for you", f"{body.type} · {format_date(body.date)} at {body.time}", target="sessions", kind="session")
     else:
         await _send_invites(session, student, counsellor, f"Session booked: {body.type}", f"{student['name']} booked a session.")
     return serialize_session(session)
@@ -212,6 +213,7 @@ async def cancel_session(session_id: str, body: CancelBody, user: CurrentUser):
             raise ApiError(400, "Give a reason; the student will see it.", {"reason": "Give a reason; the student will see it."})
         s = await _update(s, user["name"], f"Cancelled: {reason}", {"status": "cancelled", "cancelReason": reason})
         await add_note(student["_id"], user["name"], f"{s['type']} session on {format_date(s['date'])} cancelled: {reason}")
+        await notify.alert_student(student["_id"], "Your session was cancelled", f"{s['type']} on {format_date(s['date'])}. {reason}", target="sessions", kind="session")
         await _send_invites(s, student, counsellor, f"Session cancelled: {s['type']}", f"Your session was cancelled. Reason: {reason}", cancel=True, notify_counsellor=s["counsellorId"] != user["_id"])
     else:
         s = await _update(s, user["name"], "Cancelled by the student.", {"status": "cancelled", "cancelReason": "Cancelled by the student"})
@@ -236,6 +238,7 @@ async def reschedule_session(session_id: str, body: RescheduleBody, user: Staff)
             {"date": body.date, "time": body.time, "mode": body.mode, "startsAt": start, "endsAt": end, "remindedAt": None},
         )
     await add_note(student["_id"], user["name"], f"{s['type']} session moved to {format_date(body.date)} at {body.time}{mode_text}: {body.reason}")
+    await notify.alert_student(student["_id"], "Your session was moved", f"{s['type']} is now on {format_date(body.date)} at {body.time}{mode_text}. {body.reason}", target="sessions", kind="session")
     counsellor = await get_db().users.find_one({"_id": s["counsellorId"]})
     await _send_invites(s, student, counsellor, f"Session moved: {s['type']}", f"Your session was moved. Reason: {body.reason}", notify_counsellor=s["counsellorId"] != user["_id"])
     return serialize_session(s)
@@ -252,6 +255,7 @@ async def complete_session(session_id: str, body: CompleteBody, user: Staff):
     plan = body.careerPlan if s["type"] == "Career counselling" and not student["journey"].get("careerPlan") else None
     s = await _update(s, user["name"], "Marked completed.", {"status": "completed", "outcomeNotes": body.notes})
     await add_note(student["_id"], user["name"], f"{s['type']} session completed: {body.notes}")
+    await notify.alert_student(student["_id"], "Your session was marked completed", s["type"], target="sessions", kind="session")
     if plan:
         await record_plan(student["_id"], user, plan)
     if body.finalCheckIn and s["type"] == "Post-arrival check-in" and student["journey"]["arrival"].get("arrivedAt") and not student["journey"]["arrival"].get("finalCheckInAt"):
@@ -267,6 +271,7 @@ async def no_show(session_id: str, body: NoShowBody, user: Staff):
     s = await _update(s, user["name"], "Marked as no-show.", {"status": "no_show"})
     extra = f" {body.note.strip()}" if body.note and body.note.strip() else ""
     await add_note(student["_id"], user["name"], f"Missed the {s['type'].lower()} session on {format_date(s['date'])}.{extra}")
+    await notify.alert_student(student["_id"], "Your session was marked as missed", f"{s['type']} on {format_date(s['date'])}", target="sessions", kind="session")
     return serialize_session(s)
 
 

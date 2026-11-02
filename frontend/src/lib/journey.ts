@@ -302,7 +302,7 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
     case 'S5': {
       const v = j.visa;
       // Starts once there's an accepted offer and funding is complete, with the student's Visa Officer.
-      if (!v && s.visaOfficerId && visaCanStart(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive' };
+      if (!v && s.visaOfficerId && visaCanStart(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive', next: 'Talk to your Visa Officer' };
       if (!v) return { status: 'not_started', summary: !offerAccepted(s) ? 'Starts after you accept an offer' : s.visaOfficerId ? 'Starts once your funding is complete' : 'Starts when your CAS or admission letter arrives' };
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
       if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };

@@ -120,7 +120,6 @@ DESTINATION_LABELS = {"uk": "United Kingdom", "europe": "Europe", "undecided": "
 PROFILE_DESTINATIONS = ["United Kingdom", "Germany", "Ireland", "France", "Not sure yet"]
 PROFILE_INTAKES = ["January 2027", "September 2027", "January 2028", "September 2028"]
 REGISTER_INTAKES = ["2027-01", "2027-09", "2028-01", "2028-09"]
-BUDGETS = ["Under ₹15 lakh", "₹15–25 lakh", "₹25–35 lakh", "₹35–50 lakh", "Above ₹50 lakh"]
 ENGLISH_TESTS = ["IELTS", "PTE", "TOEFL", "Duolingo", "Not taken yet"]
 
 FOLLOW_UP_RULES = [
@@ -174,7 +173,6 @@ def blank_profile() -> dict:
         "courseInterest": "",
         "destination": "",
         "intake": "",
-        "budget": "",
     }
 
 
@@ -189,7 +187,7 @@ INDIAN_STATES = (
 MAX_COURSES = 3
 # Starting the journey needs only these. The form also requires the address and the highest qualification's year (the 10th,
 # 12th, gender and grade are optional), but profiles completed before those were added stay complete.
-PROFILE_REQUIRED = ["dateOfBirth", "city", "degree", "institution", "englishTest", "courseInterest", "destination", "intake", "budget"]
+PROFILE_REQUIRED = ["dateOfBirth", "city", "degree", "institution", "englishTest", "courseInterest", "destination", "intake"]
 STUDY_PLAN_FIELDS = {"courseInterests": "courses of interest", "destination": "preferred destination", "intake": "preferred intake"}
 
 

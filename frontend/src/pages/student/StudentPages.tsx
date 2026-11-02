@@ -100,6 +100,11 @@ export function StudentOverviewPage() {
   if (record.financeOfficerId && services.find((s) => s.code === 'S4')?.status === 'in_progress' && !fundingBooked) {
     bookingButtons.S4 = { label: 'Book a session', onClick: () => openBooking('Scholarship & funding') };
   }
+  // The same for the visa: until a session is booked by anyone (a cancelled one doesn't count).
+  const visaBooked = sessions.some((x) => x.studentId === record.id && x.type === 'Visa preparation' && x.status !== 'cancelled');
+  if (record.visaOfficerId && services.find((s) => s.code === 'S5')?.status === 'in_progress' && !visaBooked) {
+    bookingButtons.S5 = { label: 'Book a session', onClick: () => openBooking('Visa preparation') };
+  }
   // Until the first session is booked (cancelled ones count, as they do for the stage).
   if (services.find((s) => s.code === 'S1')?.status === 'in_progress' && !record.journey.careerPlan && !sessions.some((x) => x.studentId === record.id)) {
     bookingButtons.S1 = { label: 'Book a session', onClick: () => openBooking('Career counselling') };

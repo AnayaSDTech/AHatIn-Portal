@@ -17,7 +17,6 @@ import {
   Sparkles,
   UserCheck,
   UserRoundX,
-  Wallet,
 } from 'lucide-react';
 import { PageHeader } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
@@ -53,7 +52,7 @@ interface QueueStudent {
   mobile: string;
   registeredAt: string;
   profileCompletedAt: string | null;
-  profile: Record<'courseInterest' | 'destination' | 'intake' | 'budget' | 'degree' | 'institution' | 'grade' | 'englishTest' | 'englishScore' | 'workExperience' | 'city', string> & { courseInterests?: string[]; gender?: string };
+  profile: Record<'courseInterest' | 'destination' | 'intake' | 'degree' | 'institution' | 'grade' | 'englishTest' | 'englishScore' | 'workExperience' | 'city', string> & { courseInterests?: string[]; gender?: string };
   fromEnquiry: boolean;
   subject?: string | null;
   matches?: Match[];
@@ -404,7 +403,6 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
     () => [
       { icon: GraduationCap, label: 'Education', value: [p.degree, p.institution].filter(Boolean).join(', ') + (p.grade ? ` · ${p.grade}` : '') },
       { icon: Languages, label: 'English', value: p.englishTest === 'Not taken yet' ? 'Not taken yet' : `${p.englishTest} ${p.englishScore}` },
-      { icon: Wallet, label: 'Budget', value: p.budget },
       { icon: Sparkles, label: 'Experience', value: p.workExperience || 'None given' },
     ],
     [p],

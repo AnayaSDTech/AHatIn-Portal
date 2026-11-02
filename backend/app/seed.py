@@ -22,7 +22,7 @@ from app.domain import DEPARTURE_TASKS, blank_profile, empty_journey, mobile_dig
 from app.services import storage
 from app.services.students import profile_in
 
-BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks", "staff_alerts", "delegates", "referrals"]
+BUSINESS = ["students", "documents", "applications", "notes", "sessions", "availability", "time_off", "messages", "leads", "follow_ups", "access_grants", "agencies", "uploads", "counters", "locks", "staff_alerts", "student_alerts", "delegates", "referrals"]
 
 COUNSELLORS = [
     ("c1", "Priya Desai", "demo.counsellor@ahatin.example", "+91 98000 11111", "https://meet.google.com/juz-bodt-wbd", 40),
@@ -235,7 +235,7 @@ def students() -> list[dict]:
             "profile": {
                 "dateOfBirth": "2001-04-18", "city": "Pune", "passportNumber": "Z1234567", "degree": "B.Tech Computer Science", "institution": "Demo Institute of Technology",
                 "grade": "8.4 CGPA", "englishTest": "IELTS", "englishScore": "7.5", "workExperience": "2 years · Data Analyst", "courseInterest": "MSc Data Science",
-                "destination": "United Kingdom", "intake": "September 2027", "budget": "₹25–35 lakh",
+                "destination": "United Kingdom", "intake": "September 2027",
             },
         },
         {
@@ -349,7 +349,7 @@ def students() -> list[dict]:
             "profile": {
                 "dateOfBirth": "2000-09-02", "city": "Nagpur", "passportNumber": "", "degree": "B.Pharm", "institution": "Demo College of Pharmacy",
                 "grade": "78%", "englishTest": "IELTS", "englishScore": "7", "workExperience": "1 year · Hospital pharmacist", "courseInterest": "MSc Public Health",
-                "destination": "Ireland", "intake": "September 2027", "budget": "₹25–35 lakh",
+                "destination": "Ireland", "intake": "September 2027",
             },
             "profileCompletedAt": ago(1),
         },

@@ -481,7 +481,7 @@ export function StudentRecordPage() {
             ) : (
               <div className="space-y-2">
                 {studentSessions.map((s) => (
-                  <SessionRow key={s.id} session={s} studentName={student.name} showCounsellor stacked />
+                  <SessionRow key={s.id} session={s} studentName={student.name} showCounsellor stacked viewOnly={s.counsellorId !== user?.id && !scope.covering.some((g) => g.ownerId === s.counsellorId)} />
                 ))}
               </div>
             )}

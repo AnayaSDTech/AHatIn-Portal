@@ -34,7 +34,7 @@ export const joinMeeting = (counsellorId: string) => {
 };
 
 /** One session with its status and the actions a counsellor can take. */
-export function SessionRow({ session, studentName, showCounsellor, stacked }: { session: Session; studentName: string; showCounsellor?: boolean; stacked?: boolean }) {
+export function SessionRow({ session, studentName, showCounsellor, stacked, viewOnly }: { session: Session; studentName: string; showCounsellor?: boolean; stacked?: boolean; /** Someone else's session: details only. */ viewOnly?: boolean }) {
   const [action, setAction] = useState<Action | null>(null);
   const started = hasStarted(session);
   const Icon = session.mode === 'online' ? Video : Building2;
@@ -64,13 +64,13 @@ export function SessionRow({ session, studentName, showCounsellor, stacked }: { 
       </div>
       <div className={cn('flex flex-wrap items-center gap-2', !stacked && 'sm:justify-end')}>
         <Pill tone={sessionStatusTone[session.status]}>{sessionStatusLabel[session.status]}</Pill>
-        {canJoin(session) && (
+        {!viewOnly && canJoin(session) && (
           <ActionButton onClick={() => joinMeeting(session.counsellorId)} primary={started}>
             <Video className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
             Join meeting
           </ActionButton>
         )}
-        {session.status === 'booked' &&
+        {!viewOnly && session.status === 'booked' &&
           (started ? (
             <>
               <ActionButton onClick={() => setAction('complete')} primary={!canJoin(session)}>Complete</ActionButton>

@@ -37,6 +37,7 @@ async def assign_default_officers(sid: str) -> None:
         entry = {"at": t, "by": AUTOMATIC, "role": area, "from": "", "to": officer["_id"], "reason": "Assigned automatically to every new student"}
         await db.students.update_one({"_id": sid}, {"$set": {field: officer["_id"], "updatedAt": t}, "$push": {"officerHistory": entry}})
         await add_note(sid, AUTOMATIC, f"Assigned {OFFICER_TITLE[area]}: {officer['name']}.")
+        await notify.alert_student(sid, f"{officer['name']} is your {OFFICER_TITLE[area]}", target="counsellor", kind="team")
         await audit(None, f"student.{area}_officer", "students", sid, {"to": officer["_id"], "automatic": True})
         await notify.alert_staff(officer["_id"], f"New student assigned: {student['name']}", f"You are now their {OFFICER_TITLE[area]} ({student['reference']}).", path=f"/staff/students/{sid}", kind="assigned")
 
@@ -65,6 +66,7 @@ async def assign_counsellor(student: dict, target: dict, by: str, reason: str, a
     # Anything else waiting on this student (e.g. a document to check) moves to the new counsellor.
     await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": None}, {"$set": {"counsellorId": target["_id"]}})
     await add_note(sid, by, f"Assigned to {target['name']}: {reason}")
+    await notify.alert_student(sid, f"{target['name']} is your counsellor", "You can now book sessions and send messages.", target="counsellor", kind="team")
     await audit(actor, "student.assigned", "students", sid, {"to": target["_id"], "reason": reason, "automatic": actor is None})
     first = target["name"].split(" ")[0]
     await notify.email_counsellor(

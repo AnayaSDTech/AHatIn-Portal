@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlarmClock, ArrowRight, ClipboardList, FileSearch, MessageSquare, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFollowUps, useLeads, useMessages, useSessions, useStaffScope, useStaffStudents } from '../../hooks/useStaffData';
+import { Caseload } from '../../components/staff/Caseload';
 import { MessagesSection, NotificationsSection, SessionsTodaySection, Stat, StatStrip, TasksSection, TodayColumns, TodayHeader, daySummary, firstTab, splitTasks, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
 import { areaOfRole, counsellorName, type StaffStudent } from '../../data/staff';
+import { COUNSELLOR_GROUPS, counsellorCase } from '../../lib/officerCase';
 import { isoDate } from '../../lib/scheduling';
 import { formatDate, initials, relativeTime } from '../../lib/utils';
 import { OfficerTodayPage } from './OfficerTodayPage';
@@ -74,6 +76,13 @@ function CounsellorToday() {
     .filter((s) => s.newForCounsellor && s.counsellorId === scope.myId)
     .sort((a, b) => (b.counsellorAssignedAt ?? '').localeCompare(a.counsellorAssignedAt ?? ''));
 
+  // Most urgent first, like the officers' caseload.
+  const cases = useMemo(
+    () => students.map((s) => ({ student: s, c: counsellorCase(s, sessions) })).sort((a, b) => b.c.urgency - a.c.urgency || a.student.name.localeCompare(b.student.name)),
+    [students, sessions],
+  );
+  const [filter, setFilter] = useState('all');
+
   const tasks = splitTasks(followUps);
   const [tab, setTab] = useState<TaskTab | null>(null);
   const current: TaskTab = tab ?? firstTab(tasks);
@@ -111,6 +120,7 @@ function CounsellorToday() {
         main={
           <>
             {newStudents.length > 0 && <NewStudents students={newStudents} />}
+            <Caseload cases={cases} groups={COUNSELLOR_GROUPS} filter={filter} onFilter={setFilter} />
             <TasksSection tasks={tasks} current={current} onTab={setTab} showCounsellor={scope.isAdmin} />
           </>
         }

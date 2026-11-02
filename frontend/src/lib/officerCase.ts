@@ -1,6 +1,8 @@
 import { PiggyBank, Plane, type LucideIcon } from 'lucide-react';
 import { DEPARTURE_TASKS, VISA_PATH, fundingComplete, offerAccepted, visaCanStart, visaStageLabel } from './journey';
 import type { StaffStudent } from '../data/staff';
+import type { Session } from './scheduling';
+import { formatDate } from './utils';
 
 /*
  * Where each student stands in an officer's part of the journey, written for the officer (not the student):
@@ -55,6 +57,70 @@ export const CASE_GROUPS: Record<OfficerArea, { value: string; label: string }[]
 
 const lakh = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(1)} lakh`;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** The counsellor's part of the journey: counselling, the shortlist and the applications. */
+export const COUNSELLOR_GROUPS = [
+  { value: 'counselling', label: 'Counselling' },
+  { value: 'shortlist', label: 'Shortlist' },
+  { value: 'applications', label: 'Applications' },
+  { value: 'offers', label: 'Offers' },
+  { value: 'done', label: 'Complete' },
+];
+
+/** Where a student stands for their counsellor. Documents to check come first, whatever the phase. */
+export function counsellorCase(s: StaffStudent, sessions: Session[]): OfficerCase {
+  const j = s.journey;
+  const sl = j.shortlist;
+  const apps = s.applications;
+  const toVerify = s.documents.filter((d) => d.category === 'general' && d.state === 'pending').length;
+  const verify = toVerify ? { next: `Verify ${plural(toVerify, 'document')}`, urgency: 2 as const } : null;
+  const accepted = apps.find((a) => a.state === 'accepted');
+  const override = j.overrides.S3?.status;
+
+  if (accepted || override === 'completed' || override === 'not_needed') {
+    return { phase: 'Complete', group: 'done', tone: 'green', ...(verify ?? { next: accepted ? `Offer accepted · ${accepted.university}` : 'Applications marked as finished', urgency: 0 as const }), progress: 1, toVerify };
+  }
+
+  const shared = !!sl?.sharedAt || (!!sl && sl.status !== 'draft');
+  if (!j.careerPlan) {
+    const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Career counselling');
+    const held = mine.find((x) => x.status === 'completed');
+    const booked = mine.find((x) => x.status === 'booked');
+    return {
+      phase: 'Counselling',
+      group: 'counselling',
+      tone: booked ? 'blue' : 'grey',
+      ...(verify ?? (held ? { next: 'Record the career plan', urgency: 2 as const } : booked ? { next: 'Hold the career counselling session', urgency: 1 as const } : { next: 'Book the career counselling session', urgency: 2 as const })),
+      detail: booked && !held ? `Session booked for ${formatDate(booked.date)} at ${booked.time}` : undefined,
+      progress: held ? 0.2 : booked ? 0.1 : 0,
+      toVerify,
+    };
+  }
+
+  if (!shared) {
+    const options = sl?.items.length ?? 0;
+    return { phase: 'Shortlist', group: 'shortlist', tone: 'blue', ...(verify ?? { next: options ? 'Finish and share the shortlist' : 'Build the university shortlist', urgency: 2 as const }), detail: options ? `${plural(options, 'option')} added` : undefined, progress: 0.3, toVerify };
+  }
+
+  if (!sl?.firstApprovedAt) {
+    return { phase: 'Shortlist', group: 'shortlist', tone: 'amber', ...(verify ?? { next: 'Waiting for the student to approve the shortlist', urgency: 1 as const }), progress: 0.45, toVerify };
+  }
+
+  const open = apps.filter((a) => !['declined', 'rejected', 'withdrawn'].includes(a.state));
+  const offers = open.filter((a) => a.state === 'conditional_offer' || a.state === 'unconditional_offer');
+  const drafts = open.filter((a) => a.state === 'draft');
+  const moreInfo = open.filter((a) => a.state === 'more_info_requested');
+  const interviews = open.filter((a) => a.state === 'interview');
+  const sent = apps.filter((a) => a.state !== 'draft').length;
+  const detail = apps.length ? `${sent} of ${plural(apps.length, 'application')} submitted${offers.length ? ` · ${plural(offers.length, 'offer')}` : ''}` : undefined;
+
+  if (offers.length) return { phase: 'Offers', group: 'offers', tone: 'amber', ...(verify ?? { next: 'Waiting for the student to reply to their offer', urgency: 1 as const }), detail, progress: 0.85, toVerify };
+  if (moreInfo.length) return { phase: 'Applications', group: 'applications', tone: 'amber', next: `Send what ${moreInfo[0]!.university} asked for`, urgency: 2, detail, progress: 0.7, toVerify };
+  if (drafts.length) return { phase: 'Applications', group: 'applications', tone: 'blue', ...(verify ?? { next: `Prepare and submit ${plural(drafts.length, 'application')}`, urgency: 2 as const }), detail, progress: 0.6, toVerify };
+  if (interviews.length) return { phase: 'Applications', group: 'applications', tone: 'blue', ...(verify ?? { next: `Help them prepare for the ${interviews[0]!.university} interview`, urgency: 1 as const }), detail, progress: 0.75, toVerify };
+  if (open.length) return { phase: 'Applications', group: 'applications', tone: 'blue', ...(verify ?? { next: 'Waiting for university decisions', urgency: 1 as const }), detail, progress: 0.7, toVerify };
+  return { phase: 'Applications', group: 'applications', tone: 'red', ...(verify ?? { next: 'No applications left: add more options', urgency: 2 as const }), detail, progress: 0.6, toVerify };
+}
 
 export function officerCase(s: StaffStudent, area: OfficerArea): OfficerCase {
   return area === 'finance' ? financeCase(s) : visaCase(s);
