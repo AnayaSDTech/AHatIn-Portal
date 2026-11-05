@@ -35,6 +35,8 @@ import { StudentRecordPage } from './pages/staff/StudentRecordPage';
 import { MyProfilePage } from './pages/staff/MyProfilePage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AssignCounsellorsPage } from './pages/admin/AssignCounsellorsPage';
+import { CoursesPage } from './pages/admin/CoursesPage';
+import { ExplorePage } from './pages/student/ExplorePage';
 import { StaffUsersPage } from './pages/admin/StaffUsersPage';
 import { AgenciesPage } from './pages/admin/AgenciesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
@@ -77,6 +79,7 @@ const router = createBrowserRouter([
           { path: 'messages', element: <StudentMessagesPage /> },
           { path: 'funding', element: <StudentFundingPage /> },
           { path: 'travel', element: <StudentTravelPage /> },
+          { path: 'explore', element: <ExplorePage /> },
           { path: 'refer', element: <StudentReferPage /> },
           { path: 'profile', element: <StudentProfilePage /> },
         ],
@@ -110,6 +113,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/admin', element: <AdminOverviewPage /> },
       { path: '/admin/assign', element: <AssignCounsellorsPage /> },
+      { path: '/admin/courses', element: <CoursesPage /> },
       { path: '/admin/users', element: <StaffUsersPage /> },
       { path: '/admin/agencies', element: <AgenciesPage /> },
       { path: '/admin/settings', element: <SettingsPage /> },

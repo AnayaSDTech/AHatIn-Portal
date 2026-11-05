@@ -83,6 +83,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "referrals": [IndexModel([("referrerId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("email", ASCENDING)]), IndexModel([("studentId", ASCENDING)])],
     "feedback": [IndexModel([("path", ASCENDING), ("createdAt", ASCENDING)])],
     "student_alerts": [IndexModel([("studentId", ASCENDING), ("createdAt", DESCENDING)])],
+    "courses": [IndexModel([("country", ASCENDING), ("level", ASCENDING)]), IndexModel([("importedAt", ASCENDING)])],
     "staff_alerts": [IndexModel([("userId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("key", ASCENDING)]), IndexModel([("userId", ASCENDING), ("studentId", ASCENDING)])],
     "audit_log": [IndexModel([("entity", ASCENDING), ("entityId", ASCENDING), ("at", DESCENDING)]), IndexModel([("actorId", ASCENDING), ("at", DESCENDING)])],
 }

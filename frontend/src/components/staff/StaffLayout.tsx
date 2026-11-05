@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Building2, CalendarCheck, CalendarDays, Gift, LayoutDashboard, LogOut, Menu, Settings, UserCheck, UserCog, UserRoundPen, Users, UsersRound } from 'lucide-react';
+import { Building2, CalendarCheck, CalendarDays, Gift, GraduationCap, LayoutDashboard, LogOut, Menu, Settings, UserCheck, UserCog, UserRoundPen, Users, UsersRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { useAuth } from '../../context/AuthContext';
@@ -47,6 +47,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/assign', label: 'Assignments', short: 'Assign', icon: UserCheck },
   { to: '/admin/users', label: 'Staff users', icon: UserCog, more: true },
   { to: '/admin/agencies', label: 'Partner agencies', icon: Building2, more: true },
+  { to: '/admin/courses', label: 'Courses', icon: GraduationCap, more: true },
   { to: '/admin/settings', label: 'Settings', icon: Settings, more: true },
   { to: '/staff/referrals', label: 'Referrals', icon: Gift, more: true },
   { to: '/staff/schedule', label: 'Schedule', icon: CalendarDays, more: true },

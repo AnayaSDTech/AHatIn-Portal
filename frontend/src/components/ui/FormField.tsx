@@ -106,10 +106,12 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   options: { value: string; label: string }[];
   placeholder?: string;
+  /** The placeholder stays selectable, so the choice can be undone. */
+  clearable?: boolean;
 }
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(function SelectField(
-  { label, error, options, placeholder, className, required, ...rest },
+  { label, error, options, placeholder, clearable, className, required, ...rest },
   ref,
 ) {
   const id = useId();
@@ -130,7 +132,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(function S
         {...rest}
       >
         {placeholder && (
-          <option value="" disabled>
+          <option value="" disabled={!clearable}>
             {placeholder}
           </option>
         )}

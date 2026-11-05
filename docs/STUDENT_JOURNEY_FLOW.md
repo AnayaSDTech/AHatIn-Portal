@@ -227,6 +227,11 @@ The admin can **Reassign** a student to another counsellor, or change an officer
 - Each referred person shows as **Invited**, **Registered**, **Profile complete**, **Applied** or **Offer accepted**, with totals at the top. The status updates by itself from the person's record.
 - Referrers see progress only, not the person's email or record.
 
+**Explore Universities**
+- Students search courses by destination, program level, study area, intake and year, and sort the list by Featured, QS Ranking or Tuition Fees. Each course shows when its figures were checked, and a link to the university's page where one is given.
+- The **Eligibility** panel compares their qualification, undergraduate and 12th scores, backlogs and English test with each course, and says why they don't meet it. Only what they enter is checked.
+- The list comes from the spreadsheet an admin uploads under **Courses**. Each upload replaces the whole list, and nothing is saved if any row has a problem. **Load demo list** fills it with a starter set of real courses, taken from each university's website on the date shown.
+
 **Notifications and tasks**
 - The student's **Notifications** card has two parts. **Updates** lists everything staff have done on the student's journey, such as a document verified, a visa step or a session moved. Each update goes once it's opened or marked as read. **To do** lists what's waiting on the student, and each item goes once it's done. New messages show under To do. Private staff notes, staff tasks and draft shortlists aren't shown.
 - Staff see a **Notifications** card on **Today** (admins on **Overview**) with their own updates: students assigned, sessions, messages, documents, shortlist and offer decisions. Each one goes once it's opened or marked as read, and some clear by themselves once dealt with.

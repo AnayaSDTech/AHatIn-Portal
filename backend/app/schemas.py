@@ -187,6 +187,13 @@ class FeedbackBody(Body):
     viewportWidth: float = Field(gt=0, le=20000)
 
 
+# ---------------------------------------------------------------- Explore Universities
+
+
+class CourseImportBody(Body):
+    csv: str = Field(min_length=1, max_length=5_000_000)
+
+
 # ---------------------------------------------------------------- inviting someone
 
 DELEGATE_RELATIONS = ["Parent", "Guardian", "Sponsor", "Other"]

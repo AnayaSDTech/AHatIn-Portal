@@ -2,10 +2,12 @@
 
 import os
 from datetime import timedelta
+from pathlib import Path
 
 from app.config import get_settings
 from app.core.clock import now, today
 from app.core.security import hash_password
+from app.course_catalog import parse_csv
 from app.db import get_db
 from app.services.scheduling import slots_for, working_dates
 
@@ -1322,6 +1324,121 @@ async def test_budget_is_no_longer_part_of_the_profile(make_api):
     # An older version of the app sending one is ignored.
     assert (await student.put("/me/profile", {**PROFILE, "budget": "₹25–35 lakh"})).status_code == 200
     assert "budget" not in (await student.get("/me/record")).json()["profile"]
+
+
+HEADER = "university,country,course,study_level,study_area,intakes,intake_years,status,duration_months,tuition_per_year,currency,application_fee,avg_scholarship,min_qualification,min_ug_percent,min_12th_percent,max_backlogs,min_ielts,min_pte,min_toefl,min_duolingo,featured,qs_ranking,source_url,checked_on"
+COURSES = [
+    "Test University A,United Kingdom,MSc Computer Science,Master's,Computing & IT,Sep;Jan,2027;2028,Open,12,\"20,000\",GBP,0,3000,Bachelor's,60,55,3,6.5,58,88,110,Yes,320,https://example.org/a-cs,2026-10-01",
+    "Test University A,United Kingdom,MBA,Master's,Business & Management,Sep,2027,Closed,24,30000,GBP,100,,Bachelor's,70,,0,7,,,,Yes,320,,2026-10-01",
+    "Test University B,Germany,MSc Data Engineering,Master's,Computing & IT,Oct,2027,Open,24,1000,EUR,75,500,Bachelor's,75,,,6,,,,,90,,2026-10-01",
+    "Test University C,Ireland,BSc Computing,Bachelor's,Computing & IT,Sep;May,2028,Open,36,15000,EUR,50,,12th,,65,,6,,,,,,,2026-10-01",
+]
+
+
+def test_the_demo_course_list_is_valid_and_sourced():
+    text = (Path(__file__).parents[2] / "frontend/public/course-demo.csv").read_text(encoding="utf-8")
+    rows, errors = parse_csv(text)
+    assert not errors and rows and all(r["sourceUrl"] and r["checkedOn"] for r in rows)
+
+
+async def test_explore_universities(make_api):
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    student = await make_api()
+    await student.student_login()
+
+    async def find(**params):
+        r = await student.get("/courses", params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    names = lambda body: [c["course"] for c in body["items"]]  # noqa: E731
+
+    # Nothing to show until the team uploads the list.
+    assert (await student.get("/courses/options")).json()["total"] == 0
+    assert (await find())["total"] == 0
+
+    # Only the admin uploads, and a file with any problem saves nothing.
+    good = "\n".join([HEADER, *COURSES])
+    assert (await student.post("/admin/courses/import", {"csv": good})).status_code == 403
+    priya = await make_api()
+    await priya.staff_login()
+    assert (await priya.post("/admin/courses/import", {"csv": good})).status_code == 403
+    assert (await priya.get("/courses")).status_code == 403
+    r = await admin.post("/admin/courses/import", {"csv": "university,course\nA,B"})
+    assert r.status_code == 400 and "Missing columns" in r.json()["errors"][0]["message"]
+    bad = COURSES[0].replace("Master's", "Masters").replace("GBP", "XXX").replace("Sep;Jan", "Sept;Foo"), COURSES[1].replace("100,", "lots,", 1)
+    r = await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, COURSES[0], *bad])})
+    assert r.status_code == 400
+    problems = r.json()["errors"][0]["message"]
+    assert "Row 3: study_level" in problems and "Row 3: currency" in problems and "Row 3: intakes" in problems and "Row 4: application_fee" in problems
+    assert (await student.get("/courses/options")).json()["total"] == 0
+    r = await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, COURSES[0], COURSES[0]])})
+    assert r.status_code == 400 and "already in the file" in r.json()["errors"][0]["message"]
+
+    r = await admin.post("/admin/courses/import", {"csv": "\ufeff" + good})
+    assert r.status_code == 200 and r.json()["total"] == 4, r.text
+    assert (await admin.get("/admin/courses")).json()["total"] == 4
+    options = (await student.get("/courses/options")).json()
+    assert options["destinations"] == ["Germany", "Ireland", "United Kingdom"]
+    assert options["levels"] == ["Bachelor's", "Master's"] and options["years"] == ["2027", "2028"] and options["intakes"] == ["Jan", "May", "Sep", "Oct"]
+
+    # The details.
+    first = next(c for c in (await find())["items"] if c["course"] == "MSc Computer Science")
+    assert (first["status"], first["intakes"], first["durationMonths"], first["tuitionPerYear"], first["currency"], first["applicationFee"], first["avgScholarship"], first["level"]) == (
+        "Open", ["Sep", "Jan"], 12, 20000, "GBP", 0, 3000, "Master's",
+    )
+
+    # Search.
+    assert names(await find(destination="Germany")) == ["MSc Data Engineering"]
+    assert names(await find(level="Bachelor's")) == ["BSc Computing"]
+    assert set(names(await find(area="Business & Management"))) == {"MBA"}
+    assert set(names(await find(intake="Jan"))) == {"MSc Computer Science"}
+    assert set(names(await find(year="2028"))) == {"MSc Computer Science", "BSc Computing"}
+    assert set(names(await find(q="engineering test university b"))) == {"MSc Data Engineering"}
+    assert set(names(await find(destination="United Kingdom", intake="Sep", year="2027"))) == {"MSc Computer Science", "MBA"}
+
+    # Sorting: featured first by default, then by QS ranking, with no ranking last.
+    assert names(await find()) == ["MBA", "MSc Computer Science", "MSc Data Engineering", "BSc Computing"]
+    assert names(await find(sort="qs")) == ["MSc Data Engineering", "MBA", "MSc Computer Science", "BSc Computing"]
+    assert names(await find(sort="tuition")) == ["MSc Data Engineering", "BSc Computing", "MSc Computer Science", "MBA"]
+    assert first["featured"] is True and first["qsRanking"] == 320
+    assert (first["sourceUrl"], first["checkedOn"]) == ("https://example.org/a-cs", "2026-10-01")
+
+    # Without an eligibility check, nothing is judged.
+    assert (await find())["eligible"] is None and first["eligible"] is None
+
+    # Eligibility: only what's entered is checked, and the reasons are given.
+    body = await find(qualification="Bachelor's", ugPercent=65, hscPercent=60, backlogs=1, englishTest="IELTS", englishScore=6.5)
+    by = {c["course"]: c for c in body["items"]}
+    assert by["MSc Computer Science"]["eligible"] is True
+    assert set(by["MBA"]["unmet"]) == {"Needs 70% in undergraduate", "Allows up to 0 backlogs", "Needs IELTS 7"}
+    assert by["MSc Data Engineering"]["unmet"] == ["Needs 75% in undergraduate"]
+    assert by["BSc Computing"]["unmet"] == ["Needs 65% in 12th"]
+    assert body["eligible"] == 1 and body["total"] == 4 and body["universities"] == 3
+    only = await find(qualification="Bachelor's", ugPercent=65, hscPercent=60, backlogs=1, englishTest="IELTS", englishScore=6.5, eligibleOnly="true")
+    assert names(only) == ["MSc Computer Science"]
+    # A lower qualification, and only one thing entered.
+    assert "Needs Bachelor's or higher" in {c["course"]: c for c in (await find(qualification="12th"))["items"]}["MBA"]["unmet"]
+    assert all(c["eligible"] for c in (await find(backlogs=0))["items"])
+    # A test the course doesn't list isn't failed; no test at all is.
+    assert {c["course"]: c for c in (await find(englishTest="PTE", englishScore=10))["items"]}["MBA"]["eligible"] is True
+    assert "Needs an English test" in {c["course"]: c for c in (await find(englishTest="Not taken yet"))["items"]}["BSc Computing"]["unmet"][0]
+    assert (await student.get("/courses", params={"ugPercent": 150})).status_code == 422
+
+    # A university can't be featured or ranked on only some of its rows.
+    r = await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, COURSES[0], COURSES[1].replace(",Yes,320", ",,320")])})
+    assert r.status_code == 400 and "every row of a university" in r.json()["errors"][0]["message"]
+    # The checked date is required and real, and the source is a web page.
+    bad = [COURSES[3].replace(",2026-10-01", ",2099-01-01"), COURSES[3].replace("Test University C", "Test University D").replace(",,2026-10-01", ",ftp://x,2026-10-01"), COURSES[3].replace("Test University C", "Test University E").replace(",2026-10-01", ",")]
+    r = await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, *bad])})
+    problems = r.json()["errors"][0]["message"]
+    assert r.status_code == 400 and "Row 2: checked_on can't be in the future" in problems
+    assert "Row 3: source_url must be a web address" in problems and "Row 4: checked_on is required" in problems
+
+    # Each upload replaces the list.
+    assert (await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, COURSES[3]])})).json()["total"] == 1
+    assert names(await find()) == ["BSc Computing"]
 
 
 async def test_english_score_report_is_only_on_request(make_api):
