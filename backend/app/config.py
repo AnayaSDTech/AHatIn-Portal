@@ -87,14 +87,13 @@ class Settings(BaseSettings):
     def is_dev(self) -> bool:
         return self.app_env in ("development", "test")
 
-    @property
-    def expose_dev_codes(self) -> bool:
-        """Development only: return one-time codes and authenticator secrets so the UI can show them."""
-        return self.is_dev
-
     def show_demo_codes(self, email: str) -> bool:
-        """Development: everyone. Elsewhere, with DEMO_LOGINS on, only the demo accounts."""
-        return self.expose_dev_codes or (self.demo_logins and email.lower().endswith("@" + self.demo_email_domain))
+        """Whether a staff member's authenticator code is shown on screen (the "Demo authenticator app"). Only for
+        accounts that aren't real people: the demo accounts (in development, or with DEMO_LOGINS on) and, in
+        development, other reserved test addresses. A real person never sees it, in any environment."""
+        email = email.lower()
+        demo = email.endswith("@" + self.demo_email_domain)
+        return demo or undeliverable(email) if self.is_dev else self.demo_logins and demo
 
     @property
     def feedback_enabled(self) -> bool:

@@ -9,7 +9,6 @@ import { homeFor } from '../../components/auth/RouteGuards';
 import { DemoAuthenticator } from './StaffLoginPage';
 import { api } from '../../lib/api/client';
 import { ApiError, type Role, type User } from '../../lib/api/types';
-import { showDemoHints } from '../../lib/demoAccounts';
 
 interface Invite {
   name: string;
@@ -17,6 +16,8 @@ interface Invite {
   role: Role;
   secret: string;
   otpauthUri: string;
+  /** True only for demo and test accounts: real people never see the demo authenticator. */
+  demo?: boolean;
 }
 
 const roleLabel: Record<string, string> = { counsellor: 'Counsellor', officer: 'Application officer', finance_officer: 'Financial Aid Officer', visa_officer: 'Visa Officer', admin: 'Administrator' };
@@ -102,7 +103,7 @@ export function StaffSetupPage() {
                 <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 font-mono text-sm tracking-wider ring-1 ring-navy-100">{invite.secret}</p>
                 <a href={invite.otpauthUri} className="mt-2 inline-block text-xs font-semibold underline underline-offset-2">On your phone? Open it in your authenticator app</a>
               </div>
-              {showDemoHints && <DemoAuthenticator secret={invite.secret} onUse={setCode} />}
+              {invite.demo && <DemoAuthenticator secret={invite.secret} onUse={setCode} />}
               <OtpInput value={code} onChange={setCode} invalid={!!error} disabled={saving} label="Code from the app" />
               <Button type="submit" size="lg" className="w-full" loading={saving}>
                 <KeyRound className="h-5 w-5" aria-hidden /> Finish and sign in

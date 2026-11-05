@@ -326,7 +326,8 @@ async def _invite(token: str) -> tuple[dict, dict]:
 async def get_invite(token: str):
     invite, user = await _invite(token)
     secret = decrypt(invite["totpSecretEnc"])
-    return {"name": user["name"], "email": user["email"], "role": user["role"], "secret": secret, "otpauthUri": totp_uri(secret, user["email"])}
+    # demo: whether the set-up page may show the "Demo authenticator app" (never for a real person).
+    return {"name": user["name"], "email": user["email"], "role": user["role"], "secret": secret, "otpauthUri": totp_uri(secret, user["email"]), "demo": get_settings().show_demo_codes(user["email"])}
 
 
 @router.post("/staff/invite/{token}")

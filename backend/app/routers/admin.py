@@ -199,7 +199,8 @@ async def add_staff(body: StaffUserBody, admin: Admin):
     link = await _send_invite(user, admin)
     await audit(admin, "staff.invited", "users", user["_id"], {"role": body.role})
     out = {"user": _staff_out(user)}
-    if get_settings().expose_dev_codes:
+    # The set-up link goes on the admin's screen only when the invitation email can't arrive.
+    if get_settings().show_email_code(user["email"]):
         out["demoInviteLink"] = link
     return out
 
@@ -268,7 +269,7 @@ async def reactivate(user_id: str, admin: Admin):
     out = {"user": _staff_out({**u, "status": status})}
     if status == "invited":
         link = await _send_invite(u, admin)
-        if get_settings().expose_dev_codes:
+        if get_settings().show_email_code(u["email"]):
             out["demoInviteLink"] = link
     return out
 
@@ -282,7 +283,7 @@ async def reset_access(user_id: str, admin: Admin):
     link = await _send_invite(u, admin)
     await audit(admin, "staff.access_reset", "users", user_id)
     out = {"user": _staff_out({**u, "status": "invited", "lastLoginAt": u.get("lastLoginAt")})}
-    if get_settings().expose_dev_codes:
+    if get_settings().show_email_code(u["email"]):
         out["demoInviteLink"] = link
     return out
 

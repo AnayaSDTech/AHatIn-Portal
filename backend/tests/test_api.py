@@ -356,6 +356,17 @@ async def test_admin_overview_and_staff(make_api):
     r = await admin.post(f"/admin/staff/{asha['id']}/deactivate")
     assert r.status_code == 200
     assert (await newbie.get("/auth/me")).status_code == 401  # signed out everywhere
+    # A real person's set-up page and sign-in never show the demo authenticator code.
+    assert invite["demo"] is True  # asha@ahat.example is a test address
+    r = await admin.post("/admin/staff", {"name": "Real Person", "email": "real.person@gmail.com", "role": "counsellor"})
+    real_token = r.json()["demoInviteLink"].rsplit("/", 1)[1]  # no email service in tests, so the link is on screen
+    real = (await admin.get(f"/auth/staff/invite/{real_token}")).json()
+    assert real["demo"] is False and real["secret"]
+    real_api = await make_api()
+    assert (await real_api.post(f"/auth/staff/invite/{real_token}", {"password": "Welcome2027x", "code": pyotp.TOTP(real["secret"]).now()})).status_code == 200
+    await real_api.post("/auth/logout")
+    r = await (await make_api()).post("/auth/staff/login", {"email": "real.person@gmail.com", "password": "Welcome2027x"})
+    assert r.status_code == 200 and "demoSecret" not in r.json()
     r = await admin.post("/admin/access-grants", {"granteeId": "c3", "ownerId": "c3", "until": today().isoformat(), "reason": "Annual leave"})
     assert r.status_code == 400
 
@@ -667,7 +678,9 @@ def test_demo_codes_and_production_checks():
     assert s.show_demo_codes("demo.student@ahatin.example") and s.show_demo_codes("Kavya.I@AHATIN.example")
     assert not s.show_demo_codes("real.student@gmail.com")  # real people get codes by email only
     assert not Settings(**prod).show_demo_codes("demo.student@ahatin.example")  # DEMO_LOGINS off
-    assert Settings(app_env="development").show_demo_codes("anyone@gmail.com")
+    # Development too: only demo and test addresses, never a real person.
+    assert Settings(app_env="development").show_demo_codes("demo.counsellor@ahatin.example") and Settings(app_env="development").show_demo_codes("asha@ahat.example")
+    assert not Settings(app_env="development").show_demo_codes("anyone@gmail.com")
     # Emailed codes: never on screen for an address that really receives them.
     live = Settings(**prod, demo_logins=True, resend_api_key="k")
     assert live.show_email_code("demo.student@ahatin.example") and not live.show_email_code("real.student@gmail.com")
