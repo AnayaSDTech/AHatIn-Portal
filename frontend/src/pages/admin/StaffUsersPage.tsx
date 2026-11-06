@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { PageHeader } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
 import { Button } from '../../components/ui/Button';
+import { AuthenticatorQr } from '../../components/auth/AuthenticatorQr';
 import { Modal } from '../../components/ui/Modal';
 import { SelectField, TextField } from '../../components/ui/FormField';
 import type { StaffRole, StaffUser } from '../../data/staff';
@@ -284,7 +285,7 @@ function EditStaffModal({ staff, onClose, onDone }: { staff: StaffUser; onClose:
   const [password2, setPassword2] = useState('');
   const [pwError, setPwError] = useState<string | null>(null);
   const [saving, setSaving] = useState<'details' | 'password' | null>(null);
-  const [key, setKey] = useState<string | null>(null);
+  const [key, setKey] = useState<{ key: string; uri: string } | null>(null);
 
   const saveDetails = async (e: FormEvent) => {
     e.preventDefault();
@@ -312,11 +313,11 @@ function EditStaffModal({ staff, onClose, onDone }: { staff: StaffUser; onClose:
     setPwError(null);
     setSaving('password');
     try {
-      const r = await mutate(() => api.post<{ authenticatorKey?: string }>(`/admin/staff/${staff.id}/password`, { password }), { silent: true });
+      const r = await mutate(() => api.post<{ authenticatorKey?: string; otpauthUri?: string }>(`/admin/staff/${staff.id}/password`, { password }), { silent: true });
       setPassword('');
       setPassword2('');
       if (r.authenticatorKey) {
-        setKey(r.authenticatorKey);
+        setKey({ key: r.authenticatorKey, uri: r.otpauthUri ?? '' });
       } else {
         onDone(`${staff.name}'s password was changed. They have been signed out on their other devices; their authenticator app stays the same.`);
         onClose();
@@ -350,9 +351,14 @@ function EditStaffModal({ staff, onClose, onDone }: { staff: StaffUser; onClose:
         }
       >
         <ol className="list-decimal space-y-2 pl-5 text-sm text-navy-700">
-          <li>In an authenticator app (Google Authenticator, Microsoft Authenticator…), add an account using this key:</li>
+          <li>In an authenticator app (Google Authenticator, Microsoft Authenticator…), scan this QR code, or add an account using the key below it:</li>
         </ol>
-        <p className="mt-3 break-all rounded-xl bg-ivory px-4 py-3 font-mono text-base tracking-wider text-navy-900 ring-1 ring-navy-100" data-authenticator-key>{key}</p>
+        {key.uri && (
+          <div className="mt-3 text-center">
+            <AuthenticatorQr uri={key.uri} />
+          </div>
+        )}
+        <p className="mt-3 break-all rounded-xl bg-ivory px-4 py-3 font-mono text-base tracking-wider text-navy-900 ring-1 ring-navy-100" data-authenticator-key>{key.key}</p>
         <ol start={2} className="mt-3 list-decimal space-y-2 pl-5 text-sm text-navy-700">
           <li>
             Sign in at <span className="font-semibold">Staff sign in</span> with <span className="font-semibold">{staff.email}</span>, the new password, and the 6-digit code from the app.

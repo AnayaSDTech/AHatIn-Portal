@@ -6,6 +6,7 @@ import { TextField } from '../../components/ui/FormField';
 import { Button } from '../../components/ui/Button';
 import { OtpInput } from '../../components/auth/OtpInput';
 import { homeFor } from '../../components/auth/RouteGuards';
+import { AuthenticatorQr } from '../../components/auth/AuthenticatorQr';
 import { DemoAuthenticator } from './StaffLoginPage';
 import { api } from '../../lib/api/client';
 import { ApiError, type Role, type User } from '../../lib/api/types';
@@ -99,7 +100,11 @@ export function StaffSetupPage() {
                 <p className="flex items-center gap-2 font-semibold text-navy-900">
                   <Smartphone className="h-4 w-4" aria-hidden /> Connect an authenticator app
                 </p>
-                <p className="mt-1">In Google Authenticator, Microsoft Authenticator or similar, add an account with this key:</p>
+                <p className="mt-1">Scan this QR code with Google Authenticator, Microsoft Authenticator or similar:</p>
+                <div className="mt-3 text-center">
+                  <AuthenticatorQr uri={invite.otpauthUri} />
+                </div>
+                <p className="mt-3">Can't scan it? Add an account with this key instead:</p>
                 <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 font-mono text-sm tracking-wider ring-1 ring-navy-100">{invite.secret}</p>
                 <a href={invite.otpauthUri} className="mt-2 inline-block text-xs font-semibold underline underline-offset-2">On your phone? Open it in your authenticator app</a>
               </div>

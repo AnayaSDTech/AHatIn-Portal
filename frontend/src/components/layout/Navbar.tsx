@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, Globe, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
+import { ChevronDown, Compass, Gift, Globe, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
 import { ButtonLink, Button } from '../ui/Button';
@@ -9,6 +9,13 @@ import { useAuth } from '../../context/AuthContext';
 import { cn, initials } from '../../lib/utils';
 import { homeFor } from '../auth/RouteGuards';
 import { isStaff } from '../../lib/api/types';
+
+/** Student pages that live in the account menu (and the ☰ menu on smaller screens), not in the dashboard's navigation. */
+const STUDENT_EXTRAS = [
+  { to: '/dashboard/profile', label: 'My profile', icon: UserRound },
+  { to: '/dashboard/explore', label: 'Explore Universities', icon: Compass },
+  { to: '/dashboard/refer', label: 'Refer a friend', icon: Gift },
+];
 
 export function Navbar() {
   const { pathname, key } = useLocation();
@@ -123,9 +130,11 @@ export function Navbar() {
                   <div className="p-1.5">
                     {inDashboard ? (
                       <>
-                        <Link role="menuitem" to="/dashboard/profile" onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory" data-menu-profile>
-                          <UserRound className="h-4 w-4 text-navy-500" aria-hidden /> My profile
-                        </Link>
+                        {STUDENT_EXTRAS.map((l) => (
+                          <Link key={l.to} role="menuitem" to={l.to} onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory" data-menu-link={l.to}>
+                            <l.icon className="h-4 w-4 text-navy-500" aria-hidden /> {l.label}
+                          </Link>
+                        ))}
                         <Link role="menuitem" to="/" onClick={() => setMenu(false)} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-ivory">
                           <Globe className="h-4 w-4 text-navy-500" aria-hidden /> Back to website
                         </Link>
@@ -186,6 +195,12 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
+          {inDashboard &&
+            STUDENT_EXTRAS.map((l) => (
+              <Link key={l.to} to={l.to} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-lg font-medium text-navy-900 transition hover:bg-navy-50">
+                <l.icon className="h-5 w-5 text-navy-500" aria-hidden /> {l.label}
+              </Link>
+            ))}
           <div className="mt-6 grid gap-3 border-t border-navy-100 pt-6">
             {user ? (
               <>

@@ -86,6 +86,20 @@ interface Section {
   navLabel?: string;
 }
 
+/** Pages that live in the account menu (the name at the top right, or ☰ on smaller screens), not in this navigation. */
+const IN_ACCOUNT_MENU = ['/dashboard/explore', '/dashboard/refer'];
+
+/** A link in the site header (large screens). */
+const headerLink = (active: boolean) =>
+  cn(
+    'relative flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition after:absolute after:inset-x-2.5 after:-bottom-[13px] after:h-0.5 after:rounded-full',
+    active ? 'font-semibold text-navy-950 after:bg-gold-500' : 'text-navy-600 hover:bg-navy-50 hover:text-navy-950 after:bg-transparent',
+  );
+
+/** A tab under the header band (tablets and small laptops). */
+const tabLink = (active: boolean) =>
+  cn('flex shrink-0 items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-semibold transition', active ? 'bg-[#F4F1EA] text-navy-900' : 'text-navy-200 hover:bg-white/10 hover:text-white');
+
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
@@ -123,7 +137,8 @@ function ProgressRing({ value }: { value: number }) {
 
 /**
  * The student area: a header with a navigation bar (Overview, Applications, Documents, Sessions, Messages, and
- * Funding & visa / Travel once they apply), and one page per section underneath.
+ * Funding & visa / Travel once they apply), and one page per section underneath. My profile, Explore and Refer a
+ * friend are in the account menu.
  */
 export function StudentLayout() {
   const { user } = useAuth();
@@ -216,6 +231,8 @@ export function StudentLayout() {
     { to: '/dashboard/explore', label: 'Explore Universities', navLabel: 'Explore', title: 'Explore Universities', description: 'Search universities and courses, and check your eligibility.', icon: Compass },
     { to: '/dashboard/refer', label: 'Refer a friend', title: 'Refer a friend or family', description: 'Share AHat with someone planning to study abroad, and follow how far they get.', icon: Gift },
   ];
+  // The journey's sections; Explore and Refer a friend are in the account menu instead.
+  const primary = sections.filter((s) => !s.hidden && !IN_ACCOUNT_MENU.includes(s.to));
   const current =
     [...sections, profileSection].find((s) => (s.to === '/dashboard' ? location.pathname.replace(/\/$/, '') === '/dashboard' : location.pathname.startsWith(s.to))) ?? sections[0]!;
   const onProfilePage = current === profileSection;
@@ -262,28 +279,16 @@ export function StudentLayout() {
       {headerSlot &&
         createPortal(
           <nav className="flex items-center gap-0.5" aria-label="My dashboard" data-dashboard-nav>
-            {sections
-              .filter((s) => !s.hidden)
-              .map((s) => (
-                <NavLink
-                  key={s.to}
-                  to={s.to}
-                  end={s.to === '/dashboard'}
-                  className={({ isActive }) =>
-                    cn(
-                      "relative flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition after:absolute after:inset-x-2.5 after:-bottom-[13px] after:h-0.5 after:rounded-full",
-                      isActive ? 'font-semibold text-navy-950 after:bg-gold-500' : 'text-navy-600 hover:bg-navy-50 hover:text-navy-950 after:bg-transparent',
-                    )
-                  }
-                >
-                  {s.navLabel ?? s.label}
-                  {!!s.badge && (
-                    <span className={cn('grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
-                      {s.badge}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
+            {primary.map((s) => (
+              <NavLink key={s.to} to={s.to} end={s.to === '/dashboard'} className={({ isActive }) => headerLink(isActive)}>
+                {s.navLabel ?? s.label}
+                {!!s.badge && (
+                  <span className={cn('grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
+                    {s.badge}
+                  </span>
+                )}
+              </NavLink>
+            ))}
           </nav>,
           headerSlot,
         )}
@@ -342,39 +347,17 @@ export function StudentLayout() {
 
           {/* Tablets and small laptops: tabs that scroll sideways */}
           <nav ref={navRef} className="-mx-1 mt-8 hidden gap-1 overflow-x-auto px-1 sm:flex xl:hidden" aria-label="My dashboard">
-            {sections
-              .filter((s) => !s.hidden)
-              .map((s) => (
-                <NavLink
-                  key={s.to}
-                  to={s.to}
-                  end={s.to === '/dashboard'}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex shrink-0 items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-semibold transition',
-                      isActive ? 'bg-[#F4F1EA] text-navy-900' : 'text-navy-200 hover:bg-white/10 hover:text-white',
-                    )
-                  }
-                >
-                  <s.icon className="h-4 w-4" aria-hidden />
-                  {s.label}
-                  {!!s.badge && (
-                    <span className={cn('grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
-                      {s.badge}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
-            <NavLink
-              to={PROFILE_PATH}
-              className={({ isActive }) =>
-                cn('ml-auto flex shrink-0 items-center gap-2 rounded-t-2xl px-4 py-3 text-sm font-semibold transition', isActive ? 'bg-[#F4F1EA] text-navy-900' : 'text-navy-200 hover:bg-white/10 hover:text-white')
-              }
-              data-open-profile
-            >
-              <UserRound className="h-4 w-4" aria-hidden />
-              My profile
-            </NavLink>
+            {primary.map((s) => (
+              <NavLink key={s.to} to={s.to} end={s.to === '/dashboard'} className={({ isActive }) => tabLink(isActive)}>
+                <s.icon className="h-4 w-4" aria-hidden />
+                {s.navLabel ?? s.label}
+                {!!s.badge && (
+                  <span className={cn('grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold', s.urgent ? 'bg-red-500 text-white' : 'bg-gold-500 text-navy-950')}>
+                    {s.badge}
+                  </span>
+                )}
+              </NavLink>
+            ))}
           </nav>
         </Container>
       </div>

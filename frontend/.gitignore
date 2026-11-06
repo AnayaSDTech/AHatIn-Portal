@@ -59,3 +59,8 @@ $RECYCLE.BIN/
 
 # Upload package for Hostinger (npm run build:hostinger)
 ahat-frontend.zip
+
+course-demo-sample.csv
+course-demo.csv
+course-template.csv
+europe_universities.csv
