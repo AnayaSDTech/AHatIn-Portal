@@ -158,27 +158,65 @@ export const universities = [
 ];
 
 /** DEMO: fictional student stories. */
-export const testimonials = [
+/** Real students' stories, as published on the AHatIn website. Photos are in public/images/testimonials. */
+export const testimonials: { name: string; university: string; course?: string; image: string; quote: string }[] = [
   {
-    name: 'Riya Mehta',
-    from: 'Pune',
-    outcome: 'MSc Data Science · United Kingdom',
+    name: 'Nilesh Sonole',
+    university: 'University of Nottingham',
+    image: '/images/testimonials/nilesh-sonole.jpg',
     quote:
-      'My counsellor helped me choose a course that matched my career plan, and the portal showed me exactly what to do next. I never had to chase anyone for updates.',
+      'The guidance I received made the admission process so smooth. I was confused about choosing the right university, but their support helped me secure a place in the UK with complete clarity.',
   },
   {
-    name: 'Arjun Nair',
-    from: 'Kochi',
-    outcome: 'MSc Computer Science · United Kingdom',
+    name: 'Karan Patil',
+    university: 'University of Manchester',
+    course: 'MSc Pollution and Environmental Control',
+    image: '/images/testimonials/karan-patil.jpg',
     quote:
-      'The mock credibility interviews made all the difference. I felt prepared on the call, and my UK Student visa was approved on the first attempt.',
+      'From shortlisting universities to preparing documents, the team was always available. I’m now pursuing my MSc in Pollution and Environmental Control in the UK, and I couldn’t have done it without their help.',
   },
   {
-    name: 'Sneha Kulkarni',
-    from: 'Nagpur',
-    outcome: 'MSc Mechanical Engineering · Germany',
+    name: 'Sadichcha',
+    university: 'University of Leeds',
+    image: '/images/testimonials/sadichcha.jpg',
     quote:
-      'From APS to my blocked account and finding accommodation, every step was planned. They even checked in after I arrived in Munich.',
+      'The team made my study abroad journey simple and transparent. From selecting universities to getting my visa approved, their constant support made a huge difference.',
+  },
+  {
+    name: 'Nirdesh Sagathia',
+    university: 'The University of York',
+    image: '/images/testimonials/nirdesh-sagathia.jpg',
+    quote:
+      'The best part was the personal attention. They understood my career goals and guided me towards the right universities in UK. I felt supported throughout.',
+  },
+  {
+    name: 'Nirmiti Pakhale',
+    university: 'University of Manchester',
+    image: '/images/testimonials/nirmiti-mahendra-pakhale.jpg',
+    quote:
+      'I had no idea how to start my application, but their team made the process stress-free. With their guidance, I successfully completed my Master’s in the UK and achieved my dream of studying abroad.',
+  },
+  {
+    name: 'Bhushan Saharkar',
+    university: 'University of Exeter',
+    image: '/images/testimonials/bhushan-saharkar.jpg',
+    quote:
+      'From SOP writing to visa preparation, every step was explained clearly. I received multiple admission offers and finally chose my dream university in the UK.',
+  },
+  {
+    name: 'Siddhant Ramteke',
+    university: 'University of Manchester',
+    image: '/images/testimonials/siddhant-ramteke.jpg',
+    quote:
+      'I always dreamed of studying abroad but didn’t know where to begin. With their support, I secured admission in the UK. The entire process was smooth and stress-free.',
+  },
+  {
+    name: 'Raju Sarkar',
+    university: 'The University of Manchester',
+    course: 'MSc Global Development (Poverty and Inequality)',
+    image: '/images/testimonials/raju-sarkar.jpg',
+    quote:
+      'I was worried about financing my studies abroad, but their advice on scholarships and planning gave me confidence. With their support, I successfully completed my MSc in Global Development (Poverty and Inequality) in the UK.',
   },
 ];
 

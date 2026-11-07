@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Quote, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Quote } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { SectionHeading } from '../ui/SectionHeading';
-import { DemoBadge } from '../ui/DemoBadge';
 import { Reveal } from '../ui/Reveal';
 import { testimonials } from '../../data/site';
-import { cn, initials } from '../../lib/utils';
+import { cn } from '../../lib/utils';
 
 export function Testimonials() {
   const [active, setActive] = useState(0);
@@ -18,6 +17,13 @@ export function Testimonials() {
     return () => clearInterval(t);
   }, [paused, count]);
 
+  // Load every photo once, so the next story doesn't flash while its photo downloads.
+  useEffect(() => {
+    testimonials.forEach((t) => {
+      new Image().src = t.image;
+    });
+  }, []);
+
   const go = (dir: number) => setActive((a) => (a + dir + count) % count);
   const current = testimonials[active]!;
 
@@ -28,10 +34,6 @@ export function Testimonials() {
           eyebrow="Student success stories"
           title={<>Real journeys, <span className="italic text-gold-600">remarkable outcomes</span></>}
         />
-        <div className="mt-4 flex justify-center">
-          <DemoBadge label="Fictional stories for demo" />
-        </div>
-
         <Reveal className="mx-auto mt-14 max-w-4xl">
           <div
             className="relative rounded-[2rem] bg-navy-950 p-8 text-white shadow-lift sm:p-14"
@@ -39,24 +41,24 @@ export function Testimonials() {
             onMouseLeave={() => setPaused(false)}
           >
             <Quote className="absolute right-8 top-8 h-20 w-20 text-white/5" aria-hidden />
-            <div className="flex gap-1 text-gold-400" aria-label="5 out of 5 stars">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="h-5 w-5 fill-current" aria-hidden />
-              ))}
-            </div>
-            <blockquote key={active} className="mt-6 animate-fade-up font-display text-xl leading-relaxed sm:text-2xl" aria-live="polite">
+            <blockquote key={active} className="animate-fade-up font-display text-xl leading-relaxed sm:text-2xl" aria-live="polite">
               “{current.quote}”
             </blockquote>
             <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <span className="grid h-14 w-14 place-items-center rounded-full bg-gold-500 font-semibold text-navy-950">
-                  {initials(current.name)}
-                </span>
+                <img
+                  key={current.image}
+                  src={current.image}
+                  alt={current.name}
+                  width={64}
+                  height={64}
+                  loading="lazy"
+                  className="h-16 w-16 shrink-0 animate-fade-up rounded-full object-cover ring-2 ring-gold-500"
+                />
                 <div>
                   <p className="font-semibold">{current.name}</p>
-                  <p className="text-sm text-navy-200">
-                    From {current.from} · {current.outcome}
-                  </p>
+                  <p className="text-sm text-navy-200">{current.university}</p>
+                  {current.course && <p className="text-xs text-navy-300">{current.course}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-3">
