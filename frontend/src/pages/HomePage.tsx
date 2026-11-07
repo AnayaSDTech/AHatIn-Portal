@@ -3,6 +3,7 @@ import { Destinations } from '../components/home/Destinations';
 import { Services } from '../components/home/Services';
 import { About } from '../components/home/About';
 import { Universities } from '../components/home/Universities';
+import { Scholarships } from '../components/home/Scholarships';
 import { Testimonials } from '../components/home/Testimonials';
 import { Faq } from '../components/home/Faq';
 import { Enquiry } from '../components/home/Enquiry';
@@ -16,6 +17,7 @@ export function HomePage() {
       <Services />
       <About />
       <Universities />
+      <Scholarships />
       <Testimonials />
       <Faq />
       <Enquiry />

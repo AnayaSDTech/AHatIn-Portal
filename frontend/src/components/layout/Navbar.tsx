@@ -91,7 +91,7 @@ export function Navbar() {
         {inDashboard ? (
           <div id="dashboard-nav" className="hidden min-w-0 flex-1 justify-center xl:flex" />
         ) : (
-          <nav className="hidden items-center gap-8 lg:flex" aria-label="Main">
+          <nav className="hidden items-center gap-5 lg:flex xl:gap-8" aria-label="Main">
             {navLinks.map((l) => (
               <Link
                 key={l.href}

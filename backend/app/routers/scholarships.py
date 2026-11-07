@@ -18,6 +18,31 @@ def _out(s: dict, problems: list[str] | None) -> dict:
     return {"id": s["_id"], **{k: v for k, v in s.items() if k not in ("_id", "active")}, "eligible": None if problems is None else not problems, "unmet": problems or []}
 
 
+PREVIEW_SIZE = 6
+# What visitors to the website see without an account. Coverage, eligibility and how to apply need a free account.
+PREVIEW_FIELDS = ("name", "offeredBy", "type", "state", "levels", "supportType", "maxAmount", "targetGroupText")
+
+
+@router.get("/scholarships/preview")
+async def scholarship_preview():
+    """Public: a few scholarships for the home page, mixed across central, state, international and trust awards."""
+    found = await get_db().scholarships.find({"active": True}, {f: 1 for f in PREVIEW_FIELDS}).to_list(None)
+    found.sort(key=lambda s: sort_key(s, None))
+    by_type = [[s for s in found if s["type"] == t] for t in TYPES]
+    picked: list[dict] = []
+    while len(picked) < PREVIEW_SIZE and any(by_type):
+        for group in by_type:
+            if group and len(picked) < PREVIEW_SIZE:
+                picked.append(group.pop(0))
+    picked.sort(key=lambda s: sort_key(s, None))
+    return {
+        "total": len(found),
+        "central": sum(1 for s in found if s["type"] == "Central government"),
+        "states": len({s["state"] for s in found if s["type"] == "State government"}),
+        "items": [{"id": s["_id"], **{f: s.get(f) for f in PREVIEW_FIELDS}} for s in picked],
+    }
+
+
 @router.get("/scholarships/options")
 async def scholarship_options(_: Reader):
     found = await get_db().scholarships.find({"active": True}, {"state": 1, "type": 1, "targetGroups": 1, "levels": 1, "supportType": 1, "lastChecked": 1}).to_list(None)

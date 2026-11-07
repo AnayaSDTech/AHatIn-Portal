@@ -1468,6 +1468,22 @@ async def test_a_missing_scholarship_file_keeps_the_list_and_the_api_up(monkeypa
     assert await get_db().scholarships.count_documents({}) == 28
 
 
+async def test_home_page_scholarship_preview_is_public_and_basic(make_api):
+    visitor = await make_api()  # not signed in
+    r = await visitor.get("/scholarships/preview")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 28 and body["central"] > 0 and body["states"] > 0
+    items = body["items"]
+    assert len(items) == 6 and len({s["id"] for s in items}) == 6
+    # A mix of kinds, not only central schemes.
+    assert len({s["type"] for s in items}) >= 3
+    # Only the basics: the details stay behind an account.
+    for s in items:
+        assert s["name"] and s["offeredBy"] and s["levels"]
+        assert not {"coverage", "eligibility", "howToApply", "officialWebsite", "sourceUrl", "notes"} & s.keys()
+
+
 async def test_explore_scholarships(make_api):
     student = await make_api()
     await student.student_login()
