@@ -18,6 +18,4 @@ var/
 # Logs and OS files
 *.log
 .DS_Store
-Thumbs.
-
-/app/data
+Thumbs.db

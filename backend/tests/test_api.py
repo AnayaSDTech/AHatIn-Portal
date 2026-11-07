@@ -1460,6 +1460,14 @@ def test_the_scholarship_list_is_valid_and_sourced():
     assert len(rows) == 28 and all(r["sourceUrl"] and r["lastChecked"] and r["coverage"] and r["eligibility"] and r["howToApply"] for r in rows)
 
 
+async def test_a_missing_scholarship_file_keeps_the_list_and_the_api_up(monkeypatch, tmp_path):
+    from app import scholarship_catalog
+
+    monkeypatch.setattr(scholarship_catalog, "CSV_PATH", tmp_path / "missing.csv")
+    await scholarship_catalog.sync_scholarships()  # logged, not raised
+    assert await get_db().scholarships.count_documents({}) == 28
+
+
 async def test_explore_scholarships(make_api):
     student = await make_api()
     await student.student_login()

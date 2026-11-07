@@ -3,10 +3,13 @@ study abroad. For now the list comes from data/scholarships.csv, copied into the
 sync_scholarships). Admin editing will come later; until then, change the CSV and redeploy."""
 
 import csv
+import logging
 from datetime import date
 from pathlib import Path
 
 from app.db import get_db
+
+log = logging.getLogger(__name__)
 
 CSV_PATH = Path(__file__).parent / "data" / "scholarships.csv"
 
@@ -35,10 +38,10 @@ def _flag(text: str) -> bool | None:
     return {"true": True, "false": False}.get(text.strip().lower())
 
 
-def load_csv(path: Path = CSV_PATH) -> list[dict]:
+def load_csv(path: Path | None = None) -> list[dict]:
     """Every scholarship in the file, as stored in the database. Raises ValueError on a value the page can't use."""
     out: list[dict] = []
-    with path.open(encoding="utf-8-sig", newline="") as f:
+    with (path or CSV_PATH).open(encoding="utf-8-sig", newline="") as f:
         for line, row in enumerate(csv.DictReader(f), start=2):
             doc = {
                 "_id": row["id"].strip(),
@@ -87,9 +90,14 @@ def load_csv(path: Path = CSV_PATH) -> list[dict]:
 
 async def sync_scholarships() -> None:
     """Makes the database match the CSV. While the CSV is the only source, it simply overwrites; once admins can edit
-    scholarships in the portal, this should only add ones that are missing."""
+    scholarships in the portal, this should only add ones that are missing. A missing or broken file is logged and the
+    list left as it was, so the rest of the API still starts."""
     db = get_db()
-    docs = load_csv()
+    try:
+        docs = load_csv()
+    except (OSError, ValueError, KeyError):
+        log.exception("Scholarships not updated: %s could not be read", CSV_PATH)
+        return
     for d in docs:
         await db.scholarships.replace_one({"_id": d["_id"]}, d, upsert=True)
     await db.scholarships.delete_many({"_id": {"$nin": [d["_id"] for d in docs]}})
