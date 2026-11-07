@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, Compass, Gift, Globe, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
+import { Award, ChevronDown, Compass, Gift, Globe, LayoutDashboard, LogOut, Menu, UserRound, X } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
 import { ButtonLink, Button } from '../ui/Button';
@@ -14,6 +14,7 @@ import { isStaff } from '../../lib/api/types';
 const STUDENT_EXTRAS = [
   { to: '/dashboard/profile', label: 'My profile', icon: UserRound },
   { to: '/dashboard/explore', label: 'Explore Universities', icon: Compass },
+  { to: '/dashboard/scholarships', label: 'Explore Scholarships', icon: Award },
   { to: '/dashboard/refer', label: 'Refer a friend', icon: Gift },
 ];
 

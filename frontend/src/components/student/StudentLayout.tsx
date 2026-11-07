@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { CalendarDays, Compass, FolderCheck, Gift, LayoutDashboard, Menu, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
+import { Award, CalendarDays, Compass, FolderCheck, Gift, LayoutDashboard, Menu, MessageSquare, PartyPopper, PiggyBank, Plane, School, UserRound, UserRoundCheck, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Container } from '../ui/Container';
@@ -87,7 +87,7 @@ interface Section {
 }
 
 /** Pages that live in the account menu (the name at the top right, or ☰ on smaller screens), not in this navigation. */
-const IN_ACCOUNT_MENU = ['/dashboard/explore', '/dashboard/refer'];
+const IN_ACCOUNT_MENU = ['/dashboard/explore', '/dashboard/scholarships', '/dashboard/refer'];
 
 /** A link in the site header (large screens). */
 const headerLink = (active: boolean) =>
@@ -229,6 +229,7 @@ export function StudentLayout() {
     { to: '/dashboard/funding', label: 'Funding & visa', title: 'Funding & visa', description: 'Your funding plan, scholarships and visa progress.', icon: PiggyBank, hidden: !showFunding },
     { to: '/dashboard/travel', label: 'Travel', title: 'Travel & arrival', description: 'Get ready to travel, then tell us when you have arrived.', icon: Plane, hidden: !showTravel },
     { to: '/dashboard/explore', label: 'Explore Universities', navLabel: 'Explore', title: 'Explore Universities', description: 'Search universities and courses, and check your eligibility.', icon: Compass },
+    { to: '/dashboard/scholarships', label: 'Explore Scholarships', navLabel: 'Scholarships', title: 'Explore Scholarships', description: 'Indian government and trust scholarships for studying abroad, and whether you may be eligible.', icon: Award },
     { to: '/dashboard/refer', label: 'Refer a friend', title: 'Refer a friend or family', description: 'Share AHat with someone planning to study abroad, and follow how far they get.', icon: Gift },
   ];
   // The journey's sections; Explore and Refer a friend are in the account menu instead.

@@ -19,6 +19,7 @@ from app.core.clock import UTC, iso, local_dt, local_now, now, today
 from app.core.security import encrypt, hash_password
 from app.db import ensure_indexes, get_db, new_id
 from app.domain import DEPARTURE_TASKS, blank_profile, empty_journey, mobile_digits
+from app.scholarship_catalog import sync_scholarships
 from app.services import storage
 from app.services.students import profile_in
 
@@ -551,6 +552,7 @@ async def seed(keep_logins: bool = True) -> None:
     await seed_leads()
     await seed_schedule()
     await recreate_missing_records()
+    await sync_scholarships()
 
 
 async def bootstrap_admin(email: str, name: str) -> None:

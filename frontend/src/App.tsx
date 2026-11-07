@@ -37,6 +37,7 @@ import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AssignCounsellorsPage } from './pages/admin/AssignCounsellorsPage';
 import { CoursesPage } from './pages/admin/CoursesPage';
 import { ExplorePage } from './pages/student/ExplorePage';
+import { ScholarshipsPage } from './pages/student/ScholarshipsPage';
 import { StaffUsersPage } from './pages/admin/StaffUsersPage';
 import { AgenciesPage } from './pages/admin/AgenciesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
@@ -80,6 +81,7 @@ const router = createBrowserRouter([
           { path: 'funding', element: <StudentFundingPage /> },
           { path: 'travel', element: <StudentTravelPage /> },
           { path: 'explore', element: <ExplorePage /> },
+          { path: 'scholarships', element: <ScholarshipsPage /> },
           { path: 'refer', element: <StudentReferPage /> },
           { path: 'profile', element: <StudentProfilePage /> },
         ],

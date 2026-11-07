@@ -16,7 +16,8 @@ from app.config import get_settings
 from app.core import errors
 from app.core.auth import csrf_middleware
 from app.db import client, ensure_indexes
-from app.routers import admin, auth, courses, delegates, feedback, messages, public, referrals, schedule, staff, students
+from app.routers import admin, auth, courses, delegates, feedback, messages, public, referrals, schedule, scholarships, staff, students
+from app.scholarship_catalog import sync_scholarships
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -26,6 +27,7 @@ logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s 
 async def lifespan(_: FastAPI):
     settings.check_production()
     await ensure_indexes()
+    await sync_scholarships()
     tasks: list[asyncio.Task] = []
     if settings.run_background_jobs:
         from app import worker
@@ -74,7 +76,7 @@ if settings.allowed_origins:
     )
 
 api = APIRouter(prefix="/api/v1")
-for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router, feedback.router, courses.router):
+for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router, feedback.router, courses.router, scholarships.router):
     api.include_router(r)
 app.include_router(api)
 

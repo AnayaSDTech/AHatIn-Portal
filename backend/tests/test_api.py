@@ -9,6 +9,7 @@ from app.core.clock import now, today
 from app.core.security import hash_password
 from app.course_catalog import parse_csv
 from app.db import get_db
+from app.scholarship_catalog import load_csv
 from app.services.scheduling import slots_for, working_dates
 
 
@@ -1452,6 +1453,81 @@ async def test_explore_universities(make_api):
     # Each upload replaces the list.
     assert (await admin.post("/admin/courses/import", {"csv": "\n".join([HEADER, COURSES[3]])})).json()["total"] == 1
     assert names(await find()) == ["BSc Computing"]
+
+
+def test_the_scholarship_list_is_valid_and_sourced():
+    rows = load_csv()
+    assert len(rows) == 28 and all(r["sourceUrl"] and r["lastChecked"] and r["coverage"] and r["eligibility"] and r["howToApply"] for r in rows)
+
+
+async def test_explore_scholarships(make_api):
+    student = await make_api()
+    await student.student_login()
+
+    async def page(**params):
+        r = await student.get("/scholarships", params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    async def find(**params):
+        """Every page of results, put together."""
+        body = await page(**params)
+        while len(body["items"]) < body["total"]:
+            body["items"] += (await page(**params, offset=len(body["items"])))["items"]
+        return body
+
+    ids = lambda body: {s["id"] for s in body["items"]}  # noqa: E731
+
+    # Five to a page.
+    pages = [await page(offset=n) for n in range(0, 30, 5)]
+    assert pages[0]["pageSize"] == 5 and len(pages[0]["items"]) == 5 and len(pages[-1]["items"]) == 3 and pages[0]["total"] == 28
+    assert sum(len(p["items"]) for p in pages) == len(set().union(*(ids(p) for p in pages))) == 28
+
+    # Staff other than admins don't browse it.
+    priya = await make_api()
+    await priya.staff_login()
+    assert (await priya.get("/scholarships")).status_code == 403
+
+    options = (await student.get("/scholarships/options")).json()
+    assert options["total"] == 28 and options["states"][0] == "All India" and "Maharashtra" in options["states"]
+    assert options["types"] == ["Central government", "State government", "International", "Trust"]
+    assert "Interest subsidy" not in options["supportTypes"]
+
+    # Every card has its details; nothing is judged without an eligibility check.
+    everything = await find()
+    assert everything["total"] == 28 and everything["eligible"] is None
+    nos = next(s for s in everything["items"] if s["id"] == "nos-sc")
+    assert nos["offeredBy"].startswith("Ministry of Social Justice") and nos["levels"] == ["Master's", "PhD"] and nos["coverage"][0] == "Tuition fees"
+    assert nos["incomeLimitLakh"] == 8 and nos["needsOffer"] is True and "active" not in nos
+    # Central schemes come first.
+    assert everything["items"][0]["type"] == "Central government"
+
+    # Filters. A group also brings the scholarships open to everyone.
+    assert {s["state"] for s in (await find(state="Telangana"))["items"]} == {"Telangana"}
+    st = await find(group="ST")
+    assert "nos-st" in ids(st) and "commonwealth-uk" in ids(st) and "nos-sc" not in ids(st)
+    assert all(s["supportType"] == "Low-interest loan" for s in (await find(support="Low-interest loan"))["items"])
+    assert "rj-vivekananda" in ids(await find(level="Post-doctoral"))
+    assert ids(await find(q="tata endowment")) == {"jn-tata-endowment"}
+
+    # Eligibility: only what's entered is checked, with the reasons.
+    body = await find(homeState="Telangana", category="SC", disability="false", studyLevel="Master's", incomeLakh=7, age=26, marks=65)
+    by = {s["id"]: s for s in body["items"]}
+    assert by["nos-sc"]["eligible"] is True
+    assert by["ts-ambedkar-overseas"]["unmet"] == ["Family income up to ₹5 lakh"]
+    assert by["mh-shahu-foreign"]["unmet"] == ["Only for students from Maharashtra"]
+    assert by["nos-st"]["unmet"] == ["For ST students", "Family income up to ₹6 lakh"]
+    assert by["nos-swd"]["unmet"] == ["For students with disabilities"]
+    assert by["commonwealth-uk"]["eligible"] is True
+    # The student's own state comes straight after the central schemes.
+    assert [s for s in body["items"] if s["type"] != "Central government"][0]["state"] == "Telangana"
+    only = await find(homeState="Telangana", category="SC", disability="false", studyLevel="Master's", incomeLakh=7, age=26, marks=65, eligibleOnly="true")
+    assert only["total"] == body["eligible"] and all(s["eligible"] for s in only["items"])
+    # Work experience, ranking and level.
+    assert (await find(workYears=1))["items"] and {s["id"]: s for s in (await find(workYears=1))["items"]}["fulbright-nehru-masters"]["unmet"] == ["Needs 3 years of work experience"]
+    assert {s["id"]: s for s in (await find(qsRank=350))["items"]}["mh-sarthi"]["unmet"] == ["University must be in the QS top 200"]
+    assert "Not for Undergraduate study" in {s["id"]: s for s in (await find(studyLevel="Undergraduate"))["items"]}["nos-sc"]["unmet"]
+    assert (await student.get("/scholarships", params={"marks": 150})).status_code == 422
 
 
 async def test_english_score_report_is_only_on_request(make_api):
