@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { ArrowRight, CalendarPlus, CheckCircle2, Circle, FileUp, Loader, MinusCircle, Route } from 'lucide-react';
-import { serviceStatusLabel, type ServiceCode, type ServiceStatus, type ServiceView } from '../../lib/journey';
+import { ArrowRight, CalendarPlus, Check, FileUp, Minus, Route } from 'lucide-react';
+import { overallProgress, serviceStatusLabel, type ServiceCode, type ServiceStatus, type ServiceView } from '../../lib/journey';
 import { cn } from '../../lib/utils';
 import { Panel, Pill } from './Panel';
 
@@ -16,6 +16,34 @@ export interface TrackerAction {
   label: string;
   onClick: () => void;
 }
+
+/** The round marker on the stage line: a tick when done, the stage number otherwise. */
+function Marker({ status, n }: { status: ServiceStatus; n: number }) {
+  if (status === 'completed') {
+    return (
+      <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-white shadow-sm">
+        <Check className="h-4 w-4" strokeWidth={3} aria-hidden />
+      </span>
+    );
+  }
+  if (status === 'in_progress') {
+    return (
+      <span className="relative grid h-9 w-9 place-items-center rounded-full bg-navy-900 text-sm font-semibold text-gold-400 shadow-sm ring-4 ring-sky-100">
+        {n}
+      </span>
+    );
+  }
+  if (status === 'not_needed') {
+    return (
+      <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-dashed border-navy-200 bg-white text-navy-300">
+        <Minus className="h-4 w-4" aria-hidden />
+      </span>
+    );
+  }
+  return <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-navy-100 bg-white text-sm font-semibold text-navy-300">{n}</span>;
+}
+
+const solid = 'inline-flex items-center gap-1.5 rounded-full bg-navy-900 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-navy-700';
 
 /**
  * The stages of the student's journey. Statuses come from real events in the shared record, never typed in.
@@ -43,95 +71,120 @@ export function ServiceTracker({
   /** Extra detail under a service, e.g. the agreed career plan. */
   details?: Partial<Record<ServiceCode, ReactNode>>;
 }) {
+  const counted = services.filter((s) => s.status !== 'not_needed');
+  const completed = counted.filter((s) => s.status === 'completed').length;
+  const pct = overallProgress(services);
+
   return (
-    <Panel id="progress" title="Application progress" icon={<Route className="h-4 w-4" aria-hidden />}>
+    <Panel
+      id="progress"
+      title="Application progress"
+      icon={<Route className="h-4 w-4" aria-hidden />}
+      action={
+        <span className="whitespace-nowrap text-xs font-medium text-navy-500">
+          <span className="font-semibold text-navy-900">{completed}</span> of {counted.length} complete
+        </span>
+      }
+    >
+      <div className="-mt-1 mb-6 flex items-center gap-3">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Overall progress">
+          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="w-10 text-right text-xs font-semibold text-navy-700">{pct}%</span>
+      </div>
+
       {intro && <div className="mb-6">{intro}</div>}
+
       <ol className="relative">
         {services.map((s, i) => {
           const last = i === services.length - 1;
+          const current = s.status === 'in_progress';
           const muted = s.status === 'not_started' || s.status === 'not_needed';
+          const action = actions[s.code];
+          const upload = documents[s.code];
+          const booking = bookings[s.code];
+          const link = links[s.code];
+          const showNext = !!s.next && (s.status !== 'completed' || !!action);
+          const hasFooter = showNext || action || upload || booking;
           return (
-            <li key={s.code} className="relative flex gap-4 pb-6 last:pb-0" data-service={s.code} data-status={s.status}>
+            <li key={s.code} className={cn('relative flex gap-4', !last && 'pb-4')} data-service={s.code} data-status={s.status}>
               {!last && (
                 <span
-                  className={cn('absolute left-[15px] top-8 h-[calc(100%-1.5rem)] w-0.5', s.status === 'completed' || s.status === 'not_needed' ? 'bg-emerald-300' : 'bg-navy-100')}
+                  className={cn('absolute left-[17px] top-10 h-[calc(100%-2.5rem)] w-0.5 rounded-full', s.status === 'completed' || s.status === 'not_needed' ? 'bg-emerald-200' : 'bg-navy-100')}
                   aria-hidden
                 />
               )}
-              <span className="relative z-10 mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white">
-                {s.status === 'completed' ? (
-                  <CheckCircle2 className="h-8 w-8 text-emerald-500" aria-hidden />
-                ) : s.status === 'in_progress' ? (
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-100">
-                    <Loader className="h-4 w-4 animate-[spin_3s_linear_infinite] text-sky-600" aria-hidden />
-                  </span>
-                ) : s.status === 'not_needed' ? (
-                  <MinusCircle className="h-8 w-8 text-navy-300" aria-hidden />
-                ) : (
-                  <Circle className="h-8 w-8 text-navy-200" aria-hidden />
-                )}
+              <span className="relative z-10 shrink-0">
+                <Marker status={s.status} n={i + 1} />
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 font-semibold', muted ? 'text-navy-400' : 'text-navy-900')}>
-                    {s.title}
-                    {links[s.code] && (
-                      <button
-                        type="button"
-                        onClick={links[s.code]!.onClick}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-gold-700 underline underline-offset-2 hover:text-navy-900"
-                        data-service-link={s.code}
-                      >
-                        {links[s.code]!.label} <ArrowRight className="h-3 w-3" aria-hidden />
-                      </button>
-                    )}
-                  </p>
+
+              <div
+                className={cn(
+                  'min-w-0 flex-1 rounded-2xl border px-4 py-3.5 transition',
+                  current ? 'border-sky-200 bg-sky-50/40 shadow-soft' : muted ? 'border-dashed border-navy-100 bg-transparent' : 'border-navy-100 bg-white',
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+                  <div className="min-w-0">
+                    {current && <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Current stage</p>}
+                    <p className={cn('font-semibold leading-snug', muted ? 'text-navy-400' : 'text-navy-900')}>{s.title}</p>
+                  </div>
                   <Pill tone={tone[s.status]}>{serviceStatusLabel[s.status]}</Pill>
                 </div>
-                <p className="mt-1 text-sm text-navy-500">{s.summary}</p>
-                {details[s.code]}
-                {(() => {
-                  const action = actions[s.code];
-                  const upload = documents[s.code];
-                  const booking = bookings[s.code];
-                  const showNext = !!s.next && (s.status !== 'completed' || !!action);
-                  if (!showNext && !action && !upload && !booking) return null;
-                  return (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {showNext && <p className="inline-flex rounded-lg bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">Next: {s.next}</p>}
-                      {action && (
-                        <button
-                          type="button"
-                          onClick={action.onClick}
-                          className="inline-flex items-center gap-1 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
-                          data-service-action={s.code}
-                        >
-                          {action.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                        </button>
-                      )}
-                      {booking && (
-                        <button
-                          type="button"
-                          onClick={booking.onClick}
-                          className="inline-flex items-center gap-1 rounded-full bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-navy-700"
-                          data-service-booking={s.code}
-                        >
-                          <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> {booking.label}
-                        </button>
-                      )}
-                      {upload && (
-                        <button
-                          type="button"
-                          onClick={upload.onClick}
-                          className="inline-flex items-center gap-1 rounded-full bg-gold-500 px-3 py-1.5 text-xs font-semibold text-navy-950 transition hover:bg-gold-400"
-                          data-service-documents={s.code}
-                        >
-                          <FileUp className="h-3.5 w-3.5" aria-hidden /> {upload.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
+                <p className={cn('mt-1 text-sm', muted ? 'text-navy-400' : 'text-navy-600')}>{s.summary}</p>
+
+                {(link || details[s.code]) && (
+                  <div className="flex flex-wrap items-center gap-x-5">
+                    {details[s.code]}
+                    {link && (
+                      <button
+                        type="button"
+                        onClick={link.onClick}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold-700 hover:text-navy-900"
+                        data-service-link={s.code}
+                      >
+                        {link.label} <ArrowRight className="h-3 w-3" aria-hidden />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {hasFooter && (
+                  <div className="mt-3 flex flex-col gap-2.5 border-t border-navy-100/80 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    {showNext ? (
+                      <p className="text-xs text-navy-600">
+                        <span className="font-semibold text-gold-700">Next: </span>
+                        {s.next}
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                    {(action || booking || upload) && (
+                      <div className="flex flex-wrap gap-2 sm:justify-end">
+                        {action && (
+                          <button type="button" onClick={action.onClick} className={solid} data-service-action={s.code}>
+                            {action.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {booking && (
+                          <button type="button" onClick={booking.onClick} className={solid} data-service-booking={s.code}>
+                            <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> {booking.label}
+                          </button>
+                        )}
+                        {upload && (
+                          <button
+                            type="button"
+                            onClick={upload.onClick}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-gold-500 px-3.5 py-2 text-xs font-semibold text-navy-950 shadow-sm transition hover:bg-gold-400"
+                            data-service-documents={s.code}
+                          >
+                            <FileUp className="h-3.5 w-3.5" aria-hidden /> {upload.label}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </li>
           );

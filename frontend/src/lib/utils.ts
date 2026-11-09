@@ -39,6 +39,12 @@ export function goToSection(id: string) {
   el?.focus({ preventScroll: true });
 }
 
+/** "University of Manchester" → "UM": a small badge in place of a university's logo. */
+export function monogram(name: string) {
+  const words = name.split(/\s+/).filter((w) => w && !['of', 'the', 'and', 'for', 'at', '&', '-'].includes(w.toLowerCase()));
+  return words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+}
+
 export function initials(name: string) {
   return name
     .split(/\s+/)

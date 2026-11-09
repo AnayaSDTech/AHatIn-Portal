@@ -15,7 +15,22 @@ const MAX = 1000;
  * (viewer "student") and on the student's record for staff (viewer "staff"). Opening it marks the other side's
  * messages as read. New messages are fetched every few seconds.
  */
-export function ChatThread({ studentId, viewer, emptyText, thread: chat = 'counsellor', placeholder }: { studentId: string; viewer: 'student' | 'staff'; emptyText: string; thread?: TeamArea; placeholder?: string }) {
+export function ChatThread({
+  studentId,
+  viewer,
+  emptyText,
+  thread: chat = 'counsellor',
+  placeholder,
+  listClassName = 'max-h-80',
+}: {
+  studentId: string;
+  viewer: 'student' | 'staff';
+  emptyText: string;
+  thread?: TeamArea;
+  placeholder?: string;
+  /** The height of the message list, e.g. taller on the student's Messages page. */
+  listClassName?: string;
+}) {
   const { user } = useAuth();
   const [all] = useMessages();
   const [sending, setSending] = useState(false);
@@ -70,7 +85,7 @@ export function ChatThread({ studentId, viewer, emptyText, thread: chat = 'couns
 
   return (
     <div>
-      <ol ref={listRef} className="max-h-80 space-y-2 overflow-y-auto rounded-2xl bg-ivory p-3" aria-label="Messages" aria-live="polite">
+      <ol ref={listRef} className={cn('space-y-2 overflow-y-auto rounded-2xl bg-ivory p-3', listClassName)} aria-label="Messages" aria-live="polite">
         {thread.length === 0 && <li className="py-6 text-center text-sm text-navy-400">{emptyText}</li>}
         {thread.map((m) => {
           const mine = m.from === viewer;

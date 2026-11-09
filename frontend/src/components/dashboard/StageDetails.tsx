@@ -68,12 +68,13 @@ export function StageDetails({ code, steps, label = 'View details', extra }: { c
   const [open, setOpen] = useState(false);
   const list = steps.steps;
   return (
-    <div className="mt-2">
+    // "contents": the button sits in its stage's row of links, and the panel opens full width below them.
+    <div className="contents">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1 text-xs font-semibold text-navy-600 underline underline-offset-2 hover:text-navy-900"
+        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-navy-700 hover:text-navy-950"
         data-stage-details={code}
       >
         {open ? label.replace(/^View/, 'Hide') : label}
@@ -81,7 +82,7 @@ export function StageDetails({ code, steps, label = 'View details', extra }: { c
       </button>
 
       {open && (
-        <div className="mt-3 animate-fade-up rounded-2xl border border-navy-100 bg-white p-4 sm:p-5" data-stage-panel={code}>
+        <div className="order-last mt-3 w-full basis-full animate-fade-up rounded-xl border border-navy-100 bg-white p-4 sm:p-5" data-stage-panel={code}>
           <StepTimeline steps={list} />
 
           {steps.list && (

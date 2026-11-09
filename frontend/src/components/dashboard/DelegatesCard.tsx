@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { CheckCircle2, Trash2, UserPlus, UsersRound } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Trash2, UserPlus, UsersRound } from 'lucide-react';
 import { Panel, Pill } from './Panel';
 import { Button } from '../ui/Button';
 import { SelectField, TextField } from '../ui/FormField';
 import { api } from '../../lib/api/client';
 import { act, mutate, useApi } from '../../lib/api/store';
 import { ApiError } from '../../lib/api/types';
-import { formatDate } from '../../lib/utils';
+import { formatDate, initials } from '../../lib/utils';
 
 interface Delegate {
   id: string;
@@ -53,10 +53,28 @@ export function DelegatesCard() {
     }
   };
 
+  const startInvite = () => {
+    setSent(null);
+    setAdding(true);
+  };
+
   return (
-    <Panel id="delegates" title="Parents and sponsors" icon={<UsersRound className="h-4 w-4" aria-hidden />} className="mt-6">
-      <p className="text-sm text-navy-600">
-        Invite a parent, guardian or sponsor to upload documents for you, such as bank statements. They get a private link by email. They can only upload: they can't open your documents or see the rest of your account.
+    <Panel
+      id="delegates"
+      title="Parents and sponsors"
+      icon={<UsersRound className="h-4 w-4" aria-hidden />}
+      action={
+        !adding && (
+          <Button size="sm" variant="outline" onClick={startInvite} className="whitespace-nowrap" data-invite-delegate>
+            <UserPlus className="h-4 w-4" aria-hidden /> Invite someone
+          </Button>
+        )
+      }
+    >
+      <p className="text-sm text-navy-600">Invite a parent, guardian or sponsor to upload documents for you, such as bank statements. They get a private link by email.</p>
+      <p className="mt-3 flex items-start gap-2 rounded-xl bg-ivory px-4 py-3 text-xs text-navy-600">
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
+        They can only upload. They can't open your documents or see the rest of your account, and you can remove their access at any time.
       </p>
 
       {sent && (
@@ -79,18 +97,23 @@ export function DelegatesCard() {
       )}
 
       {people.length > 0 && (
-        <ul className="mt-4 divide-y divide-navy-100" aria-label="People you've invited">
+        <ul className="mt-4 space-y-2" aria-label="People you've invited">
           {people.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3" data-delegate={p.email}>
+            <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-navy-100 px-4 py-3" data-delegate={p.email}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-navy-900 font-display text-sm text-gold-400" aria-hidden>
+                {initials(p.name)}
+              </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-navy-900">
-                  {p.name} <span className="font-normal text-navy-500">· {p.relation}</span>
+                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-navy-900">
+                  {p.name}
+                  <span className="rounded-full bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">{p.relation}</span>
                 </p>
                 <p className="truncate text-xs text-navy-500">
                   {p.email} · {p.uploads ? `${p.uploads} uploaded` : 'Nothing uploaded yet'}
                 </p>
               </div>
-              {p.expired ? <Pill tone="grey">Expired</Pill> : <span className="text-xs text-navy-400">Link works until {formatDate(p.expiresAt)}</span>}
+              <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
+              {p.expired ? <Pill tone="grey">Link expired</Pill> : <span className="text-xs text-navy-400">Link works until {formatDate(p.expiresAt)}</span>}
               <button
                 type="button"
                 onClick={() => act(() => api.delete(`/me/delegates/${p.id}`))}
@@ -100,13 +123,17 @@ export function DelegatesCard() {
               >
                 <Trash2 className="h-4 w-4" aria-hidden />
               </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
 
-      {adding ? (
-        <form onSubmit={submit} noValidate className="mt-4 rounded-xl border border-navy-100 p-4" data-delegate-form>
+      {people.length === 0 && !adding && !sent && <p className="mt-4 rounded-xl border border-dashed border-navy-200 px-4 py-6 text-center text-sm text-navy-500">You haven't invited anyone yet.</p>}
+
+      {adding && (
+        <form onSubmit={submit} noValidate className="mt-4 rounded-xl border border-navy-100 bg-ivory/50 p-4 sm:p-5" data-delegate-form>
+          <p className="mb-4 text-sm font-semibold text-navy-900">Invite someone to upload for you</p>
           {formError && (
             <p role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
               {formError}
@@ -126,18 +153,6 @@ export function DelegatesCard() {
             </Button>
           </div>
         </form>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setSent(null);
-            setAdding(true);
-          }}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-navy-700 ring-1 ring-navy-200 transition hover:bg-navy-50"
-          data-invite-delegate
-        >
-          <UserPlus className="h-4 w-4" aria-hidden /> Invite someone
-        </button>
       )}
     </Panel>
   );

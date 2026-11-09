@@ -221,9 +221,10 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       const sl = j.shortlist;
       const shared = !!sl?.sharedAt || (!!sl && sl.status !== 'draft') || skippedShortlist(j);
       const preparing = sl?.status === 'draft' && sl.items.length > 0;
-      if (j.careerPlan && shared) return { status: 'completed', summary: `Career plan and shortlist shared · ${j.careerPlan.summary}` };
+      // The plan itself is shown in the stage's details (and on the Applications page), not in this line.
+      if (j.careerPlan && shared) return { status: 'completed', summary: 'Career plan and shortlist shared' };
       if (j.careerPlan) {
-        return { status: 'in_progress', summary: `Career plan shared · ${j.careerPlan.summary}`, next: preparing ? 'Your counsellor is preparing your university shortlist' : 'Your counsellor will share your university shortlist' };
+        return { status: 'in_progress', summary: 'Career plan shared', next: preparing ? 'Your counsellor is preparing your university shortlist' : 'Your counsellor will share your university shortlist' };
       }
       if (shared) return { status: 'in_progress', summary: 'University shortlist shared', next: 'Your counsellor shares your career plan after your counselling session' };
       // Any session ever booked counts, so later sessions or a cancellation never move this step back.
