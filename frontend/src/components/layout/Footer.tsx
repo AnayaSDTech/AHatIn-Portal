@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Clock, Mail, MapPin, Phone } from 'lucide-react';
+import { Clock, Mail, MapPin } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
-import { DemoBadge } from '../ui/DemoBadge';
 import { contact, destinations, navLinks, services } from '../../data/site';
 
 export function Footer() {
@@ -17,7 +16,6 @@ export function Footer() {
             Free, honest guidance for Indian students heading to the UK and Europe, from career counselling to
             settling in abroad.
           </p>
-          <DemoBadge light className="mt-6" label="Demo website" />
         </div>
 
         <div className="lg:col-span-2">
@@ -49,19 +47,19 @@ export function Footer() {
         </div>
 
         <div className="lg:col-span-3">
-          <h3 className="font-sans text-sm font-semibold uppercase tracking-wider text-white">Contact (demo)</h3>
+          <h3 className="font-sans text-sm font-semibold uppercase tracking-wider text-white">Contact</h3>
           <ul className="mt-4 space-y-4 text-sm">
-            <li className="flex gap-3">
-              <Phone className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
-              <a href={`tel:${contact.phone.replace(/\s/g, '')}`} className="hover:text-gold-300">{contact.phone}</a>
-            </li>
             <li className="flex gap-3">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
               <a href={`mailto:${contact.email}`} className="hover:text-gold-300">{contact.email}</a>
             </li>
             <li className="flex gap-3">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
-              <span>{contact.address}</span>
+              <span>
+                {contact.offices.map((o) => (
+                  <span key={o} className="block">{o}</span>
+                ))}
+              </span>
             </li>
             <li className="flex gap-3">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
@@ -73,10 +71,10 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <Container className="flex flex-col items-center justify-between gap-3 py-6 text-xs text-navy-400 sm:flex-row">
-          <p>© {year} AHat International Educational Consultancy. Demo build: names, figures and contact details are fictional.</p>
+          <p>© {year} AHat International Educational Consultancy, a trading name of AnayaSD Limited.</p>
           <p className="flex gap-5">
-            <a href="#" className="hover:text-gold-300">Privacy notice</a>
-            <a href="#" className="hover:text-gold-300">Terms of use</a>
+            <Link to="/privacy" className="hover:text-gold-300">Privacy notice</Link>
+            <Link to="/terms" className="hover:text-gold-300">Terms of use</Link>
           </p>
         </Container>
       </div>

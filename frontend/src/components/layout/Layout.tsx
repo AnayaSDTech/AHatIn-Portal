@@ -6,16 +6,19 @@ import { UpdatePrompt } from '../pwa/UpdatePrompt';
 
 /** Scrolls to the #section in the URL, or to the top on a new page. */
 function ScrollManager() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, key } = useLocation();
+  // A new page: start at the top.
   useEffect(() => {
-    if (hash) {
-      const id = hash.slice(1);
-      // Wait a frame so the target section has rendered.
-      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    } else {
-      window.scrollTo({ top: 0 });
-    }
+    if (!hash) window.scrollTo({ top: 0 });
   }, [pathname, hash]);
+  // A link to a section: scroll to it. `key` changes on every click, so the same section link works twice in a row.
+  useEffect(() => {
+    if (!hash) return;
+    const id = hash.slice(1);
+    // Wait a frame so the target section has rendered.
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, key]);
   return null;
 }
 

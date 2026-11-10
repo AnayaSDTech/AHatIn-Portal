@@ -131,8 +131,8 @@ export function RegisterPage() {
           <label className="flex items-start gap-3 text-sm leading-relaxed text-navy-700">
             <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-navy-300 accent-navy-900" aria-invalid={!!errors.consent} {...register('consent')} />
             <span>
-              I agree to the <a href="#" className="font-medium text-navy-900 underline underline-offset-2">Terms of use</a> and{' '}
-              <a href="#" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>, and I understand AHat may earn
+              I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Terms of use</a> and{' '}
+              <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>, and I understand AHat may earn
               commission from universities through partner agencies, which will be disclosed to me.
             </span>
           </label>

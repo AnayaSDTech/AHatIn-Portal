@@ -244,9 +244,7 @@ export const faqs = [
 ];
 
 export const contact = {
-  // DEMO contact details
-  phone: '+91 98000 00000',
-  email: 'hello@ahatin.example',
-  address: 'Demo Office, 2nd Floor, MG Road, Pune 411001',
+  email: 'contact@ahat.in',
+  offices: ['Nagpur, India', 'London, United Kingdom'],
   hours: 'Mon–Sat, 10:00–19:00 IST',
 };

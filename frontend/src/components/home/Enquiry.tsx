@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CheckCircle2, Clock, Mail, Phone, Send } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2, Clock, Mail, MapPin, Send } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Reveal } from '../ui/Reveal';
 import { Button } from '../ui/Button';
@@ -76,7 +76,7 @@ export function Enquiry() {
       setDone({ name: data.name, result });
       reset(blank);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again, or call us.');
+      setFormError(err instanceof ApiError ? err.message : `Something went wrong. Please try again, or email us at ${contact.email}.`);
     }
   });
 
@@ -104,14 +104,14 @@ export function Enquiry() {
                 ))}
               </ul>
               <div className="relative mt-10 space-y-3 border-t border-white/10 pt-8 text-sm">
-                <a href={`tel:${contact.phone.replace(/\s/g, '')}`} className="flex items-center gap-3 text-white hover:text-gold-300">
-                  <Phone className="h-4 w-4 text-gold-400" aria-hidden /> {contact.phone}
-                </a>
                 <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-white hover:text-gold-300">
                   <Mail className="h-4 w-4 text-gold-400" aria-hidden /> {contact.email}
                 </a>
                 <p className="flex items-center gap-3 text-navy-200">
                   <Clock className="h-4 w-4 text-gold-400" aria-hidden /> {contact.hours}
+                </p>
+                <p className="flex items-center gap-3 text-navy-200">
+                  <MapPin className="h-4 w-4 text-gold-400" aria-hidden /> {contact.offices.join(' · ')}
                 </p>
               </div>
             </div>
@@ -164,7 +164,7 @@ export function Enquiry() {
                       <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-navy-300 accent-navy-900" aria-invalid={!!errors.consent} {...register('consent')} />
                       <span>
                         I agree that AHat may contact me by phone, email or WhatsApp about my enquiry, as described in the{' '}
-                        <a href="#" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>.
+                        <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>.
                       </span>
                     </label>
                     {errors.consent && <p className="mt-1.5 text-xs font-medium text-red-600" role="alert">{errors.consent.message}</p>}

@@ -37,7 +37,7 @@ async def submit_enquiry(body: EnquiryBody, request: Request):
     if body.website.strip():
         return {"kind": "ignored"}
     ip = request.client.host if request.client else "unknown"
-    await hit(f"enquiry:ip:{ip}", 3, 600, "You have sent several enquiries in the last few minutes. Please wait a little, or call us instead.")
+    await hit(f"enquiry:ip:{ip}", 3, 600, "You have sent several enquiries in the last few minutes. Please wait a little, or email us at contact@ahat.in.")
 
     db = get_db()
     t = now()

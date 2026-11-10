@@ -23,6 +23,8 @@ import {
 } from './pages/student/StudentPages';
 import { ProfilePage as StudentProfilePage } from './pages/student/ProfilePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { PrivacyPage } from './pages/legal/PrivacyPage';
+import { TermsPage } from './pages/legal/TermsPage';
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
 import { StaffSetupPage } from './pages/staff/StaffSetupPage';
 import { ErrorToast } from './components/ui/ErrorToast';
@@ -48,6 +50,8 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <HomePage /> },
+      { path: '/privacy', element: <PrivacyPage /> },
+      { path: '/terms', element: <TermsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
