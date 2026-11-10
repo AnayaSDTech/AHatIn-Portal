@@ -16,7 +16,7 @@ export function Services() {
           light
           eyebrow="Our services"
           title={<>Nine services. <span className="italic text-gold-400">One seamless journey.</span></>}
-          description="Every service is free, and each one hands over smoothly to the next. Your portal shows where you are at all times."
+          description="All free. All connected. Tracked in your portal."
         />
 
         {/* Nine cards in an even 3 × 3 grid (one column on phones). */}

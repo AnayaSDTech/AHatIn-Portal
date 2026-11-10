@@ -250,7 +250,7 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
           next: offers[0] ? `Reply to your offer from ${offers[0].university}` : newOption ?? (drafts[0] ? `Your counsellor is preparing your ${drafts[0].university} application` : 'Waiting for university decisions'),
         };
       }
-      // Under way as soon as the shortlist is approved: the counsellor is preparing the applications.
+      // Once the shortlist is approved, the counsellor is preparing the applications.
       const shortlistDone = !!j.shortlist?.firstApprovedAt || skippedShortlist(j) || ['completed', 'not_needed'].includes(j.overrides.S1?.status ?? '');
       if (apps.length || shortlistDone) {
         return {
@@ -259,7 +259,14 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
           next: newOption ?? (applicationDocumentsDue(s) ? 'Upload your remaining documents' : undefined),
         };
       }
-      return { status: 'not_started', summary: 'Starts after you approve your shortlist', next: shortlistWaiting ? 'Review and approve your shortlist' : undefined };
+      // Under way as soon as the shortlist is shared: choosing where to apply is this stage's first step.
+      const shortlistShared = !!j.shortlist && (!!j.shortlist.sharedAt || j.shortlist.status !== 'draft');
+      if (shortlistShared) {
+        return shortlistWaiting
+          ? { status: 'in_progress', summary: 'Shortlist shared with you', next: 'Review and approve your shortlist' }
+          : { status: 'in_progress', summary: 'Your counsellor is updating your shortlist', next: 'Review and approve your shortlist once it is shared again' };
+      }
+      return { status: 'not_started', summary: 'Starts once your counsellor shares your shortlist' };
     }
     case 'S4': {
       const f = j.funding;

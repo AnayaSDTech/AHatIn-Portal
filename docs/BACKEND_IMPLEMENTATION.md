@@ -1006,7 +1006,8 @@ Statuses are **computed** from the student's data on every read, never stored, s
 | S3 | completed | "Offer accepted · {university}" | |
 | S3 | in progress | "{sent} of {total} submitted · {offers} offer(s)" | first offer: "Reply to your offer from {university}"; else first draft: "Your counsellor is preparing your {university} application"; else "Waiting for university decisions" |
 | S3 | not started, drafts exist | "{n} application(s) being prepared" | "Make sure your documents are uploaded" |
-| S3 | not started | "Starts after you approve your shortlist" | |
+| S3 | in progress, shortlist shared but not yet approved | "Shortlist shared with you" | "Review and approve your shortlist" |
+| S3 | not started | "Starts once your counsellor shares your shortlist" | |
 | S4 | completed | "Proof of funds verified" | |
 | S4 | in progress | "₹{covered} lakh of ₹{cost} lakh covered · {n} scholarship(s)" (or "₹{covered} lakh planned") | first missing/rejected funds document: "Upload: {name}" / "Re-upload: {name}"; any pending: "Your counsellor is checking your proof of funds"; no funds documents: "Your counsellor will list the proof of funds you need" |
 | S4 | not started | "Estimated cost of study ₹{cost} lakh" or "Starts once your shortlist is approved" | "Add your funding plan" (when cost is set) |

@@ -46,7 +46,7 @@ export function Scholarships() {
 
   const isStudent = user?.role === 'student' || user?.role === 'parent';
   const fullList = isStudent ? '/dashboard/scholarships' : '/register';
-  const cta = isStudent ? 'See all scholarships' : 'Register free to see full details';
+  const cta = isStudent ? 'See all scholarships' : 'Register free for full details';
 
   return (
     <section id="scholarships" className="relative scroll-mt-24 bg-ivory py-24 sm:py-32">
@@ -54,7 +54,7 @@ export function Scholarships() {
         <SectionHeading
           eyebrow="Scholarships for study abroad"
           title={<>Funding your degree <span className="italic text-gold-600">is possible</span></>}
-          description={`We track ${data.total} Indian government and trust scholarships and loans for studying abroad: ${data.central} central schemes and offers from ${data.states} states. Here are a few of them.`}
+          description={`${data.total} scholarships and loans for studying abroad: ${data.central} central schemes, plus awards from ${data.states} states and private trusts.`}
         />
 
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -95,7 +95,7 @@ export function Scholarships() {
                     aria-label={`View full details of ${s.name}`}
                   >
                     {isStudent ? null : <Lock className="h-3.5 w-3.5" aria-hidden />}
-                    View eligibility and how to apply
+                    Eligibility & how to apply
                     <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
                   </Link>
                 </div>
@@ -110,7 +110,7 @@ export function Scholarships() {
           </ButtonLink>
           {!isStudent && (
             <p className="max-w-md text-sm text-navy-500">
-              With a free account you can see all {data.total} scholarships, check which ones you qualify for, and get help applying from your counsellor.
+              Free account: see all {data.total}, check your eligibility and get help applying.
             </p>
           )}
         </Reveal>

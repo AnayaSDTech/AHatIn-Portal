@@ -13,7 +13,7 @@ export function Universities() {
         <SectionHeading
           eyebrow="Top-ranked universities"
           title={<>The UK and Europe's <span className="italic text-gold-600">leading universities</span></>}
-          description={`Ranked in the ${qsEdition}. Your shortlist is always built around your profile, budget and goals.`}
+          description={`${qsEdition}. Your shortlist fits your profile and budget.`}
         />
         <div className="mt-4 flex justify-center">
           <DemoBadge label="Illustrative list · not a partnership claim" />
@@ -42,7 +42,7 @@ export function Universities() {
           ))}
         </div>
         <p className="mt-6 text-center text-xs text-navy-400">
-          Source: {qsEdition}, published June 2026. “Joint” means the rank is shared with another university. Ranks change every year.
+          Source: {qsEdition}, June 2026. “Joint” means a shared rank.
         </p>
 
         <Reveal className="mt-16">
@@ -50,8 +50,8 @@ export function Universities() {
             <SmartImage src={images.campus} alt="University campus" className="h-64 w-full sm:h-80" />
             <div className="absolute inset-0 flex items-center bg-gradient-to-r from-navy-950/90 via-navy-950/60 to-transparent">
               <div className="max-w-lg px-8 sm:px-12">
-                <p className="font-display text-2xl text-white sm:text-3xl">150+ universities reachable through our partner agencies</p>
-                <p className="mt-3 text-sm text-navy-100">Demo figure. We apply through trusted partner agencies across the UK and Europe.</p>
+                <p className="font-display text-2xl text-white sm:text-3xl">150+ universities through our partners</p>
+                <p className="mt-3 text-sm text-navy-100">Demo figure. Applications via trusted partner agencies.</p>
               </div>
             </div>
           </div>

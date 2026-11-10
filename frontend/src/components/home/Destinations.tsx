@@ -13,7 +13,7 @@ export function Destinations() {
         <SectionHeading
           eyebrow="Study destinations"
           title={<>Where will your degree <span className="italic text-gold-600">take you?</span></>}
-          description="We specialise in the UK and Europe, two of the world's strongest study destinations, so our advice is deep, current and practical."
+          description="UK and Europe specialists. Advice that is current and practical."
         />
 
         <div className="mx-auto mt-16 grid max-w-5xl gap-8 md:grid-cols-2">

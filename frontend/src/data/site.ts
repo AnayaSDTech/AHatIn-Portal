@@ -50,16 +50,16 @@ export interface Destination {
 export const destinations: Destination[] = [
   {
     name: 'United Kingdom',
-    tagline: 'One-year master’s degrees and world-famous universities',
+    tagline: 'World-famous universities. One-year master’s.',
     image: img('photo-1513635269975-59663e0ac1ad', 900),
-    highlights: ['1-year master’s programmes', 'Graduate Route work visa', 'Scholarships for Indian students'],
+    highlights: ['1-year master’s degrees', 'Graduate Route work visa', 'Scholarships for Indians'],
     intakes: 'September · January',
   },
   {
     name: 'Europe',
-    tagline: 'Germany, Ireland and France: quality education, lower costs',
+    tagline: 'Top quality. Lower costs.',
     image: img('photo-1502602898657-3e91760cbb34', 900),
-    highlights: ['Low or no tuition in Germany', 'English-taught programmes', 'Post-study work in Ireland'],
+    highlights: ['Low or no fees in Germany', 'Taught in English', 'Work after study in Ireland'],
     intakes: 'Winter · Summer · September',
   },
 ];
@@ -75,64 +75,64 @@ export const services: Service[] = [
   {
     code: 'S1',
     title: 'Career Counselling & Course Selection',
-    description: 'We understand your strengths and goals, then recommend courses that lead to the career you want.',
+    description: 'Find the course that fits your goals.',
     icon: Compass,
   },
   {
     code: 'S2',
     title: 'University & Country Selection',
-    description: 'Compare countries on cost, work rights and visas, and build a shortlist that fits your profile and budget.',
+    description: 'The right country and university for your budget.',
     icon: GraduationCap,
   },
   {
     code: 'S3',
     title: 'Application Assistance',
-    description: 'SOP, LOR and CV guidance, complete applications, and help comparing and accepting offers.',
+    description: 'SOP, LOR, CV and applications, done right.',
     icon: FileText,
   },
   {
     code: 'S4',
     title: 'Scholarship & Financial Guidance',
-    description: 'Scholarship search, a clear cost-of-study estimate, funding plans and proof-of-funds planning.',
+    description: 'Scholarships, cost estimates and a funding plan.',
     icon: Coins,
   },
   {
     code: 'S5',
     title: 'Visa Assistance',
-    description: 'Visa checklists, financial-document checks, form review and mock interviews.',
+    description: 'Checklists, document checks and mock interviews.',
     icon: Stamp,
   },
   {
     code: 'S6',
     title: 'Pre-Departure Support',
-    description: 'Accommodation, travel, forex, insurance and a clear plan for your first week abroad.',
+    description: 'Housing, flights, forex and insurance, sorted.',
     icon: Luggage,
   },
   {
     code: 'S7',
     title: 'Post-Arrival Support',
-    description: 'Safe-arrival check, local registration help and regular check-ins during your first months.',
+    description: 'A safe-arrival check and support in your first months.',
     icon: HeartHandshake,
   },
   {
     code: 'S8',
     title: 'On-site Support',
-    description: 'Help on the ground in your study country: settling into housing, local appointments, and a contact to call when you need a hand.',
+    description: 'A local contact whenever you need a hand.',
     icon: MapPinned,
   },
   {
     code: 'S9',
     title: 'Job Assistance',
-    description: 'A CV for the local market, part-time job search within your visa rules, and guidance on graduate jobs and post-study work.',
+    description: 'Part-time jobs, local CVs and post-study work.',
     icon: Briefcase,
   },
 ];
 
 export const aboutPoints = [
-  { title: 'Always free for students', text: 'Our guidance costs you nothing, from first conversation to settling in.' },
-  { title: 'Dedicated counsellor', text: 'A dedicated counsellor stays with you through every step.' },
-  { title: 'Honest, transparent advice', text: 'We tell you which universities earn us commission, so you can decide with confidence.' },
-  { title: 'Your progress, always visible', text: 'Track every application, document and deadline in your student portal.' },
+  { title: 'Free for students', text: 'No fees, from day one to settling in.' },
+  { title: 'Your own counsellor', text: 'One expert with you at every step.' },
+  { title: 'Honest advice', text: 'We tell you which universities pay us commission.' },
+  { title: 'Track everything', text: 'Applications, documents and deadlines in one portal.' },
 ];
 
 /** Edition the ranks below come from. Update the list and this label together once a year. */
@@ -151,10 +151,6 @@ export const universities = [
   { name: 'EPFL', country: 'Switzerland', city: 'Lausanne', qsRank: '=22', programmes: 'Engineering, Computer Science' },
   { name: 'Technical University of Munich', country: 'Germany', city: 'Munich', qsRank: '25', programmes: 'Engineering, Informatics, Management' },
   { name: 'Université PSL', country: 'France', city: 'Paris', qsRank: '34', programmes: 'Sciences, Economics, Arts' },
-  { name: 'University of Edinburgh', country: 'United Kingdom', city: 'Edinburgh', qsRank: '35', programmes: 'Informatics, Medicine, Business' },
-  { name: 'King’s College London', country: 'United Kingdom', city: 'London', qsRank: '37', programmes: 'Law, Health, Digital Humanities' },
-  { name: 'University of Manchester', country: 'United Kingdom', city: 'Manchester', qsRank: '=40', programmes: 'Business, Data Science, Engineering' },
-  { name: 'Trinity College Dublin', country: 'Ireland', city: 'Dublin', qsRank: '75', programmes: 'Computer Science, Business, Biotech' },
 ];
 
 /** DEMO: fictional student stories. */
@@ -223,27 +219,27 @@ export const testimonials: { name: string; university: string; course?: string; 
 export const faqs = [
   {
     q: 'Is AHat’s guidance really free?',
-    a: 'Yes. Our counselling and application support are free for students. Universities and our partner agencies pay us when a student enrols, and we always tell you which universities earn us commission.',
+    a: 'Yes. Universities and partner agencies pay us when you enrol, and we always tell you which ones.',
   },
   {
     q: 'Which countries do you help with?',
-    a: 'We guide students to the United Kingdom and Europe, mainly Germany, Ireland and France.',
+    a: 'The UK and Europe, mainly Germany, Ireland and France.',
   },
   {
     q: 'When should I start preparing?',
-    a: 'Ideally 9 to 12 months before your intake. That leaves time for tests, applications, scholarships and the visa without rushing.',
+    a: '9 to 12 months before your intake. Enough time for tests, applications and the visa.',
   },
   {
     q: 'Do you help with scholarships and education loans?',
-    a: 'Yes. We estimate your full cost of study, help you build a funding plan, find scholarships you are eligible for, and connect you with loan partners if you need one.',
+    a: 'Yes. We estimate your costs, find scholarships for you and connect you with loan partners.',
   },
   {
     q: 'What happens after I get my visa?',
-    a: 'We help with accommodation, travel and forex, confirm you have arrived safely, and check in during your first three months abroad.',
+    a: 'We help with housing, travel and forex, and check in during your first three months.',
   },
   {
     q: 'Can my parents follow my progress?',
-    a: 'Yes. You can invite parents to the student portal, where they can see your progress and pay fees such as visa or application fees.',
+    a: 'Yes. Invite them to your portal to follow your progress and pay fees.',
   },
 ];
 

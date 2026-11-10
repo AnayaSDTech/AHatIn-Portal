@@ -52,24 +52,23 @@ export function Hero() {
             Free guidance · UK · Europe
           </span>
           <h1 className="mt-6 animate-fade-up text-4xl font-semibold leading-[1.1] text-white [animation-delay:100ms] sm:text-5xl lg:text-6xl">
-            Your journey to a world-class university,{' '}
-            <span className="italic text-gold-400">guided every step</span> of the way.
+            Study at a world-class university.{' '}
+            <span className="italic text-gold-400">We guide every step.</span>
           </h1>
           <p className="mt-6 max-w-xl animate-fade-up text-lg leading-relaxed text-navy-100 [animation-delay:200ms]">
-            From choosing the right course to settling in abroad, AHat gives Indian students honest advice, a dedicated
-            counsellor and a portal that shows exactly what happens next.
+            Honest advice, your own counsellor and a portal that always shows what's next.
           </p>
           <div className="mt-9 flex animate-fade-up flex-col gap-3 [animation-delay:300ms] sm:flex-row">
             <ButtonLink to="/register" variant="gold" size="lg">
-              Start your free assessment
+              Start free assessment
               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
             </ButtonLink>
             <ButtonLink to="/#enquire" variant="light" size="lg">
-              Request a call back
+              Get a call back
             </ButtonLink>
           </div>
           <ul className="mt-8 flex animate-fade-up flex-wrap gap-x-6 gap-y-2 text-sm text-navy-200 [animation-delay:400ms]">
-            {['No consultancy fees', 'Dedicated counsellor', 'Transparent and honest advice'].map((t) => (
+            {['No fees', 'Your own counsellor', 'Honest advice'].map((t) => (
               <li key={t} className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-gold-400" aria-hidden />
                 {t}

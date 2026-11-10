@@ -13,12 +13,12 @@ export function About() {
           <SmartImage
             src={images.about}
             alt="Students studying together"
-            className="aspect-[4/5] w-full rounded-[2rem] shadow-lift sm:aspect-[5/4] lg:aspect-[4/5]"
+            className="aspect-square w-full rounded-[2rem] shadow-lift sm:aspect-[5/4] lg:aspect-square"
           />
           <div className="absolute -bottom-8 -right-4 max-w-xs rounded-2xl bg-white p-6 shadow-lift sm:-right-8">
             <Quote className="h-6 w-6 text-gold-500" aria-hidden />
             <p className="mt-3 font-display text-lg leading-snug text-navy-900">
-              “We measure success by where our students end up, not by how many we sign up.”
+              “Success is where our students end up, not how many sign up.”
             </p>
             <p className="mt-3 text-xs font-medium uppercase tracking-wider text-navy-400">AHat founding principle</p>
           </div>
@@ -30,7 +30,7 @@ export function About() {
             align="left"
             eyebrow="About AHat"
             title={<>Advice you can trust, <span className="italic text-gold-600">people who care</span></>}
-            description="AHat International Educational Consultancy helps Indian students make one of the biggest decisions of their lives with clarity and confidence. We combine experienced counsellors with a modern student portal, so nothing falls through the cracks."
+            description="We help Indian students make a big decision with clarity and confidence. Expert counsellors and a smart portal, so nothing is missed."
           />
           <div className="mt-10 grid gap-6 sm:grid-cols-2">
             {aboutPoints.map((p, i) => (

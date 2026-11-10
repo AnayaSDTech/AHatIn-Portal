@@ -19,11 +19,11 @@ function ThankYou({ name, result, onAgain }: { name: string; result: EnquiryResu
   const text =
     result.kind === 'student'
       ? result.counsellor
-        ? `You already have an AHat account, so we've passed this to your counsellor, ${result.counsellor}, who will get back to you. You can also log in to see your progress.`
-        : "You already have an AHat account, so we've added this to your record and the AHat team will get back to you. You can also log in to see your progress."
+        ? `You already have an account, so we've passed this to ${result.counsellor}. Log in to see your progress.`
+        : "You already have an account, so the AHat team will get back to you. Log in to see your progress."
       : result.kind === 'lead'
-        ? `We've added this to your earlier enquiry. ${result.counsellor ?? 'The AHat team'} will call you to talk it through.`
-        : `The AHat team will call you on your mobile within working hours (${contact.hours}).`;
+        ? `Added to your earlier enquiry. ${result.counsellor ?? 'The AHat team'} will call you.`
+        : `We'll call you within working hours (${contact.hours}).`;
   return (
     <div role="status" className="flex h-full flex-col items-center justify-center py-8 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
@@ -38,7 +38,7 @@ function ThankYou({ name, result, onAgain }: { name: string; result: EnquiryResu
           </Link>
         ) : (
           <Link to="/register" className="inline-flex items-center justify-center gap-2 rounded-full bg-navy-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-navy-800">
-            Create your free account now <ArrowRight className="h-4 w-4" aria-hidden />
+            Create free account <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         )}
         <Button type="button" variant="outline" onClick={onAgain}>Send another enquiry</Button>
@@ -93,10 +93,10 @@ export function Enquiry() {
                 Have a question? <span className="italic text-gold-400">Ask a counsellor.</span>
               </h2>
               <p className="relative mt-4 text-navy-100">
-                No account needed. Tell us a little about your plans and a counsellor will call you back, usually on the same working day.
+                No account needed. A counsellor usually calls back the same working day.
               </p>
               <ul className="relative mt-8 space-y-3 text-sm text-navy-100">
-                {['Free, with no obligation to register', 'Honest advice on the UK and Europe', 'One counsellor who stays with you'].map((t) => (
+                {['Free, no obligation', 'Honest UK and Europe advice', 'One counsellor, start to finish'].map((t) => (
                   <li key={t} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
                     {t}

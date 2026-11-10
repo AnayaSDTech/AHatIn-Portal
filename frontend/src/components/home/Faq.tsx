@@ -15,7 +15,7 @@ export function Faq() {
             align="left"
             eyebrow="FAQs"
             title="Questions students and parents ask"
-            description="Can't find your answer? Send us your question and a counsellor will call you back."
+            description="Still unsure? Ask us and a counsellor will call you."
           />
           <Reveal className="mt-8">
             <ButtonLink to="/#enquire" variant="primary">
