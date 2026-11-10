@@ -1,3 +1,12 @@
-# Client demo with fictional data: keep it out of search engines.
+# Public pages are open to search engines; the student portal, staff area and sign-in pages are not.
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /dashboard
+Disallow: /staff
+Disallow: /admin
+Disallow: /upload
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+
+Sitemap: https://ahat.in/sitemap.xml

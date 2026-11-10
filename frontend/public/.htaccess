@@ -26,8 +26,6 @@
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
   Header always set Strict-Transport-Security "max-age=31536000"
-  # Demo content: keep the site out of search results until the real content is in. Remove this line to go live.
-  Header always set X-Robots-Tag "noindex, nofollow"
 
   # Built assets have hashed names, so they can be cached for a year.
   <FilesMatch "\.(js|css|woff2?|png|svg|jpg|webp)$">

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
@@ -85,3 +86,9 @@ app.include_router(api)
 async def health():
     await client().admin.command("ping")
     return {"status": "ok"}
+
+
+@app.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)
+async def robots():
+    """The API is not a website: keep search engines out of it."""
+    return "User-agent: *\nDisallow: /\n"
