@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from app.core.auth import is_staff
+from app.core.auth import REFERRER, is_staff
 from app.core.clock import now
 from app.core.errors import ApiError, not_found
 from app.core.scope import visible_student
@@ -69,6 +69,8 @@ async def create_student_record(user: dict, *, destination: str | None, intake: 
 
 
 async def own_record(user: dict) -> dict:
+    if user["role"] == REFERRER:
+        raise ApiError(403, "Referrer accounts don't have a student record.")
     record = await get_db().students.find_one({"userId": user["_id"]})
     if not record:
         raise not_found("Your student record was not found. Please contact AHat.")

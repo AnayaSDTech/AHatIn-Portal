@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, ArrowRight, Briefcase } from 'lucide-react';
+import { AlertCircle, ArrowRight, Briefcase, Gift, GraduationCap } from 'lucide-react';
 import { AuthShell } from '../components/auth/AuthShell';
 import { VerifyCodeStep } from '../components/auth/VerifyCodeStep';
 import { homeFor } from '../components/auth/RouteGuards';
@@ -12,8 +12,11 @@ import { useAuth } from '../context/AuthContext';
 import { studentLoginSchema, type StudentLoginForm } from '../lib/validation';
 import { ApiError, type OtpRequestResult, type User } from '../lib/api/types';
 
-/** Student and parent login: email and password. An email that was never verified is verified with a code first. */
-export function LoginPage() {
+/**
+ * Student and parent login: email and password. An email that was never verified is verified with a code first.
+ * `referrer`: the same login, worded for referrers. Either page takes anyone to their own home after login.
+ */
+export function LoginPage({ referrer = false }: { referrer?: boolean }) {
   const { login, verifyEmail, resendVerification } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,7 +38,10 @@ export function LoginPage() {
   const typedEmail = watch('email');
 
   // signedIn: the dashboard opens the profile form if the profile isn't complete yet.
-  const goHome = (user: User) => navigate(from && homeFor(user.role) === '/dashboard' ? from : homeFor(user.role), { replace: true, state: { signedIn: true } });
+  const goHome = (user: User) => {
+    const home = homeFor(user.role);
+    navigate(from && from.startsWith(home) ? from : home, { replace: true, state: { signedIn: true } });
+  };
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setFormError(null);
@@ -69,12 +75,12 @@ export function LoginPage() {
 
   return (
     <AuthShell
-      title="Student login"
+      title={referrer ? 'Referrer login' : 'Student login'}
       subtitle={
         <>
-          Log in with your email and password. New here?{' '}
-          <Link to="/register" className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
-            Create a free account
+          Log in with your email and password. {referrer ? 'Not a referrer yet?' : 'New here?'}{' '}
+          <Link to={referrer ? '/referrer/register' : '/register'} className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
+            {referrer ? 'Become a referrer' : 'Create a free account'}
           </Link>
         </>
       }
@@ -106,12 +112,16 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="mt-10 border-t border-navy-100 pt-6">
+      <div className="mt-10 flex flex-col items-center gap-3 border-t border-navy-100 pt-6 text-sm font-medium text-navy-500">
         <Link
-          to="/staff/login"
+          to={referrer ? '/login' : '/referrer/login'}
           state={{ email: typedEmail }}
-          className="flex items-center justify-center gap-2 text-sm font-medium text-navy-500 transition hover:text-navy-900"
+          className="flex items-center justify-center gap-2 transition hover:text-navy-900"
         >
+          {referrer ? <GraduationCap className="h-4 w-4" aria-hidden /> : <Gift className="h-4 w-4" aria-hidden />}
+          {referrer ? 'Studying abroad with us? Student login' : 'Referring someone? Referrer login'}
+        </Link>
+        <Link to="/staff/login" state={{ email: typedEmail }} className="flex items-center justify-center gap-2 transition hover:text-navy-900">
           <Briefcase className="h-4 w-4" aria-hidden /> AHat staff? Staff sign in
         </Link>
       </div>

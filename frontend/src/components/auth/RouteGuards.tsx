@@ -9,7 +9,14 @@ import { NotFoundPage } from '../../pages/NotFoundPage';
 export function homeFor(role: Role) {
   if (role === 'admin') return '/admin';
   if (isStaff(role)) return '/staff';
+  if (role === 'referrer') return '/referrer';
   return '/dashboard';
+}
+
+/** The login page for an area only these roles may use. */
+function loginFor(roles: Role[]) {
+  if (roles.every((r) => r === 'referrer')) return '/referrer/login';
+  return roles.some(isStaff) && !roles.includes('student') ? '/staff/login' : '/login';
 }
 
 function FullPageLoader() {
@@ -29,10 +36,7 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <FullPageLoader />;
-  if (!user) {
-    const staffArea = roles.some(isStaff) && !roles.includes('student');
-    return <Navigate to={staffArea ? '/staff/login' : '/login'} replace state={{ from: location.pathname }} />;
-  }
+  if (!user) return <Navigate to={loginFor(roles)} replace state={{ from: location.pathname }} />;
   if (!roles.includes(user.role)) return <NotFoundPage />;
   return <>{children}</>;
 }

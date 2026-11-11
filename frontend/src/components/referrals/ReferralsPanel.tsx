@@ -17,8 +17,9 @@ interface Referral {
   source: 'invite' | 'link';
   status: ReferralStatus;
   at: string;
-  /** Who referred them (the admin's view). */
+  /** Who referred them, and their role (the admin's view). */
   referrer?: string;
+  referrerRole?: string;
   /** Development and demo addresses only, where the email can't arrive. */
   demoLink?: string;
 }
@@ -55,7 +56,15 @@ async function copyText(text: string) {
 }
 
 /** "Refer a Friend/Family": the person's link, an invitation by email, and how far each person has got. */
-export function ReferralsPanel({ showReferrer = false }: { /** The admin sees everyone's referrals, and who made each. */ showReferrer?: boolean }) {
+export function ReferralsPanel({
+  showReferrer = false,
+  shareMessage = "I've been getting free study abroad guidance from AHat. Create your account here:",
+}: {
+  /** The admin sees everyone's referrals, and who made each. */
+  showReferrer?: boolean;
+  /** The WhatsApp message, before the link. */
+  shareMessage?: string;
+}) {
   const [data, loaded] = useApi<Referrals | null>('/referrals', null);
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
@@ -67,7 +76,7 @@ export function ReferralsPanel({ showReferrer = false }: { /** The admin sees ev
   if (!loaded) return <p className="py-10 text-center text-sm text-navy-400">Loading…</p>;
   if (!data) return <p className="py-10 text-center text-sm text-navy-500">Referrals aren't available for your account.</p>;
 
-  const share = `I've been getting free study abroad guidance from AHat. Create your account here: ${data.link}`;
+  const share = `${shareMessage} ${data.link}`;
   const copy = async () => {
     await copyText(data.link);
     setCopied(true);
@@ -170,7 +179,7 @@ export function ReferralsPanel({ showReferrer = false }: { /** The admin sees ev
                   </p>
                   <p className="text-xs text-navy-500">
                     {r.source === 'link' ? 'Used your link' : 'Invited'} on {formatDate(r.at)}
-                    {showReferrer && r.referrer && ` · by ${r.referrer}`}
+                    {showReferrer && r.referrer && ` · by ${r.referrer}${r.referrerRole === 'referrer' ? ' (referrer)' : ''}`}
                   </p>
                 </div>
                 <Pill tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Pill>

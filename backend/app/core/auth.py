@@ -13,7 +13,9 @@ from app.db import get_db, new_id
 
 # officer = Application officer (sees every student). finance_officer / visa_officer: only the students assigned to them.
 STAFF_ROLES = ("counsellor", "officer", "finance_officer", "visa_officer", "admin")
-UNSAFE = ("POST", "PUT", "PATCH", "DELETE")
+# Referrers only refer people to AHat: they have no student record and no access to anyone's details.
+REFERRER = "referrer"
+UNSAFE =("POST", "PUT", "PATCH", "DELETE")
 
 
 def is_staff(role: str) -> bool:

@@ -77,7 +77,7 @@ if settings.allowed_origins:
     )
 
 api = APIRouter(prefix="/api/v1")
-for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router,courses.router, scholarships.router):
+for r in (auth.router, public.router, students.router, delegates.router, referrals.router, schedule.router, messages.router, staff.router, admin.router, courses.router, scholarships.router):
     api.include_router(r)
 app.include_router(api)
 

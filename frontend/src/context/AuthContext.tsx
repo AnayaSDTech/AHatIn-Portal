@@ -7,6 +7,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   register: (payload: RegisterPayload) => Promise<OtpRequestResult>;
+  registerReferrer: (payload: RegisterPayload) => Promise<OtpRequestResult>;
   /** The code from the registration email: verifies the email and signs in. */
   verifyEmail: (email: string, code: string) => Promise<User>;
   resendVerification: (email: string) => Promise<OtpRequestResult>;
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       register: authService.register,
+      registerReferrer: authService.registerReferrer,
       verifyEmail,
       resendVerification: authService.resendVerification,
       login,

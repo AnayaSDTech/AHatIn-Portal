@@ -8,7 +8,7 @@ export function ReferralsPage() {
   const admin = user?.role === 'admin';
   return (
     <>
-      <PageHeader title="Referrals" description={admin ? 'Everyone referred by students and counsellors, and how far they have got.' : 'Refer a friend or family member, and follow how far they get.'} />
+      <PageHeader title="Referrals" description={admin ? 'Everyone referred by students, counsellors and referrers, and how far they have got.' : 'Refer a friend or family member, and follow how far they get.'} />
       <ReferralsPanel showReferrer={admin} />
     </>
   );

@@ -5,6 +5,8 @@ import type { AuthResult, OtpRequestResult, RegisterPayload, StaffChallenge, Stu
 export interface AuthService {
   /** Creates the account and emails a code to verify the email. */
   register(payload: RegisterPayload): Promise<OtpRequestResult>;
+  /** A referrer's account; the email is then verified, and they log in, the same way as students. */
+  registerReferrer(payload: RegisterPayload): Promise<OtpRequestResult>;
   verifyEmail(email: string, code: string): Promise<AuthResult>;
   resendVerification(email: string): Promise<OtpRequestResult>;
   login(email: string, password: string): Promise<StudentLoginResult>;
@@ -20,6 +22,7 @@ export interface AuthService {
 
 export const authService: AuthService = {
   register: (p) => api.post('/auth/register', p),
+  registerReferrer: ({ ref: _ref, ...p }) => api.post('/auth/referrer/register', p),
   verifyEmail: (email, code) => api.post('/auth/verify-email', { email, code }),
   resendVerification: (email) => api.post('/auth/verify-email/resend', { email }),
   login: (email, password) => api.post('/auth/login', { email, password }),

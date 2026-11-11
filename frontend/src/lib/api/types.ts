@@ -1,6 +1,7 @@
 // Shapes shared with the FastAPI backend (JSON uses the same camelCase names).
 
-export type Role = 'student' | 'parent' | 'counsellor' | 'officer' | 'finance_officer' | 'visa_officer' | 'admin';
+/** referrer: an account only for referring people to AHat (no student record, no staff access). */
+export type Role = 'student' | 'parent' | 'referrer' | 'counsellor' | 'officer' | 'finance_officer' | 'visa_officer' | 'admin';
 
 export const STAFF_ROLES: Role[] = ['counsellor', 'officer', 'finance_officer', 'visa_officer', 'admin'];
 export const isStaff = (role: Role) => STAFF_ROLES.includes(role);

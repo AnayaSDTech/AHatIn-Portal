@@ -1150,6 +1150,59 @@ async def test_referrals_track_people_through_the_journey(make_api):
     assert {i["referrer"] for i in everyone["items"]} == {"Ananya Sharma", "Priya Desai"}
 
 
+async def test_referrer_account(make_api):
+    """Referrers register, verify their email and log in like students, but only have referrals: no student record."""
+    api = await make_api()
+    body = {"name": "Neha Joshi", "email": "neha.ref@ahatin.example", "mobile": "9811166601", "password": "Refer2027x", "consent": True}
+    assert (await api.post("/auth/referrer/register", {**body, "consent": False})).status_code == 422
+    r = await api.post("/auth/referrer/register", body)
+    assert r.status_code == 200, r.text
+    assert await get_db().students.count_documents({"email": body["email"]}) == 0
+    r = await api.post("/auth/verify-email", {"email": body["email"], "code": r.json()["demoCode"]})
+    assert r.status_code == 200 and r.json()["user"]["role"] == "referrer"
+    assert (await api.get("/auth/me")).json()["role"] == "referrer"
+
+    # The email can't be reused for a student or another referrer, and a student's email can't become a referrer.
+    other = await make_api()
+    assert (await other.post("/auth/register", {**body, "mobile": "9811166602"})).status_code == 409
+    assert (await other.post("/auth/referrer/register", body)).status_code == 409
+    assert (await other.post("/auth/referrer/register", {**body, "email": "demo.student@ahatin.example"})).status_code == 409
+
+    # Log in again with the password.
+    again = await make_api()
+    r = await again.post("/auth/login", {"email": body["email"], "password": body["password"]})
+    assert r.status_code == 200 and r.json()["user"]["role"] == "referrer"
+
+    # Student and staff areas are closed to them.
+    assert (await again.get("/me/record")).status_code == 403
+    assert (await again.get("/messages")).status_code == 403
+    assert (await again.get("/students")).json() == []
+    assert (await again.get("/students/s1")).status_code == 404
+    assert (await again.get("/scholarships/preview")).status_code == 200  # public
+    assert (await again.get("/admin/staff")).status_code == 403
+
+    # Referrals: their link credits them, and they are emailed when someone registers.
+    mine = (await again.get("/referrals")).json()
+    assert mine["totals"]["referred"] == 0 and mine["link"].endswith(f"/register?ref={mine['code']}")
+    friend = await make_api()
+    r = await friend.post("/auth/register", {"name": "Arjun Rao", "email": "arjun.rao@example.com", "mobile": "9811166603", "password": "Welcome123", "consent": True, "ref": mine["code"]})
+    assert r.status_code == 200
+    mine = (await again.get("/referrals")).json()
+    assert [(i["name"], i["source"], i["status"]) for i in mine["items"]] == [("Arjun Rao", "link", "registered")]
+    assert await get_db().notifications.find_one({"to": body["email"], "subject": "Arjun Rao registered from your referral"})
+    assert (await again.post("/referrals", {"name": "Meera Iyer", "email": "meera.iyer@example.com", "relation": "Colleague"})).status_code == 200
+
+    # The admin sees who referred each person, and that they are a referrer.
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    found = {i["name"]: i for i in (await admin.get("/referrals")).json()["items"]}
+    assert found["Arjun Rao"]["referrer"] == "Neha Joshi" and found["Arjun Rao"]["referrerRole"] == "referrer"
+
+    # Forgot password works for referrers too.
+    r = await make_api()
+    assert "demoCode" in (await r.post("/auth/password/forgot", {"email": body["email"]})).json()
+
+
 async def test_counsellor_can_edit_and_delete_suggested_scholarships(make_api):
     student = await make_api()
     await student.student_login()

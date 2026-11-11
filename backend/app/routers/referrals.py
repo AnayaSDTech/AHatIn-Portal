@@ -1,11 +1,11 @@
-"""Refer a Friend/Family, for students and counsellors. Admins see every referral."""
+"""Refer a Friend/Family, for students, counsellors and referrers (accounts made only for referring). Admins see every referral."""
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
 from app.config import get_settings
-from app.core.auth import require_roles
+from app.core.auth import REFERRER, require_roles
 from app.core.clock import iso, now
 from app.core.errors import ApiError
 from app.core.ratelimit import hit
@@ -16,7 +16,7 @@ from app.services.referrals import STATUSES, referral_code, referral_link, statu
 
 router = APIRouter(tags=["referrals"])
 
-Referrer = Annotated[dict, Depends(require_roles("student", "counsellor", "admin"))]
+Referrer = Annotated[dict, Depends(require_roles("student", "counsellor", "admin", REFERRER))]
 
 
 def _out(r: dict, status: str, *, with_referrer: bool) -> dict:
@@ -25,6 +25,7 @@ def _out(r: dict, status: str, *, with_referrer: bool) -> dict:
         out["registeredAt"] = iso(r["registeredAt"])
     if with_referrer:
         out["referrer"] = r["referrerName"]
+        out["referrerRole"] = r.get("referrerRole", "")
     return out
 
 

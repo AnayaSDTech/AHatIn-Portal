@@ -11,17 +11,21 @@ import { useAuth } from '../context/AuthContext';
 import { registerSchema, type RegisterForm } from '../lib/validation';
 import { ApiError, type OtpRequestResult } from '../lib/api/types';
 
-/** Free student registration: details and a password, then verify the email with the 6-digit code we send. */
-export function RegisterPage() {
-  const { register: registerStudent, verifyEmail, resendVerification } = useAuth();
+/**
+ * Free registration: details and a password, then verify the email with the 6-digit code we send.
+ * Students by default; `referrer` makes a referrer's account instead (for people who only refer others to AHat).
+ */
+export function RegisterPage({ referrer = false }: { referrer?: boolean }) {
+  const { register: registerStudent, registerReferrer, verifyEmail, resendVerification } = useAuth();
   const navigate = useNavigate();
   const [sent, setSent] = useState<{ email: string; result: OtpRequestResult } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   // Registration links from counsellors are no longer used: everyone registers here.
   const [params] = useSearchParams();
-  const oldInviteLink = params.has('invite');
+  const oldInviteLink = !referrer && params.has('invite');
   // From someone's referral link: they are credited when this person registers.
-  const referralCode = params.get('ref') ?? undefined;
+  const referralCode = referrer ? undefined : (params.get('ref') ?? undefined);
+  const loginPath = referrer ? '/referrer/login' : '/login';
 
   const {
     register,
@@ -36,7 +40,8 @@ export function RegisterPage() {
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
     try {
-      const result = await registerStudent({ name: data.name, email: data.email, mobile: `+91${data.mobile}`, password: data.password, consent: data.consent, ref: referralCode });
+      const payload = { name: data.name, email: data.email, mobile: `+91${data.mobile}`, password: data.password, consent: data.consent };
+      const result = referrer ? await registerReferrer(payload) : await registerStudent({ ...payload, ref: referralCode });
       setSent({ email: data.email, result });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -62,7 +67,7 @@ export function RegisterPage() {
           submitLabel="Verify email and continue"
           onVerify={async (code) => {
             await verifyEmail(sent.email, code);
-            navigate('/dashboard', { replace: true, state: { welcome: true } });
+            navigate(referrer ? '/referrer' : '/dashboard', { replace: true, state: { welcome: true } });
           }}
           onResend={() => resendVerification(sent.email)}
           onBack={() => setSent(null)}
@@ -73,11 +78,13 @@ export function RegisterPage() {
 
   return (
     <AuthShell
-      title="Create your free account"
+      title={referrer ? 'Become an AHat referrer' : 'Create your free account'}
       subtitle={
         <>
-          It takes under a minute. Already registered?{' '}
-          <Link to="/login" className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
+          {referrer
+            ? 'Know someone who wants to study abroad? Refer them to AHat and follow their progress. Already a referrer? '
+            : 'It takes under a minute. Already registered? '}
+          <Link to={loginPath} className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
             Log in
           </Link>
         </>
@@ -101,7 +108,7 @@ export function RegisterPage() {
       )}
 
       <form onSubmit={onSubmit} noValidate className="space-y-5">
-        <TextField label="Full name" autoComplete="name" placeholder="As on your passport" error={errors.name?.message} {...register('name')} />
+        <TextField label="Full name" autoComplete="name" placeholder={referrer ? 'Your full name' : 'As on your passport'} error={errors.name?.message} {...register('name')} />
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField label="Email address" type="email" autoComplete="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
           <TextField
@@ -132,17 +139,29 @@ export function RegisterPage() {
             <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 rounded border-navy-300 accent-navy-900" aria-invalid={!!errors.consent} {...register('consent')} />
             <span>
               I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Terms of use</a> and{' '}
-              <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>, and I understand AHat may earn
-              commission from universities through partner agencies, which will be disclosed to me.
+              <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-navy-900 underline underline-offset-2">Privacy notice</a>
+              {referrer
+                ? ', and I will only refer people who are happy to hear from AHat.'
+                : ', and I understand AHat may earn commission from universities through partner agencies, which will be disclosed to me.'}
             </span>
           </label>
           {errors.consent && <p className="mt-1.5 text-xs font-medium text-red-600" role="alert">{errors.consent.message}</p>}
         </div>
 
         <Button type="submit" variant="gold" size="lg" className="w-full" loading={isSubmitting}>
-          Create my account <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
+          {referrer ? 'Create my referrer account' : 'Create my account'} <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
         </Button>
-        <p className="text-center text-xs text-navy-400">We use your details only to guide you and process your applications.</p>
+        <p className="text-center text-xs text-navy-400">
+          {referrer ? 'We use your details only to run your referrer account and contact you about it.' : 'We use your details only to guide you and process your applications.'}
+        </p>
+        {!referrer && (
+          <p className="text-center text-sm text-navy-500">
+            Not studying abroad yourself?{' '}
+            <Link to="/referrer/register" className="font-semibold text-navy-900 underline decoration-gold-500 underline-offset-4 hover:text-gold-700">
+              Become a referrer
+            </Link>
+          </p>
+        )}
       </form>
     </AuthShell>
   );

@@ -28,6 +28,16 @@ export function Footer() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link to="/referrer/register" className="transition hover:text-gold-300">
+                Become a referrer
+              </Link>
+            </li>
+            <li>
+              <Link to="/referrer/login" className="transition hover:text-gold-300">
+                Referrer login
+              </Link>
+            </li>
           </ul>
         </div>
 

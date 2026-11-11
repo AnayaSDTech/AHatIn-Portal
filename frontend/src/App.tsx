@@ -21,6 +21,7 @@ import {
 } from './pages/student/StudentPages';
 import { ProfilePage as StudentProfilePage } from './pages/student/ProfilePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ReferrerDashboardPage } from './pages/referrer/ReferrerDashboardPage';
 import { PrivacyPage } from './pages/legal/PrivacyPage';
 import { TermsPage } from './pages/legal/TermsPage';
 import { StaffLoginPage } from './pages/staff/StaffLoginPage';
@@ -60,7 +61,15 @@ const router = createBrowserRouter([
       { path: '/login', element: <GuestOnly><LoginPage /></GuestOnly> },
       { path: '/register', element: <GuestOnly><RegisterPage /></GuestOnly> },
       { path: '/forgot-password', element: <GuestOnly><ForgotPasswordPage /></GuestOnly> },
+      // Referrers: people who only refer others to AHat
+      { path: '/referrer/login', element: <GuestOnly><LoginPage referrer /></GuestOnly> },
+      { path: '/referrer/register', element: <GuestOnly><RegisterPage referrer /></GuestOnly> },
     ],
+  },
+  // Referrer dashboard
+  {
+    element: <Layout />,
+    children: [{ path: '/referrer', element: <RequireRole roles={['referrer']}><ReferrerDashboardPage /></RequireRole> }],
   },
   // A parent or sponsor uploading from their private link (no account)
   {

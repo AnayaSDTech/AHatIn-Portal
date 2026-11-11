@@ -4,6 +4,7 @@ import secrets
 
 from pymongo.errors import DuplicateKeyError
 
+from app.core.auth import REFERRER, is_staff
 from app.core.clock import now
 from app.db import get_db, new_id
 from app.records import add_note
@@ -53,8 +54,15 @@ async def link_referral(user: dict, record: dict, code: str | None) -> None:
         return
     await db.referrals.update_one({"_id": referral["_id"]}, {"$set": {"studentId": record["_id"], "registeredAt": now()}})
     await add_note(record["_id"], "System", f"Referred by {referral['referrerName']}.")
-    if referral["referrerRole"] != "student":
+    if is_staff(referral["referrerRole"]):
         await notify.alert_staff(referral["referrerId"], f"{user['name']} registered from your referral", "They now have a student account.", path="/staff/referrals")
+    elif referral["referrerRole"] == REFERRER and (referrer := await db.users.find_one({"_id": referral["referrerId"], "status": "active"})):
+        await notify.queue_email(
+            referrer["email"],
+            f"{user['name']} registered from your referral",
+            f"Hello {referrer['name'].split(' ')[0]},\n\n{user['name']} has created an AHat account from your referral. "
+            f"You can follow how far they get from your referrer dashboard:\n{notify.portal_link('/referrer')}\n\nThank you for recommending us.\n\nAHat",
+        )
 
 
 async def status_of(referrals: list[dict]) -> dict[str, str]:

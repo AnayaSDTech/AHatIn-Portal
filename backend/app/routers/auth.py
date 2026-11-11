@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, Response
 
 from app.config import get_settings
 from app.core.audit import audit
-from app.core.auth import CurrentUser, end_session, is_staff, public_user, revoke_all_sessions, start_session
+from app.core.auth import REFERRER, CurrentUser, end_session, is_staff, public_user, revoke_all_sessions, start_session
 from app.core.clock import now
 from app.core.errors import ApiError
 from app.core.ratelimit import hit
@@ -29,6 +29,7 @@ from app.schemas import (
     CodeBody,
     EmailBody,
     InviteCompleteBody,
+    ReferrerRegisterBody,
     RegisterBody,
     ResetPasswordBody,
     StaffLoginBody,
@@ -127,7 +128,7 @@ async def register(body: RegisterBody, request: Request):
     await hit(f"register:ip:{_ip(request)}", 10, 3600, "Too many sign-ups from this connection. Please try again later.")
     db = get_db()
     existing = await db.users.find_one({"email": body.email})
-    if existing and (existing.get("emailVerifiedAt") or is_staff(existing["role"])):
+    if existing and (existing.get("emailVerifiedAt") or existing["role"] != "student"):
         raise ApiError(409, "An account with this email already exists. Log in instead.", {"email": "This email is already registered."})
     if existing:
         # Registered before but never verified the email: take the new details and send a fresh code.
@@ -152,6 +153,35 @@ async def register(body: RegisterBody, request: Request):
     user["studentReference"] = record["reference"]
     await audit(user, "student.registered", "students", record["_id"])
     await link_referral(user, record, body.ref)
+    return await _send_code(body.email, user, "verify")
+
+
+@router.post("/referrer/register")
+async def register_referrer(body: ReferrerRegisterBody, request: Request):
+    """A referrer's account: like a student's (password, then the email verified with a code), but with no student
+    record. Verifying the email and logging in use the same endpoints as students."""
+    await hit(f"register:ip:{_ip(request)}", 10, 3600, "Too many sign-ups from this connection. Please try again later.")
+    db = get_db()
+    existing = await db.users.find_one({"email": body.email})
+    if existing and (existing.get("emailVerifiedAt") or existing["role"] != REFERRER):
+        raise ApiError(409, "An account with this email already exists. Log in instead.", {"email": "This email is already registered."})
+    if existing:
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": {"name": body.name, "mobile": f"+91{body.mobile}", "passwordHash": hash_password(body.password)}})
+        return await _send_code(body.email, existing, "verify")
+    user = {
+        "_id": new_id(),
+        "role": REFERRER,
+        "name": body.name,
+        "email": body.email,
+        "mobile": f"+91{body.mobile}",
+        "passwordHash": hash_password(body.password),
+        "status": "active",
+        "emailVerifiedAt": None,
+        "consentAt": now(),
+        "createdAt": now(),
+    }
+    await db.users.insert_one(user)
+    await audit(user, "referrer.registered", "users", user["_id"])
     return await _send_code(body.email, user, "verify")
 
 

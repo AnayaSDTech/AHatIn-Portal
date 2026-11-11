@@ -108,6 +108,22 @@ class RegisterBody(EmailBody):
         return v
 
 
+class ReferrerRegisterBody(EmailBody):
+    """A referrer's account: they refer people to AHat and see how far each has got (no student record)."""
+
+    name: Name
+    mobile: Mobile
+    password: StudentPassword
+    consent: bool
+
+    @field_validator("consent")
+    @classmethod
+    def consented(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("Please accept to continue.")
+        return v
+
+
 class CodeBody(EmailBody):
     """A 6-digit code sent by email (to verify the email, or to reset the password)."""
 
