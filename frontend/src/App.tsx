@@ -1,6 +1,4 @@
-import { useSyncExternalStore } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { FeedbackMode, feedbackEnabled } from './components/feedback/FeedbackMode';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/layout/Layout';
 import { StaffLayout } from './components/staff/StaffLayout';
@@ -127,18 +125,11 @@ const router = createBrowserRouter([
   },
 ]);
 
-/** Temporary Feedback Mode, told which page is showing (it sits outside the router's pages). */
-function Feedback() {
-  const pathname = useSyncExternalStore(router.subscribe, () => router.state.location.pathname);
-  return <FeedbackMode pathname={pathname} />;
-}
-
 export default function App() {
   return (
     <AuthProvider>
       <RouterProvider router={router} />
       <ErrorToast />
-      {feedbackEnabled && <Feedback />}
     </AuthProvider>
   );
 }

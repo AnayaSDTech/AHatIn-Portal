@@ -508,8 +508,7 @@ PROFILE = {
 
 
 async def test_profile_gate_and_admin_assignment(make_api, monkeypatch):
-    """With automatic assignment off, a student with a complete profile waits for the admin to choose."""
-    monkeypatch.setattr(get_settings(), "auto_assign_counsellors", False)
+    """A student with a complete profile waits for the admin to choose their counsellor."""
     db = get_db()
     # An earlier website enquiry with the same email is linked when the person registers.
     web = await make_api()
@@ -744,8 +743,6 @@ async def test_staff_change_own_name(make_api):
 
 
 async def test_full_student_journey(make_api, bucket, monkeypatch):
-    # Officers assigned by the admin: what happens if the single officers aren't available.
-    monkeypatch.setattr(get_settings(), "auto_assign_officers", False)
     """One new student from registration to the final post-arrival check-in, through every hand-over.
     With JOURNEY_SNAPSHOTS set, the student's view at each step is saved there (to check the dashboard's status rules)."""
     import json
@@ -782,8 +779,11 @@ async def test_full_student_journey(make_api, bucket, monkeypatch):
 
     await snap("Registered")
 
-    # Profile complete -> the best-matched counsellor is assigned automatically.
+    # Profile complete -> the student waits for the admin, who assigns the counsellor.
     assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    assert (await student.get("/me/record")).json()["record"]["counsellorId"] is None
+    assert sid in {s["id"] for s in (await admin.get("/admin/assignments")).json()["waiting"]}
+    assert (await admin.post(f"/students/{sid}/assign", {"counsellorId": "c1"})).status_code == 200
     assert (await student.get("/me/record")).json()["record"]["counsellorId"] == "c1"
     await snap("Counsellor assigned")
 
@@ -918,8 +918,9 @@ async def test_full_student_journey(make_api, bucket, monkeypatch):
             json.dump(snapshots, f, default=str)
 
 
-async def test_counsellor_assigned_automatically(make_api):
-    """Completing the profile assigns the best-matched counsellor with room, with the reasons on the record."""
+async def test_counsellor_assigned_automatically(make_api, monkeypatch):
+    """With AUTO_ASSIGN_COUNSELLORS on, completing the profile assigns the best-matched counsellor with room."""
+    monkeypatch.setattr(get_settings(), "auto_assign_counsellors", True)
     db = get_db()
     student = await make_api()
     await student.register_student("Isha Verma", "isha@example.com", "9811177777")
@@ -949,7 +950,8 @@ async def test_counsellor_assigned_automatically(make_api):
     assert (await student.get("/me/record")).json()["counsellor"]["name"] == "Priya Desai"
 
 
-async def test_full_counsellors_are_skipped_and_nobody_with_room_waits_for_admin(make_api):
+async def test_full_counsellors_are_skipped_and_nobody_with_room_waits_for_admin(make_api, monkeypatch):
+    monkeypatch.setattr(get_settings(), "auto_assign_counsellors", True)
     db = get_db()
     # Priya (the best match for this profile) is full: the next best counsellor with room is chosen.
     await db.users.update_one({"_id": "c1"}, {"$set": {"matchingProfile.capacity": 1}})
@@ -1003,6 +1005,8 @@ async def test_profile_address_and_school_details(make_api):
 
 
 async def test_new_students_get_the_single_officers(make_api, monkeypatch):
+    monkeypatch.setattr(get_settings(), "auto_assign_officers", True)
+    monkeypatch.setattr(get_settings(), "auto_assign_counsellors", True)
     student = await make_api()
     await student.register_student("Nina Rao", "nina.rao@example.com", "9811133344")
     sid = (await student.get("/me/record")).json()["record"]["id"]
@@ -1204,66 +1208,6 @@ async def test_a_requested_document_remembers_its_stage(make_api):
     # The starter documents weren't requested at any stage.
     await staff.get("/students/s1")
     assert "requestedStage" not in doc(rec, "Updated CV")
-
-
-async def test_feedback_mode(make_api, monkeypatch):
-    guest = await make_api()
-    pin = {"text": "This button is confusing", "path": "/login", "x": 120.5, "y": 2400, "viewportWidth": 1280}
-    r = await guest.post("/feedback", pin)
-    assert r.status_code == 200 and r.json()["by"] == "Guest", r.text
-    student = await make_api()
-    await student.student_login()
-    r = await student.post("/feedback", {**pin, "path": "/dashboard"})
-    assert r.json()["by"] == "Ananya Sharma"
-
-    # Saved, and fetched per page.
-    assert [c["text"] for c in (await guest.get("/feedback", params={"path": "/login"})).json()] == [pin["text"]]
-    assert (await guest.get("/feedback", params={"path": "/dashboard"})).json()[0]["x"] == 120.5
-    assert (await guest.get("/feedback", params={"path": "/nowhere"})).json() == []
-    assert len((await guest.get("/feedback")).json()) == 2
-
-    # Secret links and query strings aren't kept, even if they are sent.
-    r = await guest.post("/feedback", {**pin, "path": "/upload/secret-token-123"})
-    assert r.json()["path"] == "/upload/(private link)"
-    r = await guest.post("/feedback", {**pin, "path": "/staff/setup/secret-token-456?a=1"})
-    assert r.json()["path"] == "/staff/setup/(private link)"
-    r = await guest.post("/feedback", {**pin, "path": "/register?ref=ABC#top"})
-    assert r.json()["path"] == "/register"
-    stored = await get_db().feedback.find({}).to_list(None)
-    assert not any("secret-token" in c["path"] for c in stored)
-
-    for bad in ({"text": ""}, {"text": "x" * 1001}, {"x": -1}, {"viewportWidth": 0}):
-        assert (await guest.post("/feedback", {**pin, **bad})).status_code == 422, bad
-
-    # Off outside development, unless switched on.
-    monkeypatch.setattr(get_settings(), "app_env", "production")
-    monkeypatch.setattr(get_settings(), "feedback_mode", False)
-    assert (await guest.get("/feedback")).status_code == 404
-    assert (await guest.post("/feedback", pin)).status_code == 404
-    monkeypatch.setattr(get_settings(), "feedback_mode", True)
-    assert (await guest.get("/feedback")).status_code == 200
-
-    # If switched on live: the author or staff can change a comment, and nobody else.
-    mine = next(c for c in (await student.get("/feedback", params={"path": "/dashboard"})).json())
-    theirs = next(c for c in (await student.get("/feedback", params={"path": "/login"})).json())
-    assert mine["canChange"] is True and theirs["canChange"] is False
-    other = await make_api()
-    await other.student_login("new.student@ahatin.example")
-    for api in (guest, other):
-        assert (await api.put(f"/feedback/{mine['id']}", {"text": "Changed"})).status_code == 403
-        assert (await api.delete(f"/feedback/{mine['id']}")).status_code == 403
-    r = await student.put(f"/feedback/{mine['id']}", {"text": "Changed by me"})
-    assert r.status_code == 200 and r.json()["text"] == "Changed by me"
-    assert (await student.put(f"/feedback/{mine['id']}", {"text": ""})).status_code == 422
-    assert (await student.delete(f"/feedback/{mine['id']}")).status_code == 204
-    assert (await student.delete(f"/feedback/{mine['id']}")).status_code == 404
-    staff = await make_api()
-    await staff.staff_login()
-    assert (await staff.delete(f"/feedback/{theirs['id']}")).status_code == 204
-
-    # Off again: no changes either.
-    monkeypatch.setattr(get_settings(), "feedback_mode", False)
-    assert (await staff.delete("/feedback/anything")).status_code == 404
 
 
 async def test_student_is_told_about_every_staff_action(make_api, bucket):
@@ -1602,11 +1546,49 @@ async def test_profile_highest_qualification_is_the_12th(make_api):
     assert (await api.put("/me/profile", {**school, "sscBoard": "CBSE", "sscYear": "2026"})).status_code == 422
 
 
+async def test_admin_assigns_counsellor_and_officers_together(make_api):
+    """Once the profile is complete, the admin assigns the counsellor and both officers in one step, without waiting for
+    a stage of the journey. A wrong officer assigns nobody; a student with a counsellor but no officers waits in both queues."""
+    db = get_db()
+    student = await make_api()
+    await student.register_student("Tara Shah", "tara@example.com", "9811122233")
+    sid = (await student.get("/me/record")).json()["record"]["id"]
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+
+    r = await admin.post(f"/students/{sid}/assign", {"counsellorId": "c1", "financeOfficerId": "u7", "visaOfficerId": "u7"})
+    assert r.status_code == 400 and "Financial Aid Officer" in r.json()["detail"]
+    rec = await db.students.find_one({"_id": sid})
+    assert rec.get("counsellorId") is None and rec.get("financeOfficerId") is None
+
+    r = await admin.post(f"/students/{sid}/assign", {"counsellorId": "c1", "financeOfficerId": "u6", "visaOfficerId": "u7"})
+    assert r.status_code == 200, r.text
+    rec = await db.students.find_one({"_id": sid})
+    assert (rec["counsellorId"], rec["financeOfficerId"], rec["visaOfficerId"]) == ("c1", "u6", "u7")
+    queue = (await admin.get("/admin/assignments")).json()
+    assert sid not in {s["id"] for s in queue["waiting"] + queue["waitingFinance"] + queue["waitingVisa"]}
+    team = (await student.get("/me/record")).json()
+    assert team["record"]["financeOfficerId"] == "u6" and team["record"]["visaOfficerId"] == "u7"
+
+    # Counsellor only: the student waits for both officers straight away.
+    other = await make_api()
+    await other.register_student("Kiran Pal", "kiran@example.com", "9811122244")
+    oid = (await other.get("/me/record")).json()["record"]["id"]
+    assert (await other.put("/me/profile", PROFILE)).status_code == 200
+    assert (await admin.post(f"/students/{oid}/assign", {"counsellorId": "c1"})).status_code == 200
+    queue = (await admin.get("/admin/assignments")).json()
+    assert oid in {s["id"] for s in queue["waitingFinance"]} and oid in {s["id"] for s in queue["waitingVisa"]}
+
+
 async def test_new_student_shows_for_counsellor_until_opened(make_api):
     student = await make_api()
     await student.register_student("Nina Rao", "nina@example.com", "9811133333")
-    assert (await student.put("/me/profile", PROFILE)).status_code == 200  # assigned to Priya automatically
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
     sid = (await student.get("/me/record")).json()["record"]["id"]
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    assert (await admin.post(f"/students/{sid}/assign", {"counsellorId": "c1"})).status_code == 200
 
     priya = await make_api()
     await priya.staff_login()
@@ -1614,8 +1596,6 @@ async def test_new_student_shows_for_counsellor_until_opened(make_api):
     assert mine[sid]["newForCounsellor"] is True and mine[sid]["counsellorAssignedAt"]
     assert mine["s1"]["newForCounsellor"] is False  # assigned before this was recorded
     # Someone else opening the record doesn't count.
-    admin = await make_api()
-    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
     assert (await admin.get(f"/students/{sid}")).json()["newForCounsellor"] is True
     # The counsellor opens it: no longer new.
     assert (await priya.get(f"/students/{sid}")).json()["newForCounsellor"] is False

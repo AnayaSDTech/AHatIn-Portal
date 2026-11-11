@@ -163,7 +163,6 @@ export function Hero() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-center text-[11px] text-navy-300">Figures shown are demo content.</p>
       </Container>
     </section>
   );

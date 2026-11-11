@@ -23,6 +23,7 @@ from app.domain import (
     DEPARTURE_TASKS,
     DOC_AREA,
     DOC_STAGE,
+    OFFICER_FIELD,
     OFFICER_ROLE,
     OFFICER_TITLE,
     OFFER_STATES,
@@ -183,13 +184,12 @@ async def save_profile(body: ProfileBody, user: CurrentUser):
         await assign_default_officers(sid)
 
     if complete and not was_complete and not record.get("counsellorId"):
-        # The best-matched counsellor with room is assigned straight away.
         await add_note(sid, actor_name(user), "Completed their profile.")
         if await auto_assign(sid):
             return {**profile, "mobile": mobile}
-        # Automatic assignment is off, or no counsellor has room: the student joins the admin's "Waiting for a counsellor" list.
+        # The student joins the admin's "Waiting for a counsellor" list (always, unless automatic assignment is on).
         await add_note(sid, "System", "Waiting for the admin to assign a counsellor.")
-        await notify.email_admins(f"Assign a counsellor: {record['name']}", f"{record['name']} ({record['reference']}) has completed their profile and is waiting for a counsellor.", alert_path="/admin/assign")
+        await notify.email_admins(f"Assign a counsellor: {record['name']}", f"{record['name']} ({record['reference']}) has completed their profile and is waiting for a counsellor, Financial Aid Officer and Visa Officer.", alert_path="/admin/assign")
         await create_follow_up(
             counsellor_id=None, person=record["name"], person_id=sid, person_type="student",
             action="Assign a counsellor (profile complete)", rule="Profile complete · 1 working day", due_at=one_working_day_from_now(), type_="reminder", source_event=f"student:{sid}:assign",
@@ -222,8 +222,9 @@ async def add_staff_note(sid: str, body: TextBody, user: Staff):
 
 @router.post("/students/{sid}/assign")
 async def assign(sid: str, body: AssignBody, user: Admin):
-    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete): those who
-    completed their profile while no counsellor had room, or before counsellors were assigned automatically."""
+    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete), and their
+    Financial Aid Officer and Visa Officer at the same time: career counselling and funding start together, so the
+    officers don't wait for a stage of the journey. Everything is checked before anything is assigned."""
     db = get_db()
     async with lock(f"student:{sid}:assign"):
         student = await student_for(user, sid, who="staff")
@@ -234,7 +235,21 @@ async def assign(sid: str, body: AssignBody, user: Admin):
         target = await db.users.find_one({"_id": body.counsellorId, "role": "counsellor", "status": "active"})
         if not target:
             raise ApiError(400, "Choose an active counsellor.", {"counsellorId": "Choose an active counsellor."})
-        await assign_counsellor(student, target, user["name"], body.reason or "Matched on the student's profile", actor=user)
+        officers = {}
+        for area, officer_id in (("finance", body.financeOfficerId), ("visa", body.visaOfficerId)):
+            if not officer_id or student.get(OFFICER_FIELD[area]) == officer_id:
+                continue
+            officer = await db.users.find_one({"_id": officer_id, "role": OFFICER_ROLE[area], "status": "active"})
+            if not officer:
+                raise ApiError(400, f"Choose an active {OFFICER_TITLE[area]}.", {OFFICER_FIELD[area]: f"Choose an active {OFFICER_TITLE[area]}."})
+            officers[area] = officer
+        reason = body.reason or "Matched on the student's profile"
+        await assign_counsellor(student, target, user["name"], reason, actor=user)
+        async with lock(f"student:{sid}:officer"):
+            for area, officer in officers.items():
+                # `student` is from before the counsellor was set, so the new counsellor isn't sent a separate email per officer.
+                await assign_officer(student, area, officer, user, body.reason or "Assigned by the admin with the counsellor")
+                await audit(user, f"student.{area}_officer", "students", sid, {"to": officer["_id"]})
     return await load_student(sid)
 
 

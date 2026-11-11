@@ -4,9 +4,9 @@
 - Financial Aid Officer: service 4, alongside the counsellor's services.
 - Visa Officer: services 5-7, once an offer is accepted and Scholarship & Financial Guidance is complete (proof of funds
   verified, or the service marked "Not needed").
-New students get both officers when their profile is complete (services/assignment.py). Funding then runs alongside
-services 1-3 rather than after them. For anyone without an officer, the admin assigns one when that part of the journey
-is reached. Once an officer is assigned, their services are read-only for the counsellor. Until then the counsellor can act on them
+The admin assigns both officers together with the counsellor once the profile is complete (or automatically, with
+AUTO_ASSIGN_OFFICERS on). Funding then runs alongside services 1-3 rather than after them. Anyone with a counsellor but
+without an officer stays in the admin's officer queue until one is assigned. Once an officer is assigned, their services are read-only for the counsellor. Until then the counsellor can act on them
 (students who were already under way before officers existed keep working as before).
 """
 
@@ -56,6 +56,17 @@ async def waiting_for(student: dict) -> str | None:
     if not student.get("financeOfficerId") and not await funding_done(student):
         return "finance"
     return None
+
+
+async def officers_needed(student: dict) -> list[str]:
+    """The officers a student with a counsellor is still missing, at any stage of the journey. No Financial Aid Officer
+    is needed once funding is complete or marked not needed."""
+    needed = []
+    if not student.get("financeOfficerId") and not await funding_done(student):
+        needed.append("finance")
+    if not student.get("visaOfficerId"):
+        needed.append("visa")
+    return needed
 
 
 async def check_handover(sid: str) -> None:

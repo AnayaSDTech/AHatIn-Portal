@@ -20,7 +20,7 @@ from app.schemas import AgencyBody, GrantBody, StaffPasswordBody, StaffUpdateBod
 from app.services import notify
 from app.services.assignment import active_counsellor_loads
 from app.services.students import profile_out
-from app.services.team import waiting_for
+from app.services.team import officers_needed
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -126,8 +126,8 @@ async def assignment_queue(_: Admin):
             incomplete.append(out)
     waiting.sort(key=lambda w: w["profileCompletedAt"] or w["registeredAt"])
 
-    # Students ready for a Financial Aid Officer (Application Assistance complete) or a Visa Officer
-    # (Scholarship & Financial Guidance complete), with each officer's current workload.
+    # Students with a counsellor who are still missing a Financial Aid Officer or a Visa Officer (at any stage), with each
+    # officer's current workload.
     officers = {}
     for area, role, field in (("finance", "finance_officer", "financeOfficerId"), ("visa", "visa_officer", "visaOfficerId")):
         people = await db.users.find({"role": role, "status": "active"}).sort("_id", 1).to_list(None)
@@ -135,12 +135,12 @@ async def assignment_queue(_: Admin):
         officers[area].sort(key=lambda o: o["activeStudents"])
     lists = {"finance": [], "visa": []}
     async for s in db.students.find({"counsellorId": {"$ne": None}, "stage": {"$ne": "settled"}}).sort("updatedAt", 1):
-        area = await waiting_for(s)
-        if area:
+        for area in await officers_needed(s):
             f = await db.follow_ups.find_one({"sourceEvent": f"student:{s['_id']}:assign-{area}"})
+            since = f["createdAt"] if f else s.get("counsellorAssignedAt") or s.get("profileCompletedAt")
             lists[area].append({
                 "id": s["_id"], "name": s["name"], "reference": s["reference"], "goal": s.get("goal", ""), "destination": s.get("destination", ""), "intake": s.get("intake", ""),
-                "counsellorId": s.get("counsellorId"), "financeOfficerId": s.get("financeOfficerId"), "readySince": iso(f["createdAt"]) if f else None,
+                "counsellorId": s.get("counsellorId"), "financeOfficerId": s.get("financeOfficerId"), "readySince": iso(since) if since else None,
             })
     return {"waiting": waiting, "incomplete": incomplete, "waitingFinance": lists["finance"], "waitingVisa": lists["visa"], "officers": officers}
 

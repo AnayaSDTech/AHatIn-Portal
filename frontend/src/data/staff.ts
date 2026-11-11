@@ -186,7 +186,7 @@ export const appTransitions: Record<AppState, AppState[]> = {
 
 export interface StaffStudent {
   id: string;
-  /** Null until a counsellor is assigned (automatically once the student's profile is complete). */
+  /** Null until a counsellor is assigned (by the admin, once the student's profile is complete). */
   counsellorId: string | null;
   counsellorAssignedAt?: string;
   /** Assigned to the counsellor, who hasn't opened the record yet: listed under "New students" on their dashboard. */

@@ -33,9 +33,9 @@ export const navLinks = [
 
 /** DEMO figures, shown with a "demo content" label on the page. */
 export const stats = [
-  { value: '1,200+', label: 'Students guided' },
+  { value: '101+', label: 'Students guided' },
   { value: '95%', label: 'Visa success rate' },
-  { value: '150+', label: 'Universities reached' },
+  { value: '50+', label: 'Universities reached' },
   { value: '₹0', label: 'Consultancy fee' },
 ];
 
@@ -68,6 +68,8 @@ export interface Service {
   code: string;
   title: string;
   description: string;
+  /** A few more details, shown when the card on the Home page is hovered or focused. */
+  details: string[];
   icon: LucideIcon;
 }
 
@@ -76,54 +78,99 @@ export const services: Service[] = [
     code: 'S1',
     title: 'Career Counselling & Course Selection',
     description: 'Find the course that fits your goals.',
+    details: [
+      'One-to-one sessions with your own counsellor',
+      'Courses matched to your academics, interests and career plans',
+      'Clear advice on entry requirements and job prospects',
+    ],
     icon: Compass,
   },
   {
     code: 'S2',
     title: 'University & Country Selection',
     description: 'The right country and university for your budget.',
+    details: [
+      'Compare countries on cost, work rights and post-study options',
+      'A balanced shortlist of ambitious, target and safe choices',
+      'Honest guidance on rankings, intakes and living costs',
+    ],
     icon: GraduationCap,
   },
   {
     code: 'S3',
     title: 'Application Assistance',
     description: 'SOP, LOR, CV and applications, done right.',
+    details: [
+      'Feedback on your statement of purpose and CV, draft by draft',
+      'Help with recommendation letters and application forms',
+      'Every application and deadline tracked in your portal',
+    ],
     icon: FileText,
   },
   {
     code: 'S4',
     title: 'Scholarship & Financial Guidance',
     description: 'Scholarships, cost estimates and a funding plan.',
+    details: [
+      'Scholarships you are eligible for, with deadlines',
+      'A realistic estimate of tuition and living costs',
+      'Guidance on education loans and proof of funds',
+    ],
     icon: Coins,
   },
   {
     code: 'S5',
     title: 'Visa Assistance',
     description: 'Checklists, document checks and mock interviews.',
+    details: [
+      'A visa checklist tailored to your country and course',
+      'Every document checked before you submit',
+      'Mock interviews so you walk in prepared',
+    ],
     icon: Stamp,
   },
   {
     code: 'S6',
     title: 'Pre-Departure Support',
     description: 'Housing, flights, forex and insurance, sorted.',
+    details: [
+      'Help finding safe, affordable accommodation',
+      'Guidance on flights, forex cards and travel insurance',
+      'A pre-departure briefing on what to pack and expect',
+    ],
     icon: Luggage,
   },
   {
     code: 'S7',
     title: 'Post-Arrival Support',
     description: 'A safe-arrival check and support in your first months.',
+    details: [
+      'We check in once you have landed safely',
+      'Help with bank accounts, SIM cards and registration',
+      'Someone to talk to as you settle into a new country',
+    ],
     icon: HeartHandshake,
   },
   {
     code: 'S8',
     title: 'On-site Support',
     description: 'A local contact whenever you need a hand.',
+    details: [
+      'A local contact in your study destination',
+      'Help with everyday questions and paperwork',
+      'Support if something goes wrong',
+    ],
     icon: MapPinned,
   },
   {
     code: 'S9',
     title: 'Job Assistance',
     description: 'Part-time jobs, local CVs and post-study work.',
+    details: [
+      'Finding part-time work that fits your student visa',
+      'A CV and cover letter in the local format',
+      'Guidance on post-study work visas and graduate jobs',
+    ],
     icon: Briefcase,
   },
 ];
@@ -245,6 +292,6 @@ export const faqs = [
 
 export const contact = {
   email: 'contact@ahat.in',
-  offices: ['Nagpur, India', 'London, United Kingdom'],
+  offices: ['India', 'Nepal', 'United Kingdom'],
   hours: 'Mon–Sat, 10:00–19:00 IST',
 };

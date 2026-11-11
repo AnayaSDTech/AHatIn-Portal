@@ -172,21 +172,6 @@ class EnquiryBody(EmailBody):
         return v
 
 
-# ---------------------------------------------------------------- Feedback Mode (temporary)
-
-
-class FeedbackEditBody(Body):
-    text: str = Field(min_length=1, max_length=1000)
-
-
-class FeedbackBody(Body):
-    text: str = Field(min_length=1, max_length=1000)
-    path: str = Field(min_length=1, max_length=300)
-    x: float = Field(ge=0, le=20000)
-    y: float = Field(ge=0, le=100000)
-    viewportWidth: float = Field(gt=0, le=20000)
-
-
 # ---------------------------------------------------------------- Explore Universities
 
 
@@ -380,9 +365,12 @@ class ReassignBody(Body):
 
 
 class AssignBody(Body):
-    """The admin's first choice of counsellor for a student (the reason is optional)."""
+    """The admin's first choice of counsellor for a student, with the Financial Aid Officer and Visa Officer chosen at the
+    same time (empty when there is no one to choose). The reason is optional."""
 
     counsellorId: str = Field(min_length=1)
+    financeOfficerId: str = Field(default="", max_length=64)
+    visaOfficerId: str = Field(default="", max_length=64)
     reason: str = Field(default="", max_length=500)
 
 

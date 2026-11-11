@@ -81,7 +81,6 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "delegates": [IndexModel([("tokenHash", ASCENDING)], unique=True), IndexModel([("studentId", ASCENDING), ("createdAt", DESCENDING)])],
     "referrals": [IndexModel([("referrerId", ASCENDING), ("createdAt", DESCENDING)]), IndexModel([("email", ASCENDING)]), IndexModel([("studentId", ASCENDING)])],
-    "feedback": [IndexModel([("path", ASCENDING), ("createdAt", ASCENDING)])],
     "student_alerts": [IndexModel([("studentId", ASCENDING), ("createdAt", DESCENDING)])],
     "courses": [IndexModel([("country", ASCENDING), ("level", ASCENDING)]), IndexModel([("importedAt", ASCENDING)])],
     "scholarships": [IndexModel([("active", ASCENDING), ("type", ASCENDING), ("state", ASCENDING)])],

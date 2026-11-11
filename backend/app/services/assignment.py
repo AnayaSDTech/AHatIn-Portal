@@ -1,6 +1,7 @@
-"""Assigning a counsellor to a student: automatically when the profile is complete (the best match with room), or by the
-admin from the Assignments page. Both go through assign_counsellor, so the record, history and emails are the same.
-The single Financial Aid Officer and Visa Officer are given to every new student at the same moment."""
+"""Assigning a counsellor to a student: by the admin from the Assignments page once the profile is complete, or
+automatically (the best match with room) when AUTO_ASSIGN_COUNSELLORS is on. Both go through assign_counsellor, so the
+record, history and emails are the same. With AUTO_ASSIGN_OFFICERS on, the single Financial Aid Officer and Visa
+Officer are given to every new student at the same moment."""
 
 from app import matching
 from app.config import get_settings

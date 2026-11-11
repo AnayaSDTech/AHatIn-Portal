@@ -22,7 +22,7 @@ import { PageHeader } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { TextField } from '../../components/ui/FormField';
+import { SelectField, TextField } from '../../components/ui/FormField';
 import { api } from '../../lib/api/client';
 import { mutate, useApi } from '../../lib/api/store';
 import { ApiError } from '../../lib/api/types';
@@ -183,9 +183,10 @@ function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title: strin
 /* ------------------------------ Page ------------------------------ */
 
 /**
- * The admin chooses who looks after each student at each handover: the counsellor once the profile is complete (ranked
- * on the profile: country 50%, subject 30%, spare capacity 20%), the Financial Aid Officer once Application Assistance is
- * complete, and the Visa Officer once Scholarship & Financial Guidance is complete. The portal suggests; the admin decides.
+ * Once a student's profile is complete, the admin chooses their counsellor (ranked on the profile: country 50%, subject
+ * 30%, spare capacity 20%) together with their Financial Aid Officer and Visa Officer, since career counselling and
+ * funding start at the same time. Students with a counsellor but missing an officer wait in that officer's queue.
+ * The portal suggests; the admin decides.
  */
 export function AssignCounsellorsPage() {
   const [queue, loaded] = useApi('/admin/assignments', NO_QUEUE, { pollMs: 60_000 });
@@ -209,15 +210,11 @@ export function AssignCounsellorsPage() {
   const matchesQuery = (...fields: (string | null | undefined)[]) => !q || fields.some((f) => f?.toLowerCase().includes(q));
 
   const oldest = (dates: (string | null)[]) => dates.filter(Boolean).sort()[0] ?? null;
-  // Counsellors are assigned automatically, so their queue only shows while someone is waiting (no counsellor had room).
-  const showCounsellorQueue = queue.waiting.length > 0;
-  const view: View = chosen === 'counsellor' && !showCounsellorQueue ? 'finance' : chosen;
+  const view: View = chosen;
   const tabs: { key: View; label: string; hint: string; count: number; since: string | null; icon: LucideIcon; tone: string }[] = [
-    ...(showCounsellorQueue
-      ? [{ key: 'counsellor' as const, label: 'Counsellor', hint: 'Needs your choice', count: queue.waiting.length, since: oldest(queue.waiting.map((s) => s.profileCompletedAt)), icon: UserCheck, tone: 'bg-navy-900 text-gold-300' }]
-      : []),
-    { key: 'finance', label: 'Financial Aid Officer', hint: 'Offer accepted', count: queue.waitingFinance.length, since: oldest(queue.waitingFinance.map((s) => s.readySince)), icon: PiggyBank, tone: 'bg-gold-500 text-navy-950' },
-    { key: 'visa', label: 'Visa Officer', hint: 'Funding complete', count: queue.waitingVisa.length, since: oldest(queue.waitingVisa.map((s) => s.readySince)), icon: Plane, tone: 'bg-sky-600 text-white' },
+    { key: 'counsellor', label: 'Counsellor', hint: 'Profile complete · assign the whole team', count: queue.waiting.length, since: oldest(queue.waiting.map((s) => s.profileCompletedAt)), icon: UserCheck, tone: 'bg-navy-900 text-gold-300' },
+    { key: 'finance', label: 'Financial Aid Officer', hint: 'Has a counsellor, no officer', count: queue.waitingFinance.length, since: oldest(queue.waitingFinance.map((s) => s.readySince)), icon: PiggyBank, tone: 'bg-gold-500 text-navy-950' },
+    { key: 'visa', label: 'Visa Officer', hint: 'Has a counsellor, no officer', count: queue.waitingVisa.length, since: oldest(queue.waitingVisa.map((s) => s.readySince)), icon: Plane, tone: 'bg-sky-600 text-white' },
     { key: 'incomplete', label: 'Profile incomplete', hint: "Can't be assigned yet", count: queue.incomplete.length, since: null, icon: UserRoundX, tone: 'bg-navy-100 text-navy-700' },
   ];
   const waitingTotal = queue.waiting.length + queue.waitingFinance.length + queue.waitingVisa.length;
@@ -275,9 +272,9 @@ export function AssignCounsellorsPage() {
           <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-navy-600">
               {view === 'counsellor' &&
-                'Counsellors are assigned automatically when a student completes their profile, using this ranking (country 50%, subject 30%, spare capacity 20%). Students wait here only when no counsellor had room, or if they completed their profile before that.'}
-              {view === 'finance' && 'Students who have accepted an offer. The Financial Aid Officer looks after scholarships, the funding plan and proof of funds.'}
-              {view === 'visa' && 'Students whose funding is complete. The Visa Officer looks after the visa, pre-departure and post-arrival support.'}
+                'Students who have completed their profile. Choose their counsellor (ranked by country 50%, subject 30%, spare capacity 20%), then their Financial Aid Officer and Visa Officer in the same step.'}
+              {view === 'finance' && 'Students who have a counsellor but no Financial Aid Officer yet. The Financial Aid Officer looks after scholarships, the funding plan and proof of funds from the start.'}
+              {view === 'visa' && 'Students who have a counsellor but no Visa Officer yet. The Visa Officer looks after the visa, pre-departure and post-arrival support.'}
               {view === 'incomplete' && 'Registered, but the profile isn’t complete, so they can’t be assigned yet. The profile form opens each time they sign in.'}
             </p>
             <label className="relative block w-full shrink-0 sm:w-72">
@@ -290,14 +287,14 @@ export function AssignCounsellorsPage() {
       {view === 'counsellor' &&
         (queue.waiting.length === 0 ? (
           <Empty icon={UserCheck} title="No one is waiting for a counsellor">
-            Counsellors are assigned automatically when students complete their profile. A student appears here only if no counsellor has room.
+            Students appear here as soon as they complete their profile, and you'll get an email when one is waiting.
           </Empty>
         ) : (
           <ul className="space-y-5">
             {queue.waiting
               .filter((s) => matchesQuery(s.name, s.reference, s.email))
               .map((s) => (
-                <WaitingStudent key={s.id} student={s} onAssigned={setMessage} />
+                <WaitingStudent key={s.id} student={s} officers={queue.officers} onAssigned={setMessage} />
               ))}
           </ul>
         ))}
@@ -390,10 +387,12 @@ function SuggestedCounsellor({ m, best, onAssign }: { m: Match; best: boolean; o
 
 /* ------------------------------ A student waiting for a counsellor ------------------------------ */
 
-function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onAssigned: (message: string) => void }) {
+function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueStudent; officers: Record<OfficerKind, Officer[]>; onAssigned: (message: string) => void }) {
   const [showAll, setShowAll] = useState(false);
   const [choice, setChoice] = useState<Match | null>(null);
   const [reason, setReason] = useState('');
+  // Officers come lightest workload first, so the first is the default choice.
+  const [team, setTeam] = useState<Record<OfficerKind, string>>({ finance: '', visa: '' });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const p = s.profile;
@@ -408,13 +407,26 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
     [p],
   );
 
+  const officerName = (kind: OfficerKind) => officers[kind].find((o) => o.id === team[kind])?.name;
+  const missingOfficer = (['finance', 'visa'] as const).find((k) => officers[k].length > 0 && !team[k]);
+
   const assign = async () => {
     if (!choice) return;
+    if (missingOfficer) {
+      setError(`Choose a ${OFFICER[missingOfficer].title}.`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await mutate(() => api.post(`/students/${s.id}/assign`, { counsellorId: choice.counsellorId, reason: reason.trim() }), { silent: true });
-      onAssigned(`${s.name} is now assigned to ${choice.name}. Both have been emailed, and ${s.name.split(' ')[0]} can now book their first session.`);
+      await mutate(
+        () => api.post(`/students/${s.id}/assign`, { counsellorId: choice.counsellorId, financeOfficerId: team.finance, visaOfficerId: team.visa, reason: reason.trim() }),
+        { silent: true },
+      );
+      const others = [officerName('finance') && `${officerName('finance')} (Financial Aid Officer)`, officerName('visa') && `${officerName('visa')} (Visa Officer)`].filter(Boolean);
+      onAssigned(
+        `${s.name} is now assigned to ${choice.name}${others.length ? `, with ${others.join(' and ')}` : ''}. Everyone has been emailed, and ${s.name.split(' ')[0]} can now book their first sessions.`,
+      );
       setChoice(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
@@ -478,6 +490,7 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
                   onAssign={() => {
                     setChoice(m);
                     setReason('');
+                    setTeam({ finance: officers.finance[0]?.id ?? '', visa: officers.visa[0]?.id ?? '' });
                     setError(null);
                   }}
                 />
@@ -495,16 +508,39 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
       <Modal
         open={!!choice}
         onClose={() => setChoice(null)}
-        title={`Assign ${s.name} to ${choice?.name ?? ''}?`}
-        description="The student and the counsellor are both emailed. The student can then book sessions and message their counsellor."
+        title={`Assign ${s.name}'s team`}
+        description="Career counselling and funding start together, so the Financial Aid Officer and Visa Officer are assigned with the counsellor. Everyone is emailed, and the student can then book sessions and message each of them."
         footer={
           <>
             <Button variant="outline" onClick={() => setChoice(null)}>Cancel</Button>
-            <Button onClick={() => void assign()} loading={saving}>Assign counsellor</Button>
+            <Button onClick={() => void assign()} loading={saving}>Assign team</Button>
           </>
         }
       >
         {choice?.atCapacity && <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">{choice.name} is at capacity ({choice.activeStudents} of {choice.capacity} students).</p>}
+        <div className="mb-4 space-y-4">
+          <div>
+            <p className="mb-1.5 block text-sm font-medium text-navy-800">Counsellor</p>
+            <p className="rounded-xl bg-ivory px-4 py-2.5 text-sm font-semibold text-navy-900">{choice?.name}</p>
+          </div>
+          {(['finance', 'visa'] as const).map((kind) =>
+            officers[kind].length === 0 ? (
+              <p key={kind} className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                No active {OFFICER[kind].title}s yet. Add one in Staff users; until then the student waits in the {OFFICER[kind].title} queue.
+              </p>
+            ) : (
+              <SelectField
+                key={kind}
+                label={OFFICER[kind].title}
+                required
+                value={team[kind]}
+                onChange={(e) => setTeam((t) => ({ ...t, [kind]: e.target.value }))}
+                options={officers[kind].map((o, i) => ({ value: o.id, label: `${o.name} · ${o.activeStudents} active ${o.activeStudents === 1 ? 'student' : 'students'}${i === 0 && officers[kind].length > 1 ? ' (lightest workload)' : ''}` }))}
+                data-officer-select={kind}
+              />
+            ),
+          )}
+        </div>
         <TextField
           label="Note (optional)"
           placeholder="e.g. Best match for the UK and computing"
@@ -524,16 +560,16 @@ function WaitingStudent({ student: s, onAssigned }: { student: QueueStudent; onA
 const OFFICER = {
   finance: {
     title: 'Financial Aid Officer',
-    ready: 'Offer accepted',
+    ready: 'Waiting',
     empty: 'No one is waiting for a Financial Aid Officer',
-    emptyText: 'Students appear here when they accept an offer.',
+    emptyText: 'Officers are assigned with the counsellor. A student appears here only if they have a counsellor but no Financial Aid Officer.',
     icon: PiggyBank,
   },
   visa: {
     title: 'Visa Officer',
-    ready: 'Funding complete',
+    ready: 'Waiting',
     empty: 'No one is waiting for a Visa Officer',
-    emptyText: 'Students appear here when their proof of funds is verified (or funding is marked "Not needed").',
+    emptyText: 'Officers are assigned with the counsellor. A student appears here only if they have a counsellor but no Visa Officer.',
     icon: Plane,
   },
 } as const;

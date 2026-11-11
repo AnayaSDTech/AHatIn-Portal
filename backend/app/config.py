@@ -40,9 +40,9 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 600
     otp_resend_seconds: int = 30
     otp_max_attempts: int = 5
-    # A student gets the best-matched counsellor with room as soon as their profile is complete. When off (or when no
-    # counsellor has room), they wait in the admin's Assignments list instead.
-    auto_assign_counsellors: bool = True
+    # Off: once a student's profile is complete they wait in the admin's Assignments list for the admin to choose a
+    # counsellor. On: the best-matched counsellor with room is assigned straight away.
+    auto_assign_counsellors: bool = False
 
     # Document storage: a private S3-compatible bucket (Backblaze B2 in use).
     s3_endpoint: str = ""
@@ -66,11 +66,9 @@ class Settings(BaseSettings):
     mail_from: str = "AHat <no-reply@ahat.example>"
     admin_alert_emails: str = ""
 
-    feedback_mode: bool = False
-
-    # The single Financial Aid Officer and Visa Officer given to every new student once their profile is complete.
-    # If either is missing or inactive, the admin assigns one from the Assignments page instead.
-    auto_assign_officers: bool = True
+    # Off: the admin assigns the Financial Aid Officer and Visa Officer from the Assignments page. On: these single
+    # officers are given to every new student once their profile is complete.
+    auto_assign_officers: bool = False
     default_finance_officer_email: str = "kavya.i@ahatin.example"
     default_visa_officer_email: str = "sneha.p@ahatin.example"
 
@@ -94,11 +92,6 @@ class Settings(BaseSettings):
         email = email.lower()
         demo = email.endswith("@" + self.demo_email_domain)
         return demo or undeliverable(email) if self.is_dev else self.demo_logins and demo
-
-    @property
-    def feedback_enabled(self) -> bool:
-        """Temporary Feedback Mode: on in development, elsewhere only with FEEDBACK_MODE=true."""
-        return self.is_dev or self.feedback_mode
 
     @property
     def can_send_email(self) -> bool:

@@ -29,9 +29,6 @@ services:
       # Demo accounts (…@ahatin.example) see their sign-in codes on screen; real users get codes by email only.
       - key: DEMO_LOGINS
         value: "true"
-      # Temporary Feedback Mode for beta testers: remove this (and VITE_FEEDBACK_MODE in the frontend) when testing ends.
-      - key: FEEDBACK_MODE
-        value: "true"
       - key: MEETING_LINK
         value: https://meet.google.com/juz-bodt-wbd
 

@@ -50,8 +50,8 @@ export function Universities() {
             <SmartImage src={images.campus} alt="University campus" className="h-64 w-full sm:h-80" />
             <div className="absolute inset-0 flex items-center bg-gradient-to-r from-navy-950/90 via-navy-950/60 to-transparent">
               <div className="max-w-lg px-8 sm:px-12">
-                <p className="font-display text-2xl text-white sm:text-3xl">150+ universities through our partners</p>
-                <p className="mt-3 text-sm text-navy-100">Demo figure. Applications via trusted partner agencies.</p>
+                <p className="font-display text-2xl text-white sm:text-3xl">50+ universities through our partners</p>
+                <p className="mt-3 text-sm text-navy-100">Applications via trusted partner agencies.</p>
               </div>
             </div>
           </div>
