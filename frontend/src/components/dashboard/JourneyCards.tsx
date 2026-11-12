@@ -7,7 +7,7 @@ import { Modal } from '../ui/Modal';
 import { UniversityBadge } from './UniversityBadge';
 import type { StaffStudent } from '../../data/staff';
 import type { useStudentActions } from '../../hooks/useJourney';
-import { DEPARTURE_TASKS, FUNDING_SOURCES, VISA_PATH, isNewOption, scholarshipStatusLabel, visaStageLabel, type ShortlistItem } from '../../lib/journey';
+import { DEPARTURE_TASKS, FUNDING_SOURCES, VISA_PATH, isNewOption, offerAccepted, scholarshipStatusLabel, visaStageLabel, type ShortlistItem } from '../../lib/journey';
 import { cn, formatDate, formatDateTime } from '../../lib/utils';
 
 type Actions = ReturnType<typeof useStudentActions>;
@@ -444,7 +444,11 @@ export function VisaCard({ student, waiting = false }: { student: StaffStudent; 
       <Panel id="visa" title="Visa" icon={<Stamp className="h-4 w-4" aria-hidden />} action={<Pill tone="blue">In progress</Pill>}>
         <div className="flex items-start gap-3 rounded-xl bg-sky-50 px-4 py-4 text-sm text-sky-900" data-visa-waiting>
           <Clock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <p>Waiting for your CAS or admission letter to arrive. Your Visa Officer will take you through the next steps once it does.</p>
+          <p>
+            {offerAccepted(student)
+              ? 'Waiting for your CAS or admission letter to arrive. Your Visa Officer will take you through the next steps once it does.'
+              : 'Your Visa Officer is helping you prepare early: a visa preparation session and documents such as your passport. The formal visa steps start once you accept an offer and receive your CAS (UK) or admission letter.'}
+          </p>
         </div>
       </Panel>
     );

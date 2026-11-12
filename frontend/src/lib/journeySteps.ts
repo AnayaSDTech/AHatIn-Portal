@@ -1,4 +1,4 @@
-import { DEPARTURE_TASKS, VISA_PATH, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
+import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
 import { appStateLabel, type AppState, type StaffStudent, type StudentApplication } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
@@ -175,6 +175,10 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
       const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Visa preparation');
       const held = mine.find((x) => x.status === 'completed');
       const booked = mine.find((x) => x.status === 'booked');
+      // Preparation comes first and can be done straight away; the formal steps follow an accepted offer.
+      const early = earlyVisaDocuments(s);
+      const uploaded = early.filter((d) => d.state === 'pending' || d.state === 'verified').length;
+      const accepted = apps.find((a) => a.state === 'accepted');
       return { steps: sequence(
         [
           { label: 'Visa Officer assigned to you', done: !!s.visaOfficerId, skip: !s.visaOfficerId && !!j.visa },
@@ -185,6 +189,13 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
             // A session helps but isn't required: a finished stage doesn't show one as still to do.
             skip: status === 'completed' && !held && !booked,
           },
+          {
+            label: early.length ? 'Early visa documents uploaded' : 'Your Visa Officer lists the documents to prepare early',
+            done: early.length > 0 && uploaded === early.length,
+            detail: early.length ? `${uploaded} of ${early.length} uploaded` : undefined,
+            skip: !early.length && !!v,
+          },
+          { label: 'You accept an offer (formal visa steps start)', done: !!v || offerAccepted(s), detail: accepted?.university },
           ...VISA_PATH.map((stage) => ({ label: visaStageLabel[stage], done: reached(stage), detail: when(stage) })),
           { label: v?.stage === 'refused' ? 'Visa refused' : 'Visa decision', done: v?.stage === 'granted', detail: v?.stage === 'granted' ? when('granted') : v?.stage === 'refused' ? v.refusalReason : undefined },
         ],

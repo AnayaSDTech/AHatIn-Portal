@@ -6,7 +6,8 @@ import { SelectField } from '../ui/FormField';
 import { Pill } from '../dashboard/Panel';
 import { SlotPicker } from './SlotPicker';
 import { useAvailability, useSessions, useStaffStudents, useTimeOff } from '../../hooks/useStaffData';
-import { counsellorName, counsellors, type StaffStudent } from '../../data/staff';
+import { areaOfRole, canEditArea, counsellorName, counsellors, sessionArea, type StaffStudent } from '../../data/staff';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api/client';
 import { mutate } from '../../lib/api/store';
 import { ApiError } from '../../lib/api/types';
@@ -287,6 +288,7 @@ export function StaffBookModal({
   students: StaffStudent[];
   fixedStudentId?: string;
 }) {
+  const { user } = useAuth();
   const [sessions] = useSessions();
   const [availabilityList] = useAvailability();
   const [timeOff] = useTimeOff();
@@ -309,6 +311,15 @@ export function StaffBookModal({
 
   const modes = pick.slot?.modes ?? ['online', 'office'];
   const effectiveMode = modes.includes(mode) ? mode : modes[0]!;
+
+  // Each person books for their own part of the journey (the server checks the same): the counsellor also covers
+  // funding or the visa while the student has no officer for it.
+  const role = user?.role ?? '';
+  const student = students.find((s) => s.id === studentId);
+  const topics = sessionTypes.filter((t) => (student ? canEditArea(role, student, sessionArea(t)) : role === 'admin' || (areaOfRole(role) ?? 'counsellor') === sessionArea(t)));
+  useEffect(() => {
+    if (type && !topics.includes(type)) setType('');
+  }, [type, topics]);
 
   const save = async () => {
     if (!studentId) return setError('Choose a student.');
@@ -349,7 +360,7 @@ export function StaffBookModal({
             onChange={(e) => setStudentId(e.target.value)}
           />
         )}
-        <SelectField label="Topic" placeholder="Choose a topic" options={sessionTypes.map((t) => ({ value: t, label: t }))} value={type} onChange={(e) => setType(e.target.value)} />
+        <SelectField label="Topic" placeholder="Choose a topic" options={topics.map((t) => ({ value: t, label: t }))} value={type} onChange={(e) => setType(e.target.value)} />
         {availability && (
           <SlotPicker availability={availability} sessions={sessions} timeOff={timeOff} date={pick.date} time={pick.time} onChange={setPick} ignoreNotice />
         )}

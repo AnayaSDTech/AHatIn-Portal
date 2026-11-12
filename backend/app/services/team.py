@@ -2,8 +2,8 @@
 
 - Counsellor: services 1-3 (career counselling, shortlist, applications). Stays the student's main contact.
 - Financial Aid Officer: service 4, alongside the counsellor's services.
-- Visa Officer: services 5-7, once an offer is accepted and Scholarship & Financial Guidance is complete (proof of funds
-  verified, or the service marked "Not needed").
+- Visa Officer: services 5-7. Visa preparation (sessions, early documents) runs alongside services 1-4 from the start;
+  the formal visa steps, from the CAS or admission letter, wait for an accepted offer.
 The admin assigns both officers together with the counsellor once the profile is complete (or automatically, with
 AUTO_ASSIGN_OFFICERS on). Funding then runs alongside services 1-3 rather than after them. Anyone with a counsellor but
 without an officer stays in the admin's officer queue until one is assigned. Once an officer is assigned, their services are read-only for the counsellor. Until then the counsellor can act on them

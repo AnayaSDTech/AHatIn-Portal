@@ -66,7 +66,7 @@ from app.schemas import (
 from app.services import notify, storage
 from app.services.assignment import assign_counsellor, assign_default_officers, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
-from app.services.team import assign_officer, check_handover, owner_for, require_area, team_of
+from app.services.team import applications_done, assign_officer, check_handover, owner_for, require_area, team_of
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
 
 router = APIRouter(tags=["students"])
@@ -222,9 +222,9 @@ async def add_staff_note(sid: str, body: TextBody, user: Staff):
 
 @router.post("/students/{sid}/assign")
 async def assign(sid: str, body: AssignBody, user: Admin):
-    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete), and their
-    Financial Aid Officer and Visa Officer at the same time: career counselling and funding start together, so the
-    officers don't wait for a stage of the journey. Everything is checked before anything is assigned."""
+    """The admin chooses the counsellor for a student who doesn't have one yet (profile must be complete) and, optionally,
+    their Financial Aid Officer and Visa Officer at the same time. An officer left out waits in that officer's queue.
+    Everything is checked before anything is assigned."""
     db = get_db()
     async with lock(f"student:{sid}:assign"):
         student = await student_for(user, sid, who="staff")
@@ -962,6 +962,10 @@ async def document_download_url(sid: str, doc_id: str, user: CurrentUser):
 async def set_visa_stage(sid: str, body: VisaBody, user: Staff):
     student = await student_for(user, sid, who="staff")
     require_area(user, student, "visa")
+    # Preparation (sessions, early documents) needs no offer; the formal steps start from the CAS or admission letter.
+    if not (student.get("journey") or {}).get("visa") and not await applications_done(student):
+        msg = "The formal visa steps start once the student accepts an offer."
+        raise ApiError(400, msg, {"form": msg})
 
     def fn(j, _):
         v = j.get("visa") or {}

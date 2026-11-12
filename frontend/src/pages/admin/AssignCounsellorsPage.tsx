@@ -272,7 +272,7 @@ export function AssignCounsellorsPage() {
           <div className="mb-5 mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-navy-600">
               {view === 'counsellor' &&
-                'Students who have completed their profile. Choose their counsellor (ranked by country 50%, subject 30%, spare capacity 20%), then their Financial Aid Officer and Visa Officer in the same step.'}
+                'Students who have completed their profile. Choose their counsellor (ranked by country 50%, subject 30%, spare capacity 20%), and optionally their Financial Aid Officer and Visa Officer in the same step.'}
               {view === 'finance' && 'Students who have a counsellor but no Financial Aid Officer yet. The Financial Aid Officer looks after scholarships, the funding plan and proof of funds from the start.'}
               {view === 'visa' && 'Students who have a counsellor but no Visa Officer yet. The Visa Officer looks after the visa, pre-departure and post-arrival support.'}
               {view === 'incomplete' && 'Registered, but the profile isn’t complete, so they can’t be assigned yet. The profile form opens each time they sign in.'}
@@ -391,7 +391,7 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
   const [showAll, setShowAll] = useState(false);
   const [choice, setChoice] = useState<Match | null>(null);
   const [reason, setReason] = useState('');
-  // Officers come lightest workload first, so the first is the default choice.
+  // Officers are optional and start unselected; the list shows the lightest workload first.
   const [team, setTeam] = useState<Record<OfficerKind, string>>({ finance: '', visa: '' });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -408,14 +408,9 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
   );
 
   const officerName = (kind: OfficerKind) => officers[kind].find((o) => o.id === team[kind])?.name;
-  const missingOfficer = (['finance', 'visa'] as const).find((k) => officers[k].length > 0 && !team[k]);
 
   const assign = async () => {
     if (!choice) return;
-    if (missingOfficer) {
-      setError(`Choose a ${OFFICER[missingOfficer].title}.`);
-      return;
-    }
     setSaving(true);
     setError(null);
     try {
@@ -490,7 +485,7 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
                   onAssign={() => {
                     setChoice(m);
                     setReason('');
-                    setTeam({ finance: officers.finance[0]?.id ?? '', visa: officers.visa[0]?.id ?? '' });
+                    setTeam({ finance: '', visa: '' });
                     setError(null);
                   }}
                 />
@@ -509,7 +504,7 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
         open={!!choice}
         onClose={() => setChoice(null)}
         title={`Assign ${s.name}'s team`}
-        description="Career counselling and funding start together, so the Financial Aid Officer and Visa Officer are assigned with the counsellor. Everyone is emailed, and the student can then book sessions and message each of them."
+        description="Choose the counsellor, and the Financial Aid Officer and Visa Officer now or later. Anyone left for later waits in that officer's queue. Everyone assigned is emailed, and the student can then book sessions and message each of them."
         footer={
           <>
             <Button variant="outline" onClick={() => setChoice(null)}>Cancel</Button>
@@ -531,8 +526,9 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
             ) : (
               <SelectField
                 key={kind}
-                label={OFFICER[kind].title}
-                required
+                label={`${OFFICER[kind].title} (optional)`}
+                placeholder="Not now: assign later"
+                clearable
                 value={team[kind]}
                 onChange={(e) => setTeam((t) => ({ ...t, [kind]: e.target.value }))}
                 options={officers[kind].map((o, i) => ({ value: o.id, label: `${o.name} · ${o.activeStudents} active ${o.activeStudents === 1 ? 'student' : 'students'}${i === 0 && officers[kind].length > 1 ? ' (lightest workload)' : ''}` }))}

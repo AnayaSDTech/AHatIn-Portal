@@ -1,5 +1,5 @@
 import { PiggyBank, Plane, type LucideIcon } from 'lucide-react';
-import { DEPARTURE_TASKS, VISA_PATH, fundingComplete, offerAccepted, visaCanStart, visaStageLabel } from './journey';
+import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, visaStageLabel } from './journey';
 import type { StaffStudent } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
@@ -201,9 +201,16 @@ function visaCase(s: StaffStudent): OfficerCase {
     };
   }
   const v = j.visa;
-  if (!v && !visaCanStart(s) && !verifyNext) {
-    const waitingFor = [!offerAccepted(s) && 'accepts an offer', !fundingComplete(s) && 'completes funding'].filter(Boolean).join(' and ');
-    return { phase: 'Upcoming', group: 'upcoming', tone: 'grey', next: `Starts once the student ${waitingFor}`, urgency: 0, progress: 0, toVerify };
+  // Preparation runs from the start; the formal steps wait for an accepted offer.
+  if (!v && !offerAccepted(s)) {
+    const early = earlyVisaDocuments(s);
+    const waiting = early.find((d) => d.state === 'missing' || d.state === 'rejected');
+    const prep = { phase: 'Preparation', group: 'visa', detail: 'Formal visa steps start once the student accepts an offer', progress: 0, toVerify };
+    if (verifyNext) return { ...prep, tone: 'amber', ...verifyNext };
+    if (!s.counsellorId) return { ...prep, phase: 'Upcoming', group: 'upcoming', tone: 'grey', next: 'Starts once the student has a counsellor', urgency: 0 };
+    if (!early.length) return { ...prep, tone: 'grey', next: 'Hold a visa preparation session and request early documents', urgency: 2 };
+    if (waiting) return { ...prep, tone: 'blue', next: `Waiting for: ${waiting.name}`, urgency: 1 };
+    return { ...prep, tone: 'blue', next: 'Waiting for the student to accept an offer', urgency: 0 };
   }
   if (!v) {
     return { phase: 'Visa', group: 'visa', tone: 'grey', ...(verifyNext ?? { next: 'Record the CAS or admission letter', urgency: 2 as const }), detail: 'Not started', progress: 0, toVerify };

@@ -15,7 +15,7 @@ from app.schemas import AvailabilityBody, CancelBody, CompleteBody, NoShowBody, 
 from app.services import notify
 from app.services.calendar import format_date, session_ics
 from app.services.scheduling import MAX_UPCOMING, check_slot, has_ended, has_started, session_times, validate_weekly
-from app.domain import OFFICER_FIELD, OFFICER_TITLE, SESSION_AREA
+from app.domain import AREA_OF_ROLE, OFFICER_FIELD, OFFICER_TITLE, SESSION_AREA
 from app.services.students import own_record, require_ready_to_start, student_for
 from app.services.team import owner_for
 
@@ -112,6 +112,20 @@ async def _send_invites(session: dict, student: dict, counsellor: dict, subject:
         await notify.email_counsellor(counsellor["_id"], subject, full, path="/staff/schedule", attachments=[ics], kind="session")
 
 
+def _check_topic(user: dict, student: dict, session_type: str) -> None:
+    """Staff book sessions for their own part of the journey: the counsellor for stages 1-2 (and for funding or the visa
+    while the student has no officer for it), each officer for theirs. Admins book any."""
+    if user["role"] == "admin":
+        return
+    area = SESSION_AREA.get(session_type, "counsellor")
+    mine = AREA_OF_ROLE.get(user["role"], "counsellor")
+    if mine == area or (mine == "counsellor" and area in OFFICER_FIELD and not student.get(OFFICER_FIELD[area])):
+        return
+    who = OFFICER_TITLE[area] if area in OFFICER_FIELD and student.get(OFFICER_FIELD[area]) else "counsellor"
+    msg = f"{session_type} sessions are booked by the student's {who}."
+    raise ApiError(403, msg, {"type": msg})
+
+
 @router.post("/sessions")
 async def book_session(body: SessionBody, user: CurrentUser):
     db = get_db()
@@ -122,6 +136,7 @@ async def book_session(body: SessionBody, user: CurrentUser):
         student = await student_for(user, body.studentId, who="staff")
         if not student.get("counsellorId"):
             raise ApiError(400, "Assign a counsellor to this student before booking a session.")
+        _check_topic(user, student, body.type)
         counsellor_id = body.counsellorId or owner_for(student, SESSION_AREA.get(body.type, "counsellor"))
         await _can_manage(user, counsellor_id)
     else:

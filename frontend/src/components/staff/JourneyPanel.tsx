@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { CheckCircle2, Circle, Pencil, Plus, Route, Send, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, Lock, Pencil, Plus, Route, Send, Trash2 } from 'lucide-react';
 import { ApiError } from '../../lib/api/types';
 import { Panel, Pill } from '../dashboard/Panel';
 import { Button } from '../ui/Button';
@@ -12,7 +12,9 @@ import type { useStudentActions } from '../../hooks/useJourney';
 import {
   DEPARTURE_TASKS,
   SERVICE_TITLES,
+  earlyVisaDocuments,
   isNewOption,
+  offerAccepted,
   VISA_PATH,
   scholarshipStatusLabel,
   serviceStatusLabel,
@@ -553,15 +555,49 @@ function VisaTab({ student, actions }: { student: StaffStudent; actions: Actions
   const [note, setNote] = useState('');
   const [reference, setReference] = useState('');
   const [refusing, setRefusing] = useState(false);
-  const accepted = student.applications.some((a) => a.state === 'accepted');
   const i = v ? VISA_PATH.indexOf(v.stage) : -1;
   const next: VisaStage | null = !v ? 'cas_received' : v.stage === 'refused' ? 'documents_verified' : i >= 0 && i < VISA_PATH.length - 1 ? VISA_PATH[i + 1]! : null;
   const canDecide = v && (v.stage === 'submitted' || v.stage === 'biometrics');
+  const early = earlyVisaDocuments(student);
+  const uploaded = early.filter((d) => d.state === 'pending' || d.state === 'verified').length;
 
-  if (!accepted && !v) return <Hint>The visa starts after the student accepts an offer.</Hint>;
+  // Preparation can start straight away; the formal steps open once the student accepts an offer.
+  const preparation = !v && (
+    <div className="rounded-2xl border border-navy-100 p-4" data-visa-preparation>
+      <p className="text-sm font-semibold text-navy-900">Preparation: start now</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-navy-600">
+        <li>Hold a visa preparation session: the visa route, timeline and costs.</li>
+        <li>Check the passport is valid for the whole course.</li>
+        <li>Request early documents below, e.g. passport (all pages), photographs, TB test (UK, where needed), police clearance.</li>
+      </ul>
+      <p className="mt-2 text-xs text-navy-500">{early.length ? `${uploaded} of ${early.length} early documents uploaded.` : 'No visa documents requested yet.'}</p>
+    </div>
+  );
+
+  if (!v && !offerAccepted(student)) {
+    return (
+      <div className="space-y-4">
+        {preparation}
+        <div className="rounded-2xl bg-ivory p-4" data-visa-locked>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-navy-900">
+            <Lock className="h-4 w-4 text-navy-400" aria-hidden /> Formal visa steps
+          </p>
+          <p className="mt-1 text-sm text-navy-600">These open once the student accepts an offer, starting with their CAS (UK) or admission letter.</p>
+          <ol className="mt-3 space-y-1.5 text-sm text-navy-400">
+            {VISA_PATH.map((stage) => (
+              <li key={stage} className="flex items-center gap-2">
+                <Circle className="h-4 w-4 text-navy-200" aria-hidden /> {visaStageLabel[stage]}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
+      {preparation}
       {v && (
         <ol className="space-y-1.5 text-sm">
           {v.history.map((h, n) => (

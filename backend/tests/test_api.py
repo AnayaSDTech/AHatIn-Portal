@@ -1299,6 +1299,8 @@ async def test_student_is_told_about_every_staff_action(make_api, bucket):
     sch_id = sch.json()["journey"]["funding"]["scholarships"][-1]["id"]
     await told(await admin.patch(f"/students/s1/funding/scholarships/{sch_id}", {"status": "awarded"}), "Chevening", "Awarded", target="funding")
     await told(await priya.delete(f"/students/s1/funding/scholarships/{sch_id}"), "Scholarship removed", target="funding")
+    assert (await admin.post("/students/s1/visa", {"stage": "cas_received"})).status_code == 400  # formal steps wait for an offer
+    await told(await admin.put("/students/s1/overrides/S3", {"status": "completed", "reason": "Offer accepted elsewhere"}))
     await told(await admin.post("/students/s1/visa", {"stage": "cas_received"}), "Visa update", target="visa")
     d, slot = await _free_slot("c1")
     booked = await priya.post("/sessions", {"studentId": "s1", "type": "Application review", "date": d, "time": slot["time"], "mode": slot["modes"][0]})
@@ -1874,3 +1876,28 @@ async def test_notifications_reach_officers_and_admins(make_api):
     [waiting] = await _notes(admin)
     assert waiting["path"] == "/admin/assign" and "waiting for a counsellor" in waiting["text"]
 
+
+
+async def test_staff_book_sessions_for_their_own_stages(make_api):
+    priya, kavya, sneha = await make_api(), await make_api(), await make_api()
+    await priya.staff_login()
+    await kavya.staff_login("kavya.i@ahatin.example")
+    await sneha.staff_login("sneha.p@ahatin.example")
+
+    async def book(api, student, topic, host):
+        d, slot = await _free_slot(host)
+        return await api.post("/sessions", {"studentId": student, "counsellorId": host, "type": topic, "date": d, "time": slot["time"], "mode": slot["modes"][0]})
+
+    # s4 has both officers: the counsellor books only for the first two stages.
+    for topic in ("Scholarship & funding", "Visa preparation", "Pre-departure briefing", "Post-arrival check-in"):
+        assert (await book(priya, "s4", topic, "c1")).status_code == 403, topic
+    assert (await book(priya, "s4", "Application review", "c1")).status_code == 200
+    # Each officer books only for their own stages.
+    for topic in ("Career counselling", "Application review", "Visa preparation"):
+        assert (await book(kavya, "s4", topic, "u6")).status_code == 403, topic
+    assert (await book(kavya, "s4", "Scholarship & funding", "u6")).status_code == 200
+    for topic in ("Career counselling", "Scholarship & funding"):
+        assert (await book(sneha, "s4", topic, "u7")).status_code == 403, topic
+    # s1 has no officers yet: the counsellor books for every stage.
+    assert (await book(priya, "s1", "Visa preparation", "c1")).status_code == 200
+    assert (await book(priya, "s1", "Scholarship & funding", "c1")).status_code == 200

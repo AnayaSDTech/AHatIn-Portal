@@ -189,20 +189,11 @@ export interface ServiceView {
 
 const lakh = (n: number) => `₹${Number.isInteger(n) ? n : n.toFixed(1)} lakh`;
 
-/** Application Assistance is finished, so funding can start. */
+/** Application Assistance is finished, so the formal visa steps can start. */
 export const offerAccepted = (s: StaffStudent) => s.applications.some((a) => a.state === 'accepted') || ['completed', 'not_needed'].includes(s.journey.overrides.S3?.status ?? '');
 
-/** The funding plan covers the estimated cost and all proof of funds is verified (or staff marked it done), so the visa can start. */
-export function fundingComplete(s: StaffStudent) {
-  const override = s.journey.overrides.S4?.status;
-  if (override) return override === 'completed' || override === 'not_needed';
-  const f = s.journey.funding;
-  const funds = s.documents.filter((d) => d.category === 'funds');
-  return !!f.estimatedCost && f.sources.reduce((n, x) => n + x.amount, 0) >= f.estimatedCost && funds.length > 0 && funds.every((d) => d.state === 'verified');
-}
-
-/** The visa needs both an accepted offer and finished funding. Funding runs alongside the applications, so either can come first. */
-export const visaCanStart = (s: StaffStudent) => offerAccepted(s) && fundingComplete(s);
+/** Visa documents requested at the Visa Assistance stage (not pre-departure or arrival), which can be gathered before an offer. */
+export const earlyVisaDocuments = (s: StaffStudent) => s.documents.filter((d) => d.category === 'visa' && (d.requestedStage ?? 'S5') === 'S5');
 
 /** A document for the applications (not funding or visa, which come later) is still to upload, or to upload again. */
 export const applicationDocumentsDue = (s: StaffStudent) => s.documents.some((d) => d.category !== 'funds' && d.category !== 'visa' && (d.state === 'missing' || d.state === 'rejected'));
@@ -309,9 +300,17 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
     }
     case 'S5': {
       const v = j.visa;
-      // Starts once there's an accepted offer and funding is complete, with the student's Visa Officer.
-      if (!v && s.visaOfficerId && visaCanStart(s)) return { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive', next: 'Talk to your Visa Officer' };
-      if (!v) return { status: 'not_started', summary: !offerAccepted(s) ? 'Starts after you accept an offer' : s.visaOfficerId ? 'Starts once your funding is complete' : 'Starts when your CAS or admission letter arrives' };
+      if (!v) {
+        // Runs alongside the first stage, like funding: preparation starts once the team is assigned, and the formal
+        // steps (from the CAS or admission letter) wait for an accepted offer.
+        if (!s.visaOfficerId) return { status: 'not_started', summary: offerAccepted(s) ? 'Starts when your CAS or admission letter arrives' : 'Starts when your Visa Officer is assigned' };
+        if (!s.counsellorId) return { status: 'not_started', summary: 'Starts once your counsellor is assigned' };
+        const toUpload = earlyVisaDocuments(s).find((d) => d.state === 'missing' || d.state === 'rejected');
+        const upload = toUpload ? `${toUpload.state === 'rejected' ? 'Re-upload' : 'Upload'}: ${toUpload.name}` : undefined;
+        return offerAccepted(s)
+          ? { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive', next: upload ?? 'Talk to your Visa Officer' }
+          : { status: 'in_progress', summary: 'Preparing for your visa', next: upload ?? 'Formal visa steps start after you accept an offer' };
+      }
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
       if (v.stage === 'refused') return { status: 'in_progress', summary: 'Visa refused', next: `${visaLead} will talk you through the next steps` };
       const i = VISA_PATH.indexOf(v.stage);
