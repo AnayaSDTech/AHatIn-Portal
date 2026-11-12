@@ -316,7 +316,7 @@ export function StaffBookModal({
   // funding or the visa while the student has no officer for it.
   const role = user?.role ?? '';
   const student = students.find((s) => s.id === studentId);
-  const topics = sessionTypes.filter((t) => (student ? canEditArea(role, student, sessionArea(t)) : role === 'admin' || (areaOfRole(role) ?? 'counsellor') === sessionArea(t)));
+  const topics: string[] = sessionTypes.filter((t) => (student ? canEditArea(role, student, sessionArea(t)) : role === 'admin' || (areaOfRole(role) ?? 'counsellor') === sessionArea(t)));
   useEffect(() => {
     if (type && !topics.includes(type)) setType('');
   }, [type, topics]);
