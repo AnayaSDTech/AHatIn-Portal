@@ -36,6 +36,7 @@ FUNNEL = [
 ]
 SOURCE_LABELS = {
     "Website": "Website",
+    "Chat": "Website chat",
     "Google ad": "Google ads",
     "Instagram ad": "Instagram",
     "Referral": "Referrals",

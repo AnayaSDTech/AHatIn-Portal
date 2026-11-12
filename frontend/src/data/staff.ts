@@ -90,7 +90,7 @@ export const staffRoleLabel: Record<string, string> = {
   admin: 'Administrator',
 };
 
-export type LeadSource = 'Website' | 'Google ad' | 'Instagram ad' | 'Referral' | 'Seminar' | 'Walk-in' | 'WhatsApp';
+export type LeadSource = 'Website' | 'Chat' | 'Google ad' | 'Instagram ad' | 'Referral' | 'Seminar' | 'Walk-in' | 'WhatsApp';
 
 export interface Lead {
   id: string;

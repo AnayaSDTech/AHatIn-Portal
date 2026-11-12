@@ -75,6 +75,8 @@ INDEXES: dict[str, list[IndexModel]] = {
     # Kept a day past expiry so the worker can delete abandoned files before the record goes.
     "uploads": [IndexModel([("expiresAt", ASCENDING)], expireAfterSeconds=86400)],
     "rate_limits": [IndexModel([("expiresAt", ASCENDING)], expireAfterSeconds=0)],
+    # "Ask AHat" chats: deleted automatically when expiresAt passes (CHAT_RETENTION_DAYS after they start).
+    "chats": [IndexModel([("expiresAt", ASCENDING)], expireAfterSeconds=0), IndexModel([("flagged", ASCENDING), ("updatedAt", DESCENDING)])],
     "notifications": [
         IndexModel([("status", ASCENDING), ("sendAfter", ASCENDING)]),
         IndexModel([("dedupeKey", ASCENDING)], unique=True, partialFilterExpression={"dedupeKey": {"$type": "string"}}),

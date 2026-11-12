@@ -72,6 +72,19 @@ class Settings(BaseSettings):
     default_finance_officer_email: str = "kavya.i@ahatin.example"
     default_visa_officer_email: str = "sneha.p@ahatin.example"
 
+    # AI chat assistant ("Ask AHat"). Any OpenAI-compatible chat API: Groq by default; for Google Gemini's free tier use
+    # CHAT_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai and e.g. CHAT_MODEL=gemini-2.5-flash.
+    # CHAT_ENABLED shows it to the public (the on/off switch); staff can always try it once CHAT_API_KEY is set.
+    chat_enabled: bool = False
+    chat_api_key: str = ""
+    chat_base_url: str = "https://api.groq.com/openai/v1"
+    chat_model: str = "openai/gpt-oss-120b"
+    # For reasoning models (gpt-oss, Gemini 2.5): "low" keeps answers quick. Empty for models that don't take it.
+    chat_reasoning_effort: str = "low"
+    chat_daily_limit: int = 500  # messages a day from everyone together; then visitors are offered a call back instead
+    chat_max_reply_tokens: int = 1200
+    chat_retention_days: int = 30
+
     # Demo accounts (emails at DEMO_EMAIL_DOMAIN) get their sign-in code and authenticator secret on screen,
     # even in production, so the demo can be tried. Everyone else gets codes by email only.
     demo_logins: bool = False

@@ -19,6 +19,12 @@ function readCookie(name: string) {
  * - Tells the app when the session has ended (401), so it can show the login page.
  */
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await apiFetch(path, init);
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
+/** The raw response (for streamed answers), with the same cookies, CSRF token and errors as apiRequest. */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const csrf = UNSAFE.includes(method) ? readCookie(CSRF_COOKIE) : undefined;
   const response = await fetch(`${env.apiBaseUrl}/api/v1${path}`, {
@@ -38,8 +44,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     const fieldErrors = Object.fromEntries((body.errors ?? []).map((e) => [e.field, e.message]));
     throw new ApiError(response.status, body.detail ?? 'Something went wrong. Please try again.', fieldErrors, body.trace_id);
   }
-
-  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+  return response;
 }
 
 export const api = {

@@ -1481,6 +1481,99 @@ async def test_home_page_scholarship_preview_is_public_and_basic(make_api):
         assert not {"coverage", "eligibility", "howToApply", "officialWebsite", "sourceUrl", "notes"} & s.keys()
 
 
+def _sse(text: str) -> list[dict]:
+    import json
+
+    return [json.loads(line[5:]) for line in text.splitlines() if line.startswith("data:")]
+
+
+async def test_ask_ahat_chat(make_api, monkeypatch):
+    """The AI provider is replaced by a script: a scholarship search, then a short answer."""
+    from app.services import chat_provider
+
+    s = get_settings()
+    visitor, admin = await make_api(), await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+
+    # Off without a key; with a key, staff can try it before it is switched on for everyone.
+    monkeypatch.setattr(s, "chat_api_key", "")
+    monkeypatch.setattr(s, "chat_enabled", True)
+    assert (await visitor.get("/chat/status")).json() == {"enabled": False}
+    monkeypatch.setattr(s, "chat_api_key", "test-key")
+    monkeypatch.setattr(s, "chat_enabled", False)
+    assert (await visitor.get("/chat/status")).json() == {"enabled": False}
+    assert (await visitor.post("/chat", {"message": "Hi"})).status_code == 404
+    assert (await admin.get("/chat/status")).json() == {"enabled": True}
+    monkeypatch.setattr(s, "chat_enabled", True)
+    assert (await visitor.get("/chat/status")).json() == {"enabled": True}
+
+    sent: list[list[dict]] = []
+
+    async def scripted(messages, tools):
+        sent.append(messages)
+        if messages[-1]["role"] == "user" and "scholarship" in messages[-1]["content"]:
+            yield {"text": "Let me look. "}
+            yield {"tool_calls": [{"id": "c1", "name": "search_scholarships", "arguments": '{"home_state": "Maharashtra", "level": "Master\'s"}'}]}
+        elif messages[-1]["role"] == "tool":
+            yield {"text": "Here are some options."}
+            yield {"tool_calls": []}
+        else:
+            yield {"text": "A counsellor can help with that."}
+            yield {"tool_calls": [{"id": "c2", "name": "show_call_back_form", "arguments": "{}"}]}
+
+    monkeypatch.setattr(chat_provider, "stream_reply", scripted)
+    r = await visitor.post("/chat", {"message": "Any scholarship for a master's? I'm from Maharashtra"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream"), r.text
+    events = _sse(r.text)
+    chat_id = events[0]["chatId"]
+    assert "".join(e["text"] for e in events if e["type"] == "text") == "Let me look. Here are some options."
+    cards = next(e for e in events if e["type"] == "scholarships")
+    assert 0 < len(cards["items"]) <= 5
+    for c in cards["items"]:
+        assert "Master's" in c["levels"] and not {"eligibility", "howToApply", "officialWebsite"} & c.keys()
+        assert c["type"] != "State government" or c["state"] == "Maharashtra"  # other states' schemes don't apply
+    assert events[-1] == {"type": "done", "index": 1}
+    # The rules and knowledge go first; the tool result went back to the model.
+    assert "Ask AHat" in sent[0][0]["content"] and "contact@ahat.in" in sent[0][0]["content"]
+    assert sent[1][-1]["role"] == "tool" and sent[1][-2]["tool_calls"][0]["function"]["name"] == "search_scholarships"
+
+    # The same chat continues with its history; asking for a person shows the call-back form.
+    r = await visitor.post("/chat", {"chatId": chat_id, "message": "Can I talk to someone?"})
+    events = _sse(r.text)
+    assert {"type": "callback"} in events and events[-1]["index"] == 3
+    assert [m["role"] for m in sent[-1][1:4]] == ["user", "assistant", "user"]
+    saved = await get_db().chats.find_one({"_id": chat_id})
+    assert [m["role"] for m in saved["messages"]] == ["user", "assistant", "user", "assistant"]
+    assert saved["messages"][3]["callback"] is True and saved["expiresAt"] > now() + timedelta(days=29)
+
+    # Thumbs up or down on answers only.
+    assert (await visitor.post(f"/chat/{chat_id}/feedback", {"index": 1, "helpful": True})).status_code == 204
+    assert (await visitor.post(f"/chat/{chat_id}/feedback", {"index": 0, "helpful": True})).status_code == 404
+    assert (await visitor.post("/chat/nope/feedback", {"index": 1, "helpful": False})).status_code == 404
+    assert (await get_db().chats.find_one({"_id": chat_id}))["messages"][1]["helpful"] is True
+
+    # Provider down: a friendly message and the call-back form instead.
+    async def down(messages, tools):
+        raise chat_provider.ProviderError("down")
+        yield {}  # pragma: no cover
+
+    monkeypatch.setattr(chat_provider, "stream_reply", down)
+    events = _sse((await visitor.post("/chat", {"message": "Hello"})).text)
+    assert {"type": "callback"} in events and any("call you back" in e.get("text", "") for e in events)
+
+    # Spam trap, empty messages, and the per-visitor limit (20 every 10 minutes).
+    assert (await visitor.post("/chat", {"message": "Hi", "website": "http://spam"})).status_code == 204
+    assert (await visitor.post("/chat", {"message": "   "})).status_code == 422
+    for _ in range(20):
+        last = await visitor.post("/chat", {"message": "Hello"})
+    assert last.status_code == 429
+
+    # The call-back form from the chat creates a lead labelled "Chat".
+    body = {"name": "Isha Kulkarni", "email": "isha.k@example.com", "mobile": "9876500011", "destination": "undecided", "intake": "unsure", "consent": True, "fromChat": True}
+    assert (await visitor.post("/enquiries", body)).json()["kind"] == "new"
+    assert (await get_db().leads.find_one({"email": "isha.k@example.com"}))["source"] == "Chat"
+
+
 async def test_explore_scholarships(make_api):
     student = await make_api()
     await student.student_login()

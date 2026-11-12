@@ -29,6 +29,19 @@ services:
       # Demo accounts (…@ahatin.example) see their sign-in codes on screen; real users get codes by email only.
       - key: DEMO_LOGINS
         value: "true"
+      # "Ask AHat" AI chat. CHAT_ENABLED is the on/off switch for the public; staff can try it whenever a key is set.
+      # Groq's free tier by default (OpenAI-compatible API). Free tiers may use what is sent to improve their models,
+      # so test with made-up questions only, and move to a paid tier with no training before switching it on publicly.
+      - key: CHAT_ENABLED
+        value: "false"
+      - key: CHAT_API_KEY
+        sync: false
+      - key: CHAT_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: CHAT_MODEL
+        value: openai/gpt-oss-120b
+      - key: CHAT_DAILY_LIMIT
+        value: "500"
       - key: MEETING_LINK
         value: https://meet.google.com/juz-bodt-wbd
 

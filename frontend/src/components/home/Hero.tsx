@@ -1,13 +1,12 @@
 import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { ButtonLink } from '../ui/Button';
-import { DemoBadge } from '../ui/DemoBadge';
 import { SmartImage } from '../ui/SmartImage';
 import { images, stats } from '../../data/site';
 import { cn } from '../../lib/utils';
 
 /**
- * Demo journey shown in the hero card (a preview of the student portal). The stages don't all fit, so the
+ * Example journey shown in the hero card (a preview of the student portal, not a real student). The stages don't all fit, so the
  * steps between funding and the last one are shown as a row of dots ("gap").
  */
 const heroSteps: { title: string; note: string; state: 'done' | 'now' | 'next' | 'gap' }[] = [
@@ -90,9 +89,6 @@ export function Hero() {
                   <p className="mt-1 font-semibold leading-snug">MSc Data Science</p>
                   <p className="text-xs text-navy-200">United Kingdom · Sept 2027 intake</p>
                 </div>
-                <span className="absolute right-4 top-4">
-                  <DemoBadge light label="Demo" />
-                </span>
               </div>
 
               {/* Steps, like the student portal */}

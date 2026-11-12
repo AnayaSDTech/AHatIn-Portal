@@ -178,7 +178,8 @@ class EnquiryBody(EmailBody):
     message: str = Field(default="", max_length=500)
     consent: bool
     website: str = ""
-
+    # Sent from the call-back form inside the "Ask AHat" chat: the lead's source is "Chat".
+    fromChat: bool = False
 
     @field_validator("consent")
     @classmethod
@@ -186,6 +187,29 @@ class EnquiryBody(EmailBody):
         if not v:
             raise ValueError("Please agree so we can contact you.")
         return v
+
+
+# ---------------------------------------------------------------- "Ask AHat" chat assistant
+
+
+class ChatBody(Body):
+    # Empty for a new chat; then the id the first answer gave.
+    chatId: str = Field(default="", max_length=64)
+    message: str = Field(min_length=1, max_length=1000)
+    website: str = ""  # spam trap, as on the enquiry form
+
+    @field_validator("message")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Type a message.")
+        return v
+
+
+class ChatFeedbackBody(Body):
+    index: int = Field(ge=0, le=200)
+    helpful: bool
 
 
 # ---------------------------------------------------------------- Explore Universities

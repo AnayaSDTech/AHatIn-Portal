@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Footer } from './Footer';
 import { UpdatePrompt } from '../pwa/UpdatePrompt';
+import { ChatWidget } from '../chat/ChatWidget';
 
 /** Scrolls to the #section in the URL, or to the top on a new page. */
 function ScrollManager() {
@@ -37,6 +38,8 @@ export function Layout({ hideFooter }: { hideFooter?: boolean }) {
         <Outlet />
       </main>
       {!hideFooter && <Footer />}
+      {/* "Ask AHat" AI chat: public pages only (not the login and register pages); hidden unless switched on. */}
+      {!hideFooter && <ChatWidget />}
       <UpdatePrompt />
     </div>
   );

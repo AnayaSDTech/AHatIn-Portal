@@ -72,6 +72,7 @@ async def submit_enquiry(body: EnquiryBody, request: Request):
         return {"kind": "lead", "counsellor": await _name(lead["counsellorId"])}
 
     # New lead. Website enquiries are handled by the admin, who can later assign one to a counsellor.
+    source = "Chat" if body.fromChat else "Website"
     lead_id = new_id()
     score = 40 + (15 if body.destination != "undecided" else 0) + (15 if body.intake != "unsure" else 0) + (10 if body.course.strip() else 0) + (10 if body.message.strip() else 0)
     doc = {
@@ -81,13 +82,13 @@ async def submit_enquiry(body: EnquiryBody, request: Request):
         "mobile": format_mobile(body.mobile),
         "mobileDigits": body.mobile,
         "city": "Not given",
-        "source": "Website",
+        "source": source,
         "interest": interest,
         "stage": "new_lead",
         "score": score,
         "createdAt": t,
         "counsellorId": None,
-        "activities": [{"at": t, "channel": "System", "outcome": "Website enquiry received. Handled by the admin"}],
+        "activities": [{"at": t, "channel": "System", "outcome": f"{'Call-back request from the website chat' if body.fromChat else 'Website enquiry'} received. Handled by the admin"}],
         "consentAt": t,
     }
     if body.message.strip():

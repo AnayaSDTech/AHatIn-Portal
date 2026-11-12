@@ -35,6 +35,7 @@ const sections: LegalSection[] = [
           items={[
             'visit our website at ahat.in;',
             'send us an enquiry or ask us to call you back;',
+            'chat with "Ask AHat", the AI assistant on our website;',
             'register for and use the AHat student portal, including as a parent;',
             'upload documents for a student through a private upload link they sent you; or',
             'are referred to us by a friend.',
@@ -59,6 +60,11 @@ const sections: LegalSection[] = [
             <><strong>Communications:</strong> messages you send in the portal, emails, the sessions you book and notes our team makes about them.</>,
             <><strong>People you invite:</strong> the name, email address and relationship of a parent, guardian or sponsor you invite to upload documents, and the files they upload.</>,
             <><strong>Referrals:</strong> the name and email address of a friend you refer to us.</>,
+            <>
+              <strong>Chat messages:</strong> what you type to "Ask AHat", our AI assistant, its answers, and whether you marked an answer helpful. Please don't share
+              passport numbers, bank details or other sensitive information in the chat. If you ask for a call back from the chat, your name, mobile number and email
+              go straight to us through the call-back form, not to the AI.
+            </>,
           ]}
         />
         <p><strong>Information we collect automatically</strong></p>
@@ -96,6 +102,7 @@ const sections: LegalSection[] = [
           head={['What we use it for', 'Lawful basis']}
           rows={[
             ['Reply to your enquiry and call you back', 'Steps you have asked us to take before using our services; our legitimate interests in answering enquiries'],
+            ['Answer your questions in the "Ask AHat" chat, and review chats to improve its answers and prevent misuse', 'Our legitimate interests in answering questions about our services'],
             ['Provide our services: counselling, shortlisting, applications, scholarships and funding guidance, visa guidance, and pre-departure and arrival support', 'Performance of our agreement with you'],
             ['Send your applications to universities and partner agencies, and follow up with them', 'Performance of our agreement with you'],
             ['Send you sign-in codes, reminders and updates about your account and journey', 'Performance of our agreement with you'],
@@ -107,7 +114,11 @@ const sections: LegalSection[] = [
             ['Send you news and offers about our services', 'Your consent, which you can withdraw at any time'],
           ]}
         />
-        <p>We do not make decisions about you based only on automated processing. Suggestions in the portal, such as matching courses or scholarships, are guidance only, and our team makes the decisions that matter.</p>
+        <p>
+          We do not make decisions about you based only on automated processing. Suggestions in the portal, such as matching courses or scholarships, and answers from
+          the "Ask AHat" AI assistant are guidance only, and our team makes the decisions that matter. The AI assistant can make mistakes, so please check anything
+          important with your counsellor.
+        </p>
       </>
     ),
   },
@@ -125,6 +136,10 @@ const sections: LegalSection[] = [
             <>
               <strong>Service providers</strong> who run parts of our service for us under contract, including website and server hosting (Hostinger and Render), our
               database (MongoDB Atlas), document storage (Backblaze), email delivery (Resend) and session calendars (Google).
+            </>,
+            <>
+              <strong>Our AI provider</strong> (Groq), which writes the "Ask AHat" chat's answers. It receives the messages in your chat, but not your account,
+              documents or call-back details.
             </>,
             <><strong>Professional advisers</strong>, such as lawyers and accountants, where needed.</>,
             <><strong>Authorities</strong>, such as the police, courts or regulators, where the law requires it.</>,
@@ -144,7 +159,7 @@ const sections: LegalSection[] = [
     body: (
       <p>
         We work in India and the United Kingdom, and your applications go to universities in the UK and Europe. Some of our service providers store data in other
-        countries, including the United States. When personal data leaves the UK, we make sure it is protected, for example by sending it only to countries the UK
+        countries, including the United States, where our AI provider processes chat messages. When personal data leaves the UK, we make sure it is protected, for example by sending it only to countries the UK
         recognises as adequate or by using the UK's approved data transfer agreements. Sending your application to a university abroad is necessary to provide the
         service you have asked for.
       </p>
@@ -160,6 +175,7 @@ const sections: LegalSection[] = [
           items={[
             'Your account, profile, documents and records: while your account is open and for up to six years after our last contact with you, so we can answer questions or complaints and meet legal requirements.',
             'Enquiries that do not lead to an account: for up to two years after our last contact.',
+            '"Ask AHat" chats: deleted automatically 30 days after the chat starts. A call-back request made from the chat is kept as an enquiry.',
             'Sign-in codes expire after 10 minutes, invitation links when their time runs out, and unfinished uploads are removed within a day.',
           ]}
         />
@@ -273,7 +289,7 @@ export function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy notice"
-      updated="10 November 2026"
+      updated="11 November 2026"
       intro={<p>How AHat, a trading name of {COMPANY.name}, collects, uses and protects your personal data.</p>}
       sections={sections}
     />

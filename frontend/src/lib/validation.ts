@@ -102,6 +102,10 @@ export const enquirySchema = z.object({
 
 export type EnquiryForm = z.infer<typeof enquirySchema>;
 
+/** The short call-back form inside the "Ask AHat" chat. */
+export const chatCallBackSchema = enquirySchema.pick({ name: true, email: true, mobile: true, consent: true, website: true });
+export type ChatCallBackForm = z.infer<typeof chatCallBackSchema>;
+
 export type EmailForm = z.infer<typeof emailSchema>;
 export type OtpForm = z.infer<typeof otpSchema>;
 export type StaffLoginForm = z.infer<typeof staffLoginSchema>;
