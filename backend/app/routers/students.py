@@ -66,7 +66,7 @@ from app.schemas import (
 from app.services import notify, storage
 from app.services.assignment import assign_counsellor, assign_default_officers, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
-from app.services.team import applications_done, assign_officer, check_handover, owner_for, require_area, team_of
+from app.services.team import COUNSELLOR_HANDLES, applications_done, assign_officer, check_handover, cover_by_counsellor, covered, owner_for, require_area, team_of
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
 
 router = APIRouter(tags=["students"])
@@ -235,9 +235,13 @@ async def assign(sid: str, body: AssignBody, user: Admin):
         target = await db.users.find_one({"_id": body.counsellorId, "role": "counsellor", "status": "active"})
         if not target:
             raise ApiError(400, "Choose an active counsellor.", {"counsellorId": "Choose an active counsellor."})
-        officers = {}
+        officers, covers = {}, []
         for area, officer_id in (("finance", body.financeOfficerId), ("visa", body.visaOfficerId)):
             if not officer_id or student.get(OFFICER_FIELD[area]) == officer_id:
+                continue
+            if officer_id == COUNSELLOR_HANDLES:
+                if not student.get(OFFICER_FIELD[area]):
+                    covers.append(area)
                 continue
             officer = await db.users.find_one({"_id": officer_id, "role": OFFICER_ROLE[area], "status": "active"})
             if not officer:
@@ -250,6 +254,9 @@ async def assign(sid: str, body: AssignBody, user: Admin):
                 # `student` is from before the counsellor was set, so the new counsellor isn't sent a separate email per officer.
                 await assign_officer(student, area, officer, user, body.reason or "Assigned by the admin with the counsellor")
                 await audit(user, f"student.{area}_officer", "students", sid, {"to": officer["_id"]})
+            for area in covers:
+                await cover_by_counsellor({**student, "counsellorId": target["_id"]}, area, user, body.reason or "Chosen by the admin with the counsellor")
+                await audit(user, f"student.{area}_officer", "students", sid, {"to": COUNSELLOR_HANDLES})
     return await load_student(sid)
 
 
@@ -259,6 +266,17 @@ async def set_officer(sid: str, body: AssignOfficerBody, user: Admin):
     db = get_db()
     async with lock(f"student:{sid}:officer"):
         student = await student_for(user, sid, who="staff")
+        if body.officerId == COUNSELLOR_HANDLES:
+            title = OFFICER_TITLE[body.kind]
+            if not student.get("counsellorId"):
+                raise ApiError(400, "Assign a counsellor to this student first.")
+            if covered(student, body.kind):
+                raise ApiError(400, f"The counsellor already handles this instead of a {title}.")
+            if student.get(OFFICER_FIELD[body.kind]) and len(body.reason) < 5:
+                raise ApiError(400, "Give a reason for the change (at least 5 characters).", {"reason": "Give a reason for the change."})
+            await cover_by_counsellor(student, body.kind, user, body.reason or "Chosen by the admin")
+            await audit(user, f"student.{body.kind}_officer", "students", sid, {"to": COUNSELLOR_HANDLES})
+            return await load_student(sid)
         officer = await db.users.find_one({"_id": body.officerId, "role": OFFICER_ROLE[body.kind], "status": "active"})
         if not officer:
             raise ApiError(400, f"Choose an active {OFFICER_TITLE[body.kind]}.", {"officerId": f"Choose an active {OFFICER_TITLE[body.kind]}."})

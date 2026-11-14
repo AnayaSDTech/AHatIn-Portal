@@ -347,7 +347,7 @@ async def _invite(token: str) -> tuple[dict, dict]:
     if not invite or invite["expiresAt"] < now():
         raise ApiError(404, "This invitation link has expired or was already used. Ask an administrator for a new one.")
     user = await db.users.find_one({"_id": invite["userId"]})
-    if not user or user.get("status") == "deactivated":
+    if not user or user.get("status") in ("deactivated", "deleted"):
         raise ApiError(404, "This invitation link has expired or was already used. Ask an administrator for a new one.")
     return invite, user
 

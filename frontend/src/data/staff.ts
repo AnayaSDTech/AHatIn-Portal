@@ -48,6 +48,8 @@ export function setCounsellors(list: Counsellor[]) {
 export const counsellorName = (id: string | null | undefined) => (id && counsellors.find((c) => c.id === id)?.name) || 'Unassigned';
 /** Counsellors who can be given students, leads or access now (the list also holds the officers). */
 export const activeCounsellors = () => counsellors.filter((c) => c.active !== false && (c.role ?? 'counsellor') === 'counsellor');
+/** Active Financial Aid Officers or Visa Officers. */
+export const activeOfficers = (area: 'finance' | 'visa') => counsellors.filter((c) => c.active !== false && c.role === (area === 'finance' ? 'finance_officer' : 'visa_officer'));
 /** Everyone with a schedule of sessions: counsellors and officers. */
 export const activeSessionHosts = () => counsellors.filter((c) => c.active !== false);
 
@@ -55,11 +57,18 @@ export const activeSessionHosts = () => counsellors.filter((c) => c.active !== f
 
 /** counsellor: services 1–3; finance: service 4 (Financial Aid Officer); visa: services 5–7 (Visa Officer). */
 export type TeamArea = 'counsellor' | 'finance' | 'visa';
+export type OfficerArea = 'finance' | 'visa';
 export interface StudentTeam {
   counsellor: Counsellor | null;
   finance: Counsellor | null;
   visa: Counsellor | null;
+  /** Officer areas with no officer that the counsellor handles instead. */
+  covered?: OfficerArea[];
 }
+/** Value chosen instead of an officer when the counsellor handles that area. */
+export const COUNSELLOR_HANDLES = 'counsellor';
+/** The person a student books with for an area: its officer, or the counsellor when they handle it. */
+export const hostFor = (team: StudentTeam, area: TeamArea) => team[area] ?? (area !== 'counsellor' && team.covered?.includes(area) ? team.counsellor : null);
 export const teamTitle: Record<TeamArea, string> = { counsellor: 'Counsellor', finance: 'Financial Aid Officer', visa: 'Visa Officer' };
 export const SERVICE_AREA: Record<string, TeamArea> = { S1: 'counsellor', S3: 'counsellor', S4: 'finance', S5: 'visa', S6: 'visa', S7: 'visa' };
 export const DOC_AREA: Record<string, TeamArea> = { general: 'counsellor', funds: 'finance', visa: 'visa' };
@@ -70,6 +79,10 @@ const OFFICER_FIELD = { finance: 'financeOfficerId', visa: 'visaOfficerId' } as 
 export const areaOfRole = (role: string): TeamArea | null => (role === 'finance_officer' ? 'finance' : role === 'visa_officer' ? 'visa' : null);
 /** The staff member looking after an area of this student's journey (the counsellor until an officer is assigned). */
 export const ownerOf = (s: StaffStudent, area: TeamArea) => (area === 'counsellor' ? s.counsellorId : s[OFFICER_FIELD[area]] || s.counsellorId);
+/** The admin chose to have the counsellor handle this area instead of assigning its officer. */
+export const counsellorCovers = (s: StaffStudent, area: OfficerArea) => !s[OFFICER_FIELD[area]] && !!s.counsellorCovers?.includes(area);
+/** Someone looks after this officer area: its officer, or the counsellor by the admin's choice. */
+export const areaHasOwner = (s: StaffStudent, area: OfficerArea) => !!s[OFFICER_FIELD[area]] || counsellorCovers(s, area);
 
 /**
  * May this staff member change this part of a student's journey? (The server applies the same rule.)
@@ -196,6 +209,8 @@ export interface StaffStudent {
   /** Assigned by the admin once Scholarship & Financial Guidance is complete. */
   visaOfficerId?: string | null;
   officerHistory?: { at: string; by: string; role: 'finance' | 'visa'; from: string; to: string; reason: string }[];
+  /** Officer areas the counsellor handles because the admin chose not to assign that officer. */
+  counsellorCovers?: OfficerArea[];
   /** Login account linked to this record. */
   userId?: string;
   assignmentHistory: { at: string; by: string; from: string; to: string; reason: string }[];

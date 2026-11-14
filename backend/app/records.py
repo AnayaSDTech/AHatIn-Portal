@@ -69,6 +69,8 @@ def serialize_student(s: dict, documents: list[dict], applications: list[dict], 
     }
     for field in ("financeOfficerId", "visaOfficerId"):
         out[field] = s.get(field)
+    # Officer areas the counsellor handles because the admin chose not to assign that officer.
+    out["counsellorCovers"] = [a for a in s.get("counsellorCovers") or [] if not s.get(f"{a}OfficerId")]
     if s.get("counsellorAssignedAt"):
         out["counsellorAssignedAt"] = iso_or(s["counsellorAssignedAt"])
     # Assigned but not yet opened by the counsellor (students assigned before this was recorded don't count as new).

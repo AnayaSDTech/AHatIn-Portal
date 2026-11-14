@@ -20,7 +20,7 @@ import { DelegatesCard } from '../../components/dashboard/DelegatesCard';
 import { ReferralsPanel } from '../../components/referrals/ReferralsPanel';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
-import type { AppState, StaffStudent, TeamArea } from '../../data/staff';
+import { areaHasOwner, hostFor, type AppState, type StaffStudent, type TeamArea } from '../../data/staff';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 /** Shown on a section page that has nothing in it yet. */
@@ -109,12 +109,12 @@ export function StudentOverviewPage() {
   // Funding runs alongside the other stages: until a session is booked by anyone (a cancelled one doesn't count).
   const fundingBooked = sessions.some((x) => x.studentId === record.id && x.type === 'Scholarship & funding' && x.status !== 'cancelled');
   const bookingButtons: Partial<Record<ServiceCode, TrackerAction>> = {};
-  if (record.financeOfficerId && services.find((s) => s.code === 'S4')?.status === 'in_progress' && !fundingBooked) {
+  if (areaHasOwner(record, 'finance') && services.find((s) => s.code === 'S4')?.status === 'in_progress' && !fundingBooked) {
     bookingButtons.S4 = { label: 'Book a session', onClick: () => openBooking('Scholarship & funding') };
   }
   // The same for the visa: until a session is booked by anyone (a cancelled one doesn't count).
   const visaBooked = sessions.some((x) => x.studentId === record.id && x.type === 'Visa preparation' && x.status !== 'cancelled');
-  if (record.visaOfficerId && services.find((s) => s.code === 'S5')?.status === 'in_progress' && !visaBooked) {
+  if (areaHasOwner(record, 'visa') && services.find((s) => s.code === 'S5')?.status === 'in_progress' && !visaBooked) {
     bookingButtons.S5 = { label: 'Book a session', onClick: () => openBooking('Visa preparation') };
   }
   // Until the first session is booked (cancelled ones count, as they do for the stage).
@@ -323,7 +323,9 @@ export function StudentMessagesPage() {
 function FundingNotStarted() {
   const { team, services, go, openBooking } = useStudent();
   const view = services.find((s) => s.code === 'S4');
-  const officer = team.finance;
+  // The Financial Aid Officer, or the counsellor when they handle funding instead.
+  const officer = hostFor(team, 'finance');
+  const title = team.finance ? 'Financial Aid Officer' : 'counsellor';
   let body: ReactNode;
   let pill: ReactNode;
   if (view?.status === 'not_needed') {
@@ -339,7 +341,7 @@ function FundingNotStarted() {
     body = (
       <>
         <p className="font-semibold text-navy-900">Your funding plan is being prepared</p>
-        <p className="mt-1 text-sm text-navy-500">{officer.name}, your Financial Aid Officer, will set your estimated cost and suggest scholarships.</p>
+        <p className="mt-1 text-sm text-navy-500">{officer.name}, your {title}, will set your estimated cost and suggest scholarships.</p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           <Button size="sm" onClick={() => go('messages')}>
             <MessageSquare className="h-4 w-4" aria-hidden /> Message {officer.name.split(' ')[0]}

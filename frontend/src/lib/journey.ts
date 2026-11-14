@@ -1,5 +1,5 @@
 import type { Session } from './scheduling';
-import type { StaffStudent } from '../data/staff';
+import { areaHasOwner, type StaffStudent } from '../data/staff';
 
 /**
  * The student's journey through its stages.
@@ -204,8 +204,10 @@ const skippedShortlist = (j: Journey) => ['completed', 'not_needed'].includes(j.
 function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<ServiceView, 'code' | 'title' | 'autoStatus' | 'override'> {
   const j = s.journey;
   const apps = s.applications;
-  // Visa, pre-departure and arrival are looked after by the Visa Officer once assigned.
+  // Visa, pre-departure and arrival are looked after by the Visa Officer once assigned; funding by the Financial Aid
+  // Officer. Without one, the counsellor (by the admin's choice, or until the officer is assigned).
   const visaLead = s.visaOfficerId ? 'Your Visa Officer' : 'Your counsellor';
+  const financeLead = s.financeOfficerId ? 'Your Financial Aid Officer' : 'Your counsellor';
   switch (code) {
     case 'S1': {
       // Complete once the student has both the career plan and the shortlist. A revision doesn't undo it.
@@ -271,10 +273,10 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       const started = f.sources.length > 0 || f.scholarships.length > 0 || funds.some((d) => d.state !== 'missing');
       if (!started) {
         // Runs alongside the first stage rather than after the applications: both start when the team is assigned.
-        if (s.financeOfficerId && s.counsellorId) {
+        if (areaHasOwner(s, 'finance') && s.counsellorId) {
           return f.estimatedCost
             ? { status: 'in_progress', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' }
-            : { status: 'in_progress', summary: 'Your Financial Aid Officer is preparing your estimated cost of study', next: 'Talk to your Financial Aid Officer' };
+            : { status: 'in_progress', summary: `${financeLead} is preparing your estimated cost of study`, next: `Talk to ${financeLead.toLowerCase()}` };
         }
         if (f.estimatedCost) return { status: 'not_started', summary: `Estimated cost of study ${lakh(f.estimatedCost)}`, next: 'Add your funding plan' };
         if (s.financeOfficerId) return { status: 'not_started', summary: 'Starts once your counsellor is assigned' };
@@ -288,14 +290,14 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
         next: toUpload
           ? `${toUpload.state === 'rejected' ? 'Re-upload' : 'Upload'}: ${toUpload.name}`
           : checking
-            ? 'Your Financial Aid Officer is checking your proof of funds'
+            ? `${financeLead} is checking your proof of funds`
             : !f.estimatedCost
-              ? 'Your Financial Aid Officer will set your estimated cost of study'
+              ? `${financeLead} will set your estimated cost of study`
               : !planned
                 ? `Add your funding plan (${lakh(covered)} of ${lakh(f.estimatedCost)} covered)`
                 : funds.length
                   ? undefined
-                  : 'Your Financial Aid Officer will list the proof of funds you need',
+                  : `${financeLead} will list the proof of funds you need`,
       };
     }
     case 'S5': {
@@ -303,12 +305,12 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
       if (!v) {
         // Runs alongside the first stage, like funding: preparation starts once the team is assigned, and the formal
         // steps (from the CAS or admission letter) wait for an accepted offer.
-        if (!s.visaOfficerId) return { status: 'not_started', summary: offerAccepted(s) ? 'Starts when your CAS or admission letter arrives' : 'Starts when your Visa Officer is assigned' };
+        if (!areaHasOwner(s, 'visa')) return { status: 'not_started', summary: offerAccepted(s) ? 'Starts when your CAS or admission letter arrives' : 'Starts when your Visa Officer is assigned' };
         if (!s.counsellorId) return { status: 'not_started', summary: 'Starts once your counsellor is assigned' };
         const toUpload = earlyVisaDocuments(s).find((d) => d.state === 'missing' || d.state === 'rejected');
         const upload = toUpload ? `${toUpload.state === 'rejected' ? 'Re-upload' : 'Upload'}: ${toUpload.name}` : undefined;
         return offerAccepted(s)
-          ? { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive', next: upload ?? 'Talk to your Visa Officer' }
+          ? { status: 'in_progress', summary: 'Waiting for your CAS or admission letter to arrive', next: upload ?? `Talk to ${visaLead.toLowerCase()}` }
           : { status: 'in_progress', summary: 'Preparing for your visa', next: upload ?? 'Formal visa steps start after you accept an offer' };
       }
       if (v.stage === 'granted') return { status: 'completed', summary: 'Visa granted' };
@@ -341,8 +343,8 @@ function auto(code: ServiceCode, s: StaffStudent, sessions: Session[]): Omit<Ser
 function waitingFor(views: ServiceView[], student: StaffStudent): 'finance' | 'visa' | null {
   const done = (code: ServiceCode) => ['completed', 'not_needed'].includes(views.find((v) => v.code === code)!.status);
   if (!done('S3')) return null;
-  if (done('S4')) return student.visaOfficerId ? null : 'visa';
-  return student.financeOfficerId ? null : 'finance';
+  if (done('S4')) return areaHasOwner(student, 'visa') ? null : 'visa';
+  return areaHasOwner(student, 'finance') ? null : 'finance';
 }
 
 export function computeServices(student: StaffStudent, sessions: Session[]): ServiceView[] {

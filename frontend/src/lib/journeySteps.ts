@@ -1,5 +1,5 @@
 import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
-import { appStateLabel, type AppState, type StaffStudent, type StudentApplication } from '../data/staff';
+import { appStateLabel, counsellorCovers, type AppState, type StaffStudent, type StudentApplication } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
 
@@ -150,7 +150,7 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
       return {
         steps: sequence(
           [
-            { label: 'Financial Aid Officer assigned to you', done: !!s.financeOfficerId, skip: !s.financeOfficerId && !!f.estimatedCost },
+            { label: 'Financial Aid Officer assigned to you', done: !!s.financeOfficerId, skip: !s.financeOfficerId && (!!f.estimatedCost || counsellorCovers(s, 'finance')) },
             {
               label: held ? 'Scholarship & funding session held' : booked ? 'Scholarship & funding session booked' : 'Book a scholarship & funding session',
               done: !!held || !!booked,
@@ -181,7 +181,7 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
       const accepted = apps.find((a) => a.state === 'accepted');
       return { steps: sequence(
         [
-          { label: 'Visa Officer assigned to you', done: !!s.visaOfficerId, skip: !s.visaOfficerId && !!j.visa },
+          { label: 'Visa Officer assigned to you', done: !!s.visaOfficerId, skip: !s.visaOfficerId && (!!j.visa || counsellorCovers(s, 'visa')) },
           {
             label: held ? 'Visa preparation session held' : booked ? 'Visa preparation session booked' : 'Book a visa preparation session',
             done: !!held || !!booked,

@@ -1901,3 +1901,60 @@ async def test_staff_book_sessions_for_their_own_stages(make_api):
     # s1 has no officers yet: the counsellor books for every stage.
     assert (await book(priya, "s1", "Visa preparation", "c1")).status_code == 200
     assert (await book(priya, "s1", "Scholarship & funding", "c1")).status_code == 200
+
+
+async def test_counsellor_handles_an_officer_area(make_api):
+    admin, student = await make_api(), await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    await student.student_login()
+
+    # Chosen with the counsellor: funding by the counsellor, the Visa Officer left for later.
+    r = await admin.post("/students/s10/assign", {"counsellorId": "c1", "financeOfficerId": "counsellor", "visaOfficerId": ""})
+    assert r.status_code == 200, r.text
+    assert r.json()["counsellorCovers"] == ["finance"] and r.json()["financeOfficerId"] is None
+    q = (await admin.get("/admin/assignments")).json()
+    assert "s10" not in {s["id"] for s in q["waitingFinance"]} and "s10" in {s["id"] for s in q["waitingVisa"]}
+    # Chosen later from the officer queue.
+    assert (await admin.post("/students/s10/officer", {"kind": "visa", "officerId": "counsellor"})).json()["counsellorCovers"] == ["finance", "visa"]
+    assert "s10" not in {s["id"] for s in (await admin.get("/admin/assignments")).json()["waitingVisa"]}
+    assert (await admin.post("/students/s10/officer", {"kind": "visa", "officerId": "counsellor"})).status_code == 400
+
+    # The student books funding sessions with their counsellor once the counsellor handles funding.
+    d, slot = await _free_slot("c1")
+    funding = {"type": "Scholarship & funding", "date": d, "time": slot["time"], "mode": slot["modes"][0]}
+    assert (await student.post("/sessions", funding)).status_code == 400  # s1: no Financial Aid Officer, no choice made
+    assert (await admin.post("/students/s1/officer", {"kind": "finance", "officerId": "counsellor"})).status_code == 200
+    r = await student.post("/sessions", funding)
+    assert r.status_code == 200 and r.json()["counsellorId"] == "c1", r.text
+    # Assigning an officer later hands it over.
+    rec = (await admin.post("/students/s1/officer", {"kind": "finance", "officerId": "u6"})).json()
+    assert rec["financeOfficerId"] == "u6" and rec["counsellorCovers"] == []
+    # The admin can also switch an assigned officer to the counsellor (with a reason); the officer's open tasks move over.
+    assert (await admin.post("/students/s1/officer", {"kind": "finance", "officerId": "counsellor"})).status_code == 400
+    db = get_db()
+    await db.follow_ups.insert_one({"_id": "fu-test", "counsellorId": "u6", "person": "Ananya", "personId": "s1", "personType": "student", "action": "Check", "rule": "", "dueAt": now(), "type": "reminder", "done": False})
+    rec = (await admin.post("/students/s1/officer", {"kind": "finance", "officerId": "counsellor", "reason": "Officer on leave"})).json()
+    assert rec["financeOfficerId"] is None and rec["counsellorCovers"] == ["finance"]
+    assert (await db.follow_ups.find_one({"_id": "fu-test"}))["counsellorId"] == "c1"
+    assert rec["officerHistory"][-1]["from"] == "u6" and rec["officerHistory"][-1]["to"] == "counsellor"
+
+
+async def test_admin_deletes_a_deactivated_staff_user(make_api):
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    db = get_db()
+
+    # Someone who still looks after students can't be deleted, even once deactivated.
+    assert (await admin.delete("/admin/staff/c1")).status_code == 400  # still active
+    assert (await admin.post("/admin/staff/c1/deactivate")).status_code == 200
+    r = await admin.delete("/admin/staff/c1")
+    assert r.status_code == 409 and "student" in r.text, r.text
+
+    # A deactivated user with nothing left is deleted: off the list, the email free again, the name kept for history.
+    new = (await admin.post("/admin/staff", {"name": "Temp Counsellor", "email": "temp.c@ahatin.example", "role": "counsellor"})).json()["user"]
+    assert (await admin.post(f"/admin/staff/{new['id']}/deactivate")).status_code == 200
+    assert (await admin.delete(f"/admin/staff/{new['id']}")).status_code == 200
+    assert new["id"] not in {u["id"] for u in (await admin.get("/admin/staff")).json()}
+    assert (await db.users.find_one({"_id": new["id"]}))["name"] == "Temp Counsellor"
+    assert (await admin.post("/admin/staff", {"name": "Temp Again", "email": "temp.c@ahatin.example", "role": "counsellor"})).status_code == 200
+    assert (await admin.delete(f"/admin/staff/{new['id']}")).status_code == 404

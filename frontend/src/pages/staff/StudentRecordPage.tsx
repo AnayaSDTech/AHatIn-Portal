@@ -23,7 +23,10 @@ import {
   appTransitions,
   DOC_AREA,
   areaOfRole,
+  COUNSELLOR_HANDLES,
+  activeOfficers,
   canEditArea,
+  counsellorCovers,
   counsellorName,
   isStudentDecision,
   teamTitle,
@@ -74,6 +77,7 @@ export function StudentRecordPage() {
   const [sessions] = useSessions();
   const [booking, setBooking] = useState(false);
   const [reassigning, setReassigning] = useState(false);
+  const [changeWho, setChangeWho] = useState<TeamArea>('counsellor');
   const [newOwner, setNewOwner] = useState('');
   const [ownerReason, setOwnerReason] = useState('');
   const [ownerError, setOwnerError] = useState<string | null>(null);
@@ -171,15 +175,41 @@ export function StudentRecordPage() {
     setMessage(`${university} updated to "${appStateLabel[to]}". The student sees this straight away.`);
   };
 
+  // The admin changes any of the student's team: the counsellor, or either officer (another officer, or the counsellor
+  // handling that part instead).
+  const officerArea = changeWho === 'counsellor' ? null : changeWho;
+  const currentFor = (area: TeamArea) =>
+    area === 'counsellor' ? counsellorName(student.counsellorId) : (student[area === 'finance' ? 'financeOfficerId' : 'visaOfficerId'] ? counsellorName(student[area === 'finance' ? 'financeOfficerId' : 'visaOfficerId']) : counsellorCovers(student, area) ? 'Counsellor handles this' : 'Not assigned');
+  const changeOptions = officerArea
+    ? [
+        ...activeOfficers(officerArea)
+          .filter((o) => o.id !== student[officerArea === 'finance' ? 'financeOfficerId' : 'visaOfficerId'])
+          .map((o) => ({ value: o.id, label: o.name })),
+        ...(counsellorCovers(student, officerArea) ? [] : [{ value: COUNSELLOR_HANDLES, label: `Counsellor handles this (${counsellorName(student.counsellorId)})` }]),
+      ]
+    : activeCounsellors().filter((c) => c.id !== student.counsellorId).map((c) => ({ value: c.id, label: c.name }));
+
   const reassign = async () => {
-    if (!newOwner) return setOwnerError('Choose the new counsellor.');
+    if (!newOwner) return setOwnerError(officerArea ? `Choose the new ${teamTitle[officerArea]}.` : 'Choose the new counsellor.');
     if (ownerReason.trim().length < 5) return setOwnerError('Give a reason (at least 5 characters).');
     try {
-      await mutate(() => api.post(`/students/${student.id}/reassign`, { counsellorId: newOwner, reason: ownerReason.trim() }), { silent: true });
+      await mutate(
+        () =>
+          officerArea
+            ? api.post(`/students/${student.id}/officer`, { kind: officerArea, officerId: newOwner, reason: ownerReason.trim() })
+            : api.post(`/students/${student.id}/reassign`, { counsellorId: newOwner, reason: ownerReason.trim() }),
+        { silent: true },
+      );
     } catch (err) {
       return setOwnerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     }
-    setMessage(`${student.name} is now assigned to ${counsellorName(newOwner)}. Upcoming sessions stay as booked until rescheduled.`);
+    setMessage(
+      officerArea
+        ? newOwner === COUNSELLOR_HANDLES
+          ? `${counsellorName(student.counsellorId)} (counsellor) now handles this part for ${student.name}. Upcoming sessions stay as booked until rescheduled.`
+          : `${counsellorName(newOwner)} is now ${student.name}'s ${teamTitle[officerArea]}. Upcoming sessions stay as booked until rescheduled.`
+        : `${student.name} is now assigned to ${counsellorName(newOwner)}. Upcoming sessions stay as booked until rescheduled.`,
+    );
     setReassigning(false);
     setNewOwner('');
     setOwnerReason('');
@@ -237,12 +267,26 @@ export function StudentRecordPage() {
                 <p key={t.area} className="text-sm text-navy-600" data-team={t.area}>
                   {teamTitle[t.area]}: <span className="font-semibold text-navy-900">{counsellorName(t.id)}</span>
                 </p>
+              ) : t.area !== 'counsellor' && counsellorCovers(student, t.area) ? (
+                <p key={t.area} className="text-sm text-navy-600" data-team={t.area}>
+                  {teamTitle[t.area]}: <span className="font-semibold text-navy-900">Counsellor handles this</span>
+                </p>
               ) : null,
             )}
             {scope.isAdmin &&
               (student.counsellorId ? (
-                <Button size="sm" variant="outline" onClick={() => setReassigning(true)}>
-                  <UserCog className="h-4 w-4" aria-hidden /> Reassign
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setChangeWho('counsellor');
+                    setNewOwner('');
+                    setOwnerReason('');
+                    setOwnerError(null);
+                    setReassigning(true);
+                  }}
+                >
+                  <UserCog className="h-4 w-4" aria-hidden /> Change team
                 </Button>
               ) : (
                 <Link
@@ -549,29 +593,69 @@ export function StudentRecordPage() {
       <Modal
         open={reassigning}
         onClose={() => setReassigning(false)}
-        title={`Reassign ${student.name}`}
-        description={`Currently with ${counsellorName(student.counsellorId)}. The change is recorded in the student's history.`}
+        title={`Change ${student.name}'s team`}
+        description="Change the counsellor, the Financial Aid Officer or the Visa Officer. Everyone affected is told, and the change is recorded in the student's history."
         footer={
           <>
             <Button variant="outline" onClick={() => setReassigning(false)}>Cancel</Button>
-            <Button onClick={reassign}>Reassign</Button>
+            <Button onClick={reassign}>Save change</Button>
           </>
         }
       >
         <div className="space-y-4">
+          <div role="radiogroup" aria-label="Who to change" className="grid gap-2 sm:grid-cols-3">
+            {(['counsellor', 'finance', 'visa'] as const).map((area) => (
+              <button
+                key={area}
+                type="button"
+                role="radio"
+                aria-checked={changeWho === area}
+                onClick={() => {
+                  setChangeWho(area);
+                  setNewOwner('');
+                  setOwnerError(null);
+                }}
+                className={cn('rounded-xl px-3 py-2.5 text-left ring-1 transition', changeWho === area ? 'bg-navy-900 text-white ring-navy-900' : 'bg-white text-navy-800 ring-navy-100 hover:bg-ivory')}
+                data-change-who={area}
+              >
+                <span className="block text-xs font-semibold">{teamTitle[area]}</span>
+                <span className={cn('block truncate text-xs', changeWho === area ? 'text-navy-200' : 'text-navy-500')}>{currentFor(area)}</span>
+              </button>
+            ))}
+          </div>
           <SelectField
-            label="New counsellor"
-            placeholder="Choose counsellor"
-            options={activeCounsellors().filter((c) => c.id !== student.counsellorId).map((c) => ({ value: c.id, label: c.name }))}
+            label={officerArea ? `New ${teamTitle[officerArea]}` : 'New counsellor'}
+            placeholder={changeOptions.length ? 'Choose who' : 'No one else to choose'}
+            options={changeOptions}
             value={newOwner}
             onChange={(e) => setNewOwner(e.target.value)}
           />
+          {officerArea && newOwner === COUNSELLOR_HANDLES && (
+            <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              {student[officerArea === 'finance' ? 'financeOfficerId' : 'visaOfficerId'] ? `The current ${teamTitle[officerArea]} is removed and their open tasks move to the counsellor. ` : ''}
+              The counsellor manages this part, and the student books these sessions with them.
+            </p>
+          )}
           <div>
             <label htmlFor="owner-reason" className="mb-1.5 block text-sm font-medium text-navy-800">Reason</label>
-            <textarea id="owner-reason" rows={2} value={ownerReason} onChange={(e) => setOwnerReason(e.target.value)} className="input resize-none" placeholder="e.g. Counsellor specialises in German university applications" />
+            <textarea id="owner-reason" rows={2} value={ownerReason} onChange={(e) => setOwnerReason(e.target.value)} className="input resize-none" placeholder={officerArea ? 'e.g. Workload balancing across the team' : 'e.g. Counsellor specialises in German university applications'} />
           </div>
           {ownerError && <p role="alert" className="text-sm font-medium text-red-600">{ownerError}</p>}
-          {student.assignmentHistory.length > 0 && (
+          {officerArea && (student.officerHistory ?? []).some((h) => h.role === officerArea) && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-navy-400">{teamTitle[officerArea]} history</p>
+              <ul className="space-y-1 text-xs text-navy-600">
+                {(student.officerHistory ?? [])
+                  .filter((h) => h.role === officerArea)
+                  .map((h, i) => (
+                    <li key={i}>
+                      {formatDateTime(h.at)} · {h.from ? `${counsellorName(h.from)} → ` : ''}{h.to === COUNSELLOR_HANDLES ? 'Counsellor handles this' : counsellorName(h.to)} · {h.reason} ({h.by})
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+          {!officerArea && student.assignmentHistory.length > 0 && (
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-navy-400">Assignment history</p>
               <ul className="space-y-1 text-xs text-navy-600">

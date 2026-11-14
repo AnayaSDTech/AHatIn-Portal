@@ -27,7 +27,7 @@ import { api } from '../../lib/api/client';
 import { mutate, useApi } from '../../lib/api/store';
 import { ApiError } from '../../lib/api/types';
 import { cn, initials, relativeTime } from '../../lib/utils';
-import { counsellorName } from '../../data/staff';
+import { COUNSELLOR_HANDLES, counsellorName } from '../../data/staff';
 
 /* ------------------------------ Types (GET /admin/assignments) ------------------------------ */
 
@@ -68,6 +68,7 @@ interface OfficerQueueStudent {
   intake: string;
   counsellorId: string | null;
   financeOfficerId: string | null;
+  counsellorCovers?: ('finance' | 'visa')[];
   readySince: string | null;
 }
 
@@ -419,8 +420,9 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
         { silent: true },
       );
       const others = [officerName('finance') && `${officerName('finance')} (Financial Aid Officer)`, officerName('visa') && `${officerName('visa')} (Visa Officer)`].filter(Boolean);
+      const handled = [team.finance === COUNSELLOR_HANDLES && 'funding', team.visa === COUNSELLOR_HANDLES && 'the visa'].filter(Boolean);
       onAssigned(
-        `${s.name} is now assigned to ${choice.name}${others.length ? `, with ${others.join(' and ')}` : ''}. Everyone has been emailed, and ${s.name.split(' ')[0]} can now book their first sessions.`,
+        `${s.name} is now assigned to ${choice.name}${others.length ? `, with ${others.join(' and ')}` : ''}${handled.length ? `. ${choice.name} also handles ${handled.join(' and ')}` : ''}. Everyone has been emailed, and ${s.name.split(' ')[0]} can now book their first sessions.`,
       );
       setChoice(null);
     } catch (err) {
@@ -518,24 +520,23 @@ function WaitingStudent({ student: s, officers, onAssigned }: { student: QueueSt
             <p className="mb-1.5 block text-sm font-medium text-navy-800">Counsellor</p>
             <p className="rounded-xl bg-ivory px-4 py-2.5 text-sm font-semibold text-navy-900">{choice?.name}</p>
           </div>
-          {(['finance', 'visa'] as const).map((kind) =>
-            officers[kind].length === 0 ? (
-              <p key={kind} className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                No active {OFFICER[kind].title}s yet. Add one in Staff users; until then the student waits in the {OFFICER[kind].title} queue.
-              </p>
-            ) : (
+          {(['finance', 'visa'] as const).map((kind) => (
+            <div key={kind}>
               <SelectField
-                key={kind}
                 label={`${OFFICER[kind].title} (optional)`}
                 placeholder="Not now: assign later"
                 clearable
                 value={team[kind]}
                 onChange={(e) => setTeam((t) => ({ ...t, [kind]: e.target.value }))}
-                options={officers[kind].map((o, i) => ({ value: o.id, label: `${o.name} · ${o.activeStudents} active ${o.activeStudents === 1 ? 'student' : 'students'}${i === 0 && officers[kind].length > 1 ? ' (lightest workload)' : ''}` }))}
+                options={[
+                  ...officers[kind].map((o, i) => ({ value: o.id, label: `${o.name} · ${o.activeStudents} active ${o.activeStudents === 1 ? 'student' : 'students'}${i === 0 && officers[kind].length > 1 ? ' (lightest workload)' : ''}` })),
+                  { value: COUNSELLOR_HANDLES, label: `Counsellor handles this (${choice?.name ?? 'the counsellor'})` },
+                ]}
                 data-officer-select={kind}
               />
-            ),
-          )}
+              {officers[kind].length === 0 && <p className="mt-1.5 text-xs text-amber-700">No active {OFFICER[kind].title}s yet. Add one in Staff users, or let the counsellor handle this.</p>}
+            </div>
+          ))}
         </div>
         <TextField
           label="Note (optional)"
@@ -578,13 +579,21 @@ function OfficerQueue({ kind, students, total, officers, onAssigned }: { kind: O
   // Officers come lightest workload first; bars are scaled to the busiest one.
   const busiest = Math.max(1, ...officers.map((x) => x.activeStudents));
 
+  // Chosen instead of an officer: the student's counsellor handles this area.
+  const byCounsellor = choice?.officer.id === COUNSELLOR_HANDLES;
+  const area = kind === 'finance' ? 'funding' : 'the visa, pre-departure and arrival';
+
   const assign = async () => {
     if (!choice) return;
     setSaving(true);
     setError(null);
     try {
       await mutate(() => api.post(`/students/${choice.student.id}/officer`, { kind, officerId: choice.officer.id }), { silent: true });
-      onAssigned(`${choice.officer.name} is now ${choice.student.name}'s ${o.title}. The student, the officer and the counsellor have been emailed.`);
+      onAssigned(
+        byCounsellor
+          ? `${choice.officer.name} (counsellor) now handles ${area} for ${choice.student.name}. The student and the counsellor have been told.`
+          : `${choice.officer.name} is now ${choice.student.name}'s ${o.title}. The student, the officer and the counsellor have been emailed.`,
+      );
       setChoice(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
@@ -630,7 +639,7 @@ function OfficerQueue({ kind, students, total, officers, onAssigned }: { kind: O
                   {kind === 'visa' && (
                     <div className="flex justify-between gap-3">
                       <dt className="text-navy-500">Financial Aid Officer</dt>
-                      <dd className="font-medium text-navy-900">{st.financeOfficerId ? counsellorName(st.financeOfficerId) : 'None (not needed)'}</dd>
+                      <dd className="font-medium text-navy-900">{st.financeOfficerId ? counsellorName(st.financeOfficerId) : st.counsellorCovers?.includes('finance') ? 'Counsellor handles this' : 'None (not needed)'}</dd>
                     </div>
                   )}
                 </dl>
@@ -668,6 +677,25 @@ function OfficerQueue({ kind, students, total, officers, onAssigned }: { kind: O
                     ))}
                   </ol>
                 )}
+                {st.counsellorId && (
+                  <div className="mt-2.5 flex items-center gap-3 rounded-2xl border border-dashed border-navy-200 p-3.5" data-counsellor-handles={kind}>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-navy-900">Counsellor handles this</p>
+                      <p className="text-xs text-navy-500">{counsellorName(st.counsellorId)} looks after {area} instead. You can still assign a {o.title} later.</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => {
+                        setChoice({ student: st, officer: { id: COUNSELLOR_HANDLES, name: counsellorName(st.counsellorId), activeStudents: 0 } });
+                        setError(null);
+                      }}
+                    >
+                      Choose
+                    </Button>
+                  </div>
+                )}
               </section>
             </div>
           </li>
@@ -677,20 +705,30 @@ function OfficerQueue({ kind, students, total, officers, onAssigned }: { kind: O
       <Modal
         open={!!choice}
         onClose={() => setChoice(null)}
-        title={`Assign ${choice?.officer.name ?? ''} as ${choice?.student.name ?? ''}'s ${o.title}?`}
+        title={
+          byCounsellor
+            ? `Let ${choice?.officer.name ?? ''} handle ${area} for ${choice?.student.name ?? ''}?`
+            : `Assign ${choice?.officer.name ?? ''} as ${choice?.student.name ?? ''}'s ${o.title}?`
+        }
         description={
-          kind === 'finance'
-            ? 'They will look after scholarships, the funding plan and proof of funds. The counsellor can still see this part but not change it.'
-            : 'They will look after the visa, pre-departure and post-arrival support. The counsellor can still see these parts but not change them.'
+          byCounsellor
+            ? `No ${o.title} is assigned. The counsellor manages this part of the journey, and the student books these sessions with them. Assigning a ${o.title} later hands it over.`
+            : kind === 'finance'
+              ? 'They will look after scholarships, the funding plan and proof of funds. The counsellor can still see this part but not change it.'
+              : 'They will look after the visa, pre-departure and post-arrival support. The counsellor can still see these parts but not change them.'
         }
         footer={
           <>
             <Button variant="outline" onClick={() => setChoice(null)}>Cancel</Button>
-            <Button onClick={() => void assign()} loading={saving}>Assign {o.title}</Button>
+            <Button onClick={() => void assign()} loading={saving}>{byCounsellor ? 'Confirm' : `Assign ${o.title}`}</Button>
           </>
         }
       >
-        <p className="text-sm text-navy-600">The student, the officer and the counsellor are emailed, and the student can then message the officer and book sessions with them.</p>
+        <p className="text-sm text-navy-600">
+          {byCounsellor
+            ? 'The student and the counsellor are told, and the student leaves this queue.'
+            : 'The student, the officer and the counsellor are emailed, and the student can then message the officer and book sessions with them.'}
+        </p>
         {error && <p role="alert" className="mt-3 text-sm font-medium text-red-600">{error}</p>}
       </Modal>
     </>

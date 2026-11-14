@@ -19,6 +19,13 @@ from app.services import notify
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
 
 DONE = ("completed", "not_needed")
+# Chosen instead of an officer: the counsellor handles that area.
+COUNSELLOR_HANDLES = "counsellor"
+
+
+def covered(student: dict, area: str) -> bool:
+    """The admin chose to have the counsellor handle this officer's area instead of assigning an officer."""
+    return area in (student.get("counsellorCovers") or []) and not student.get(OFFICER_FIELD[area])
 
 
 def _override(student: dict, code: str) -> str | None:
@@ -51,20 +58,20 @@ async def waiting_for(student: dict) -> str | None:
     """'finance' or 'visa' when the student is ready for that officer and doesn't have one yet."""
     if not await applications_done(student):
         return None
-    if not student.get("visaOfficerId") and await funding_done(student):
+    if not student.get("visaOfficerId") and not covered(student, "visa") and await funding_done(student):
         return "visa"
-    if not student.get("financeOfficerId") and not await funding_done(student):
+    if not student.get("financeOfficerId") and not covered(student, "finance") and not await funding_done(student):
         return "finance"
     return None
 
 
 async def officers_needed(student: dict) -> list[str]:
     """The officers a student with a counsellor is still missing, at any stage of the journey. No Financial Aid Officer
-    is needed once funding is complete or marked not needed."""
+    is needed once funding is complete or marked not needed, nor for an area the counsellor handles."""
     needed = []
-    if not student.get("financeOfficerId") and not await funding_done(student):
+    if not student.get("financeOfficerId") and not covered(student, "finance") and not await funding_done(student):
         needed.append("finance")
-    if not student.get("visaOfficerId"):
+    if not student.get("visaOfficerId") and not covered(student, "visa"):
         needed.append("visa")
     return needed
 
@@ -124,7 +131,43 @@ async def team_of(student: dict) -> dict:
     for key, field in (("counsellor", "counsellorId"), ("finance", "financeOfficerId"), ("visa", "visaOfficerId")):
         u = await db.users.find_one({"_id": student[field]}) if student.get(field) else None
         out[key] = serialize_counsellor(u) if u else None
+    # Areas with no officer that the counsellor looks after instead.
+    out["covered"] = [area for area in OFFICER_FIELD if covered(student, area)]
     return out
+
+
+async def cover_by_counsellor(student: dict, area: str, by: dict, reason: str) -> None:
+    """The admin decides the counsellor handles this area (funding or the visa) instead of an officer. An officer who
+    had it hands it back: their open tasks for the student move to the counsellor. Assigning an officer later hands it
+    over as usual."""
+    db = get_db()
+    sid = student["_id"]
+    field = OFFICER_FIELD[area]
+    title = OFFICER_TITLE[area]
+    previous = student.get(field)
+    entry = {"at": now(), "by": by["name"], "role": area, "from": previous or "", "to": "counsellor", "reason": reason}
+    await db.students.update_one(
+        {"_id": sid}, {"$addToSet": {"counsellorCovers": area}, "$push": {"officerHistory": entry}, "$set": {"updatedAt": now()}, "$unset": {field: ""}}
+    )
+    await close_follow_ups(f"student:{sid}:assign-{area}")
+    what = "funding: scholarships, the funding plan and proof of funds" if area == "finance" else "the visa, pre-departure and post-arrival support"
+    short = "funding" if area == "finance" else "your visa"
+    if previous:
+        if student.get("counsellorId"):
+            await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": previous}, {"$set": {"counsellorId": student["counsellorId"]}})
+        await db.staff_alerts.delete_many({"userId": previous, "studentId": sid})
+        officer = await db.users.find_one({"_id": previous}, {"name": 1})
+        name = f" {officer['name']}" if officer else ""
+        await notify.email_counsellor(previous, f"{student['name']} is no longer with you", f"You are no longer {student['name']}'s {title}: their counsellor handles {what} now. Reason: {reason}")
+        await add_note(sid, by["name"], f"Removed {title}{name}: the counsellor handles {what} now. {reason}")
+    else:
+        await add_note(sid, by["name"], f"No {title}: the counsellor handles {what}. {reason}")
+    await notify.alert_student(sid, f"Your counsellor will help with {short}", target="counsellor", kind="team")
+    if student.get("counsellorId"):
+        await notify.email_counsellor(
+            student["counsellorId"], f"You're handling {short.replace('your ', 'the ')} for {student['name']}",
+            f"{student['name']} has no {title}, so you look after {what}. Reason: {reason}", path=f"/staff/students/{sid}",
+        )
 
 
 async def assign_officer(student: dict, area: str, officer: dict, by: dict, reason: str) -> None:
@@ -134,7 +177,7 @@ async def assign_officer(student: dict, area: str, officer: dict, by: dict, reas
     previous = student.get(field)
     t = now()
     entry = {"at": t, "by": by["name"], "role": area, "from": previous or "", "to": officer["_id"], "reason": reason}
-    await db.students.update_one({"_id": student["_id"]}, {"$set": {field: officer["_id"], "updatedAt": t}, "$push": {"officerHistory": entry}})
+    await db.students.update_one({"_id": student["_id"]}, {"$set": {field: officer["_id"], "updatedAt": t}, "$push": {"officerHistory": entry}, "$pull": {"counsellorCovers": area}})
     await close_follow_ups(f"student:{student['_id']}:assign-{area}")
     sid = student["_id"]
     if previous:

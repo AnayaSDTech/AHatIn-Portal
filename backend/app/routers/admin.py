@@ -13,7 +13,7 @@ from app.core.errors import ApiError, not_found
 from app.core.security import encrypt, hash_password, new_totp_secret, random_token, sha256, totp_uri
 from app.db import get_db, new_id
 from app import matching
-from app.domain import profile_complete, stage_index
+from app.domain import LEAD_STAGES, profile_complete, stage_index
 from app.records import serialize_grant
 from app.routers.staff import agencies_with_counts
 from app.schemas import AgencyBody, GrantBody, StaffPasswordBody, StaffUpdateBody, StaffUserBody
@@ -141,7 +141,7 @@ async def assignment_queue(_: Admin):
             since = f["createdAt"] if f else s.get("counsellorAssignedAt") or s.get("profileCompletedAt")
             lists[area].append({
                 "id": s["_id"], "name": s["name"], "reference": s["reference"], "goal": s.get("goal", ""), "destination": s.get("destination", ""), "intake": s.get("intake", ""),
-                "counsellorId": s.get("counsellorId"), "financeOfficerId": s.get("financeOfficerId"), "readySince": iso(since) if since else None,
+                "counsellorId": s.get("counsellorId"), "financeOfficerId": s.get("financeOfficerId"), "counsellorCovers": s.get("counsellorCovers") or [], "readySince": iso(since) if since else None,
             })
     return {"waiting": waiting, "incomplete": incomplete, "waitingFinance": lists["finance"], "waitingVisa": lists["visa"], "officers": officers}
 
@@ -165,7 +165,7 @@ def _staff_out(u: dict) -> dict:
 
 @router.get("/staff")
 async def list_staff(_: Admin):
-    found = await get_db().users.find({"role": {"$in": list(STAFF_ROLES)}}).sort("_id", 1).to_list(None)
+    found = await get_db().users.find({"role": {"$in": list(STAFF_ROLES)}, "status": {"$ne": "deleted"}}).sort("_id", 1).to_list(None)
     return [_staff_out(u) for u in found]
 
 
@@ -207,7 +207,7 @@ async def add_staff(body: StaffUserBody, admin: Admin):
 
 
 async def _staff_user(user_id: str) -> dict:
-    u = await get_db().users.find_one({"_id": user_id, "role": {"$in": list(STAFF_ROLES)}})
+    u = await get_db().users.find_one({"_id": user_id, "role": {"$in": list(STAFF_ROLES)}, "status": {"$ne": "deleted"}})
     if not u:
         raise not_found("Staff user not found.")
     return u
@@ -259,6 +259,43 @@ async def deactivate(user_id: str, admin: Admin):
     await revoke_all_sessions(user_id)
     await audit(admin, "staff.deactivated", "users", user_id)
     return _staff_out({**u, "status": "deactivated"})
+
+
+@router.delete("/staff/{user_id}")
+async def delete_staff(user_id: str, admin: Admin):
+    """Deletes a deactivated staff member who no longer looks after anyone. Their sign-in, email, phone and schedule are
+    removed (so the email can be used again); their name stays, so the history still shows who did what."""
+    db = get_db()
+    u = await _staff_user(user_id)
+    if u["_id"] == admin["_id"]:
+        raise ApiError(400, "You can't delete your own account.")
+    if u.get("status") != "deactivated":
+        raise ApiError(400, "Deactivate this staff user before deleting them.")
+    work = {
+        "student": await db.students.count_documents({"$or": [{"counsellorId": user_id}, {"financeOfficerId": user_id}, {"visaOfficerId": user_id}]}),
+        "open lead": await db.leads.count_documents({"counsellorId": user_id, "stage": {"$in": LEAD_STAGES}, "convertedStudentId": None}),
+        "upcoming session": await db.sessions.count_documents({"counsellorId": user_id, "status": "booked", "date": {"$gte": today_iso()}}),
+        "open task": await db.follow_ups.count_documents({"counsellorId": user_id, "done": False}),
+    }
+    left = [f"{n} {what}{'' if n == 1 else 's'}" for what, n in work.items() if n]
+    if left:
+        msg = f"{u['name']} still has {', '.join(left)}. Hand them over to someone else first, then delete."
+        raise ApiError(409, msg, {"form": msg})
+    await db.users.update_one(
+        {"_id": user_id},
+        {
+            "$set": {"status": "deleted", "deletedAt": now(), "deletedBy": admin["_id"], "email": f"deleted-{user_id}@deleted.invalid"},
+            "$unset": {k: "" for k in ("passwordHash", "totpSecretEnc", "totpLastStep", "mobile", "counsellorProfile", "matchingProfile", "deactivatedAt")},
+        },
+    )
+    for coll in ("availability", "time_off"):
+        await db[coll].delete_many({"counsellorId": user_id})
+    await db.invites.delete_many({"userId": user_id})
+    await db.staff_alerts.delete_many({"userId": user_id})
+    await db.access_grants.update_many({"$or": [{"granteeId": user_id}, {"ownerId": user_id}], "revoked": {"$ne": True}}, {"$set": {"revoked": True}})
+    await revoke_all_sessions(user_id)
+    await audit(admin, "staff.deleted", "users", user_id, {"name": u["name"], "role": u["role"]})
+    return {"deleted": user_id}
 
 
 @router.post("/staff/{user_id}/reactivate")

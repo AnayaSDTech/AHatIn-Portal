@@ -1,6 +1,6 @@
 import { PiggyBank, Plane, type LucideIcon } from 'lucide-react';
 import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, visaStageLabel } from './journey';
-import type { StaffStudent } from '../data/staff';
+import { counsellorCovers, type StaffStudent } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
 
@@ -67,8 +67,35 @@ export const COUNSELLOR_GROUPS = [
   { value: 'done', label: 'Complete' },
 ];
 
-/** Where a student stands for their counsellor. Documents to check come first, whatever the phase. */
+/** Groups for the officer areas a counsellor handles instead of an officer ("Counsellor handles this"). */
+export const COUNSELLOR_EXTRA_GROUPS = [
+  { value: 'funding', label: 'Funding' },
+  { value: 'visa', label: 'Visa & travel' },
+];
+
+/**
+ * Where a student stands for their counsellor: counselling, the shortlist and the applications, plus funding or the
+ * visa when the admin chose to have the counsellor handle them. Progress covers every part they handle; the part that
+ * needs them most is shown, and the student is complete only when all of them are.
+ */
 export function counsellorCase(s: StaffStudent, sessions: Session[]): OfficerCase {
+  const own = ownCounsellorCase(s, sessions);
+  const extra = (['finance', 'visa'] as const).filter((area) => counsellorCovers(s, area)).map((area) => ({ area, c: officerCase(s, area) }));
+  if (!extra.length) return own;
+  const parts = [{ area: 'counsellor' as const, c: own }, ...extra];
+  const progress = parts.reduce((n, p) => n + p.c.progress, 0) / parts.length;
+  const toVerify = parts.reduce((n, p) => n + p.c.toVerify, 0);
+  const done = (c: OfficerCase) => c.group === 'done';
+  // Most urgent unfinished part; their own part first on a tie (the sort is stable).
+  const lead = [...parts].filter((p) => !done(p.c) || p.c.urgency > 0).sort((a, b) => b.c.urgency - a.c.urgency)[0];
+  if (!lead) return { ...own, next: 'All the stages you handle are complete', detail: undefined, progress: 1, toVerify };
+  if (lead.area === 'counsellor') return { ...own, progress, toVerify };
+  const phase = lead.area === 'finance' ? 'Funding' : lead.c.phase === 'Preparation' ? 'Visa preparation' : lead.c.phase === 'Upcoming' ? 'Visa' : lead.c.phase;
+  return { ...lead.c, phase, group: lead.area === 'finance' ? 'funding' : 'visa', progress, toVerify };
+}
+
+/** The counsellor's own part: counselling, the shortlist and the applications. Documents to check come first. */
+function ownCounsellorCase(s: StaffStudent, sessions: Session[]): OfficerCase {
   const j = s.journey;
   const sl = j.shortlist;
   const apps = s.applications;

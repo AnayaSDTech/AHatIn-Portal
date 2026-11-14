@@ -5,7 +5,7 @@ import { useSessions, useStaffScope, useStaffStudents } from '../../hooks/useSta
 import { computeServices, serviceValues } from '../../lib/journey';
 import { EmptyState, FilterChips, PageHeader, SearchBox, ServiceBar } from '../../components/staff/StaffUi';
 import { Pill } from '../../components/dashboard/Panel';
-import { areaOfRole, counsellorName, counsellors, serviceShortNames, stageIndex, stageLabel, type StaffStudent } from '../../data/staff';
+import { areaOfRole, counsellorCovers, counsellorName, counsellors, serviceShortNames, stageIndex, stageLabel, type StaffStudent } from '../../data/staff';
 import { useAuth } from '../../context/AuthContext';
 import { CASE_GROUPS, DESK, officerCase, type OfficerArea } from '../../lib/officerCase';
 import { cn, initials } from '../../lib/utils';
@@ -195,9 +195,12 @@ function AllStudents() {
                           : 'No counsellor yet'}
                     </p>
                   )}
-                  {scope.isAdmin && (s.financeOfficerId || s.visaOfficerId) && (
+                  {scope.isAdmin && (!!s.financeOfficerId || !!s.visaOfficerId || !!s.counsellorCovers?.length) && (
                     <p className="text-xs text-navy-500">
-                      {[s.financeOfficerId && `Financial Aid: ${counsellorName(s.financeOfficerId)}`, s.visaOfficerId && `Visa: ${counsellorName(s.visaOfficerId)}`].filter(Boolean).join(' · ')}
+                      {[
+                        s.financeOfficerId ? `Financial Aid: ${counsellorName(s.financeOfficerId)}` : counsellorCovers(s, 'finance') && 'Financial Aid: counsellor',
+                        s.visaOfficerId ? `Visa: ${counsellorName(s.visaOfficerId)}` : counsellorCovers(s, 'visa') && 'Visa: counsellor',
+                      ].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   <p className="mt-3 text-sm text-navy-700">{s.goal} · {s.destination}</p>

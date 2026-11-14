@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { SelectField } from '../ui/FormField';
 import { SlotPicker } from '../scheduling/SlotPicker';
 import { sessionTypes } from '../../data/dashboard';
-import { sessionArea, teamTitle, type StudentTeam } from '../../data/staff';
+import { hostFor, sessionArea, teamTitle, type StudentTeam } from '../../data/staff';
 import { useAvailability, useSessions, useTimeOff } from '../../hooks/useStaffData';
 import { type Session, type SessionMode, type Slot } from '../../lib/scheduling';
 import { api } from '../../lib/api/client';
@@ -41,10 +41,10 @@ export function BookSessionModal({ open, onClose, studentId, team, initialType }
   const forArea = initialType ? sessionArea(initialType) : null;
   const topics = forArea ? sessionTypes.filter((t) => sessionArea(t) === forArea) : [...sessionTypes];
   // Until a topic is chosen, show the counsellor's times.
-  const host = team[area];
+  const host = hostFor(team, area);
   const counsellor = host ?? team.counsellor!;
   const availability = host ? availabilityList.find((a) => a.counsellorId === host.id) : undefined;
-  const role = area === 'counsellor' ? 'your counsellor' : `your ${teamTitle[area]}`;
+  const role = area === 'counsellor' || (!team[area] && host) ? 'your counsellor' : `your ${teamTitle[area]}`;
   const [pick, setPick] = useState<{ date: string; time: string; slot?: Slot }>({ date: '', time: '' });
   const [mode, setMode] = useState<SessionMode>('online');
   const [notes, setNotes] = useState('');
@@ -148,7 +148,7 @@ export function BookSessionModal({ open, onClose, studentId, team, initialType }
             label="What would you like to discuss?"
             placeholder="Choose a topic"
             options={topics.map((t) => {
-              const who = team[sessionArea(t)];
+              const who = hostFor(team, sessionArea(t));
               // All with the same person when opened for one of them, so the name is in the title instead.
               if (forArea) return { value: t, label: t };
               return { value: t, label: who ? `${t} · with ${who.name}` : `${t} · once your ${teamTitle[sessionArea(t)]} is assigned` };

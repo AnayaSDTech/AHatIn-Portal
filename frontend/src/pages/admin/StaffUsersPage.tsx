@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { KeyRound, Pencil, ShieldCheck, UserPlus } from 'lucide-react';
+import { KeyRound, Pencil, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { useGrants } from '../../hooks/useStaffData';
 import { Panel } from '../../components/dashboard/Panel';
 import { activeCounsellors, counsellorName, isGrantActive, staffRoleLabel } from '../../data/staff';
@@ -28,6 +28,8 @@ export function StaffUsersPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState<StaffUser | null>(null);
   const [editing, setEditing] = useState<StaffUser | null>(null);
+  const [deleting, setDeleting] = useState<StaffUser | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [grants] = useGrants();
   const [granting, setGranting] = useState(false);
@@ -85,6 +87,13 @@ export function StaffUsersPage() {
     );
     setForm({ name: '', email: '', role: 'counsellor' });
     setAdding(false);
+  };
+
+  const remove = async (u: StaffUser) => {
+    const done = await send(() => api.delete(`/admin/staff/${u.id}`), (message) => setDeleteError(message));
+    if (!done) return;
+    setMessage(`${u.name} was deleted. Their name stays in past history.`);
+    setDeleting(null);
   };
 
   const toggle = async (u: StaffUser) => {
@@ -148,6 +157,21 @@ export function StaffUsersPage() {
                         className="rounded-full border border-navy-100 px-3 py-1.5 text-xs font-semibold text-navy-700 transition hover:border-navy-900"
                       >
                         {u.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    )}
+                    {!self && u.status !== 'active' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleting(u);
+                        }}
+                        className="inline-grid h-7 w-7 place-items-center rounded-full border border-red-200 align-middle text-red-700 transition hover:border-red-500 hover:bg-red-50"
+                        aria-label={`Delete ${u.name}`}
+                        title="Delete"
+                        data-delete-staff={u.email}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
                       </button>
                     )}
                   </td>
@@ -267,6 +291,27 @@ export function StaffUsersPage() {
             ? 'They will be signed out of all devices within a minute and can no longer sign in. Their history is kept.'
             : 'They will be able to sign in again.'}
         </p>
+      </Modal>
+
+      <Modal
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title={`Delete ${deleting?.name}?`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700" onClick={() => deleting && void remove(deleting)}>
+              Delete permanently
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-navy-600">
+          Their account, sign-in, email, phone and schedule are removed for good, and the email can be used for a new account. Their name stays in past
+          history (sessions, notes and assignments). This can't be undone.
+        </p>
+        <p className="mt-3 text-sm text-navy-600">Anyone who still looks after students, leads, upcoming sessions or tasks must hand them over first.</p>
+        {deleteError && <p role="alert" className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{deleteError}</p>}
       </Modal>
     </>
   );

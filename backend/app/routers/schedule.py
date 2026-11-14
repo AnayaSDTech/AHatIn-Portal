@@ -17,7 +17,7 @@ from app.services.calendar import format_date, session_ics
 from app.services.scheduling import MAX_UPCOMING, check_slot, has_ended, has_started, session_times, validate_weekly
 from app.domain import AREA_OF_ROLE, OFFICER_FIELD, OFFICER_TITLE, SESSION_AREA
 from app.services.students import own_record, require_ready_to_start, student_for
-from app.services.team import owner_for
+from app.services.team import covered, owner_for
 
 router = APIRouter(tags=["schedule"])
 
@@ -144,7 +144,7 @@ async def book_session(body: SessionBody, user: CurrentUser):
         require_ready_to_start(student, "book a session")
         # Each kind of session is with the person who looks after it.
         area = SESSION_AREA.get(body.type, "counsellor")
-        counsellor_id = student.get(OFFICER_FIELD[area]) if area in OFFICER_FIELD else student["counsellorId"]
+        counsellor_id = owner_for(student, area) if area not in OFFICER_FIELD or student.get(OFFICER_FIELD[area]) or covered(student, area) else None
         if not counsellor_id:
             msg = f"You can book a {body.type.lower()} session once your {OFFICER_TITLE[area]} is assigned."
             raise ApiError(400, msg, {"form": msg})

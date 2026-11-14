@@ -6,7 +6,7 @@ import { useFollowUps, useLeads, useMessages, useSessions, useStaffScope, useSta
 import { Caseload } from '../../components/staff/Caseload';
 import { MessagesSection, NotificationsSection, SessionsTodaySection, Stat, StatStrip, TasksSection, TodayColumns, TodayHeader, daySummary, firstTab, splitTasks, unreadThreads, type TaskTab } from '../../components/staff/TodayParts';
 import { areaOfRole, counsellorName, type StaffStudent } from '../../data/staff';
-import { COUNSELLOR_GROUPS, counsellorCase } from '../../lib/officerCase';
+import { COUNSELLOR_EXTRA_GROUPS, COUNSELLOR_GROUPS, counsellorCase } from '../../lib/officerCase';
 import { isoDate } from '../../lib/scheduling';
 import { formatDate, initials, relativeTime } from '../../lib/utils';
 import { OfficerTodayPage } from './OfficerTodayPage';
@@ -81,6 +81,11 @@ function CounsellorToday() {
     () => students.map((s) => ({ student: s, c: counsellorCase(s, sessions) })).sort((a, b) => b.c.urgency - a.c.urgency || a.student.name.localeCompare(b.student.name)),
     [students, sessions],
   );
+  // Funding and visa filters only for counsellors handling those parts for some students.
+  const caseGroups = useMemo(() => {
+    const extra = COUNSELLOR_EXTRA_GROUPS.filter((g) => cases.some((x) => x.c.group === g.value));
+    return [...COUNSELLOR_GROUPS.filter((g) => g.value !== 'done'), ...extra, ...COUNSELLOR_GROUPS.filter((g) => g.value === 'done')];
+  }, [cases]);
   const [filter, setFilter] = useState('all');
 
   const tasks = splitTasks(followUps);
@@ -120,7 +125,7 @@ function CounsellorToday() {
         main={
           <>
             {newStudents.length > 0 && <NewStudents students={newStudents} />}
-            <Caseload cases={cases} groups={COUNSELLOR_GROUPS} filter={filter} onFilter={setFilter} />
+            <Caseload cases={cases} groups={caseGroups} filter={filter} onFilter={setFilter} />
             <TasksSection tasks={tasks} current={current} onTab={setTab} showCounsellor={scope.isAdmin} />
           </>
         }
