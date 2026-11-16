@@ -8,6 +8,7 @@ import { navLinks } from '../../data/site';
 import { useAuth } from '../../context/AuthContext';
 import { cn, initials } from '../../lib/utils';
 import { homeFor } from '../auth/RouteGuards';
+import { AnnouncementBar } from './AnnouncementBar';
 import { isStaff } from '../../lib/api/types';
 
 /** Student pages that live in the account menu (and the ☰ menu on smaller screens), not in the dashboard's navigation. */
@@ -18,7 +19,7 @@ const STUDENT_EXTRAS = [
   { to: '/dashboard/refer', label: 'Refer a friend', icon: Gift },
 ];
 
-export function Navbar() {
+export function Navbar({ showAnnouncement = false }: { showAnnouncement?: boolean }) {
   const { pathname, key } = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -45,6 +46,8 @@ export function Navbar() {
   // In the student's dashboard the header holds their sections (placed here by StudentLayout), not the website's links.
   const inDashboard = !!user && !isStaff(user.role) && pathname.startsWith('/dashboard');
   const transparent = isHome && !scrolled && !open;
+  // The referral announcement: public website pages only, not the dashboards or the referral pages themselves.
+  const announcement = showAnnouncement && !user && !pathname.startsWith('/refer');
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -78,14 +81,15 @@ export function Navbar() {
       className={cn(
         'fixed inset-x-0 top-0 z-50 transition-all duration-500',
         transparent
-          ? 'bg-transparent py-5'
+          ? 'bg-transparent'
           : open
             ? // No backdrop blur while the menu is open: it would trap the fixed menu panel inside the header.
-              'bg-ivory py-3 shadow-sm'
-            : 'border-b border-navy-100/60 bg-ivory/90 py-3 shadow-sm backdrop-blur-xl',
+              'bg-ivory shadow-sm'
+            : 'border-b border-navy-100/60 bg-ivory/90 shadow-sm backdrop-blur-xl',
       )}
     >
-      <Container className="flex items-center justify-between gap-6">
+      {announcement && <AnnouncementBar hidden={scrolled || open} />}
+      <Container className={cn('flex items-center justify-between gap-6 transition-all duration-500', transparent ? 'py-5' : 'py-3')}>
         <Logo light={transparent} />
 
         {inDashboard ? (

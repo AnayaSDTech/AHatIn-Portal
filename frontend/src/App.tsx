@@ -21,6 +21,7 @@ import {
 } from './pages/student/StudentPages';
 import { ProfilePage as StudentProfilePage } from './pages/student/ProfilePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ReferralProgrammePage } from './pages/ReferralProgrammePage';
 import { ReferrerDashboardPage } from './pages/referrer/ReferrerDashboardPage';
 import { PrivacyPage } from './pages/legal/PrivacyPage';
 import { TermsPage } from './pages/legal/TermsPage';
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
       { path: '/', element: <HomePage /> },
       { path: '/privacy', element: <PrivacyPage /> },
       { path: '/terms', element: <TermsPage /> },
+      { path: '/refer', element: <ReferralProgrammePage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

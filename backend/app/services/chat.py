@@ -29,8 +29,8 @@ KNOWLEDGE = """
 ABOUT AHAT
 - AHat (also written A-Hat) International Educational Consultancy is a trading name of AnayaSD Limited, a company registered in England and Wales.
 - We give free, honest guidance to students (mainly from India) who want to study in the UK and Europe, from choosing a course to settling in abroad.
-- Our guidance is free for students. Universities and partner agencies pay us a commission when a student enrols, and we always tell students which universities on their shortlist earn us commission.
-- Every student gets their own counsellor, and tracks applications, documents and deadlines in the AHat student portal. Parents can be invited to follow progress.
+- Our services are completely free for students. We receive commissions directly from partner universities, so students pay nothing at any stage of their journey.
+- Every student gets a dedicated counsellor, and tracks applications, documents and deadlines in the AHat student portal. Parents can be invited to follow progress.
 - Offices: India, Nepal and United Kingdom. Email: contact@ahat.in. Hours: Monday to Saturday, 10:00 to 19:00 IST.
 - Students register free at https://ahat.in/register. After registering they complete their profile, and an AHat counsellor is assigned.
 
@@ -38,8 +38,8 @@ DESTINATIONS
 - United Kingdom: world-famous universities, 1-year master's degrees, the Graduate Route work visa after study, scholarships for Indian students. Intakes: September and January.
 - Europe (mainly Germany, Ireland and France): top quality at lower cost, low or no tuition fees in Germany, many courses taught in English, work after study in Ireland. Intakes: Winter, Summer and September.
 
-OUR NINE SERVICES (all free, in journey order)
-1. Career Counselling & Course Selection: one-to-one sessions with your own counsellor; courses matched to your academics, interests and career plans; clear advice on entry requirements and job prospects.
+OUR SERVICES (all free, in journey order)
+1. Career Counselling & Course Selection: one-to-one sessions with your dedicated counsellor; courses matched to your academics, interests and career plans; clear advice on entry requirements and job prospects.
 2. University & Country Selection: compare countries on cost, work rights and post-study options; a balanced shortlist of ambitious, target and safe choices; honest guidance on rankings, intakes and living costs.
 3. Application Assistance: feedback on your statement of purpose (SOP) and CV, draft by draft; help with recommendation letters (LOR) and application forms; every application and deadline tracked in your portal.
 4. Scholarship & Financial Guidance: scholarships you are eligible for, with deadlines; a realistic estimate of tuition and living costs; guidance on education loans and proof of funds.
@@ -50,7 +50,7 @@ OUR NINE SERVICES (all free, in journey order)
 9. Job Assistance: part-time work that fits a student visa; a CV in the local format; guidance on post-study work visas and graduate jobs.
 
 FREQUENT QUESTIONS
-- Is AHat's guidance really free? Yes. Universities and partner agencies pay us when you enrol, and we always tell you which ones.
+- Is AHat's guidance really free? Yes. We receive commissions directly from partner universities, so you pay nothing at any stage.
 - Which countries? The UK and Europe, mainly Germany, Ireland and France.
 - When should I start preparing? 9 to 12 months before your intake: enough time for tests, applications and the visa.
 - Scholarships and education loans? Yes. We estimate your costs, find scholarships for you and connect you with loan partners.

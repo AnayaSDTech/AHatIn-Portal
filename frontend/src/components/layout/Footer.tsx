@@ -3,6 +3,7 @@ import { Clock, Mail, MapPin } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
 import { contact, destinations, navLinks, services } from '../../data/site';
+import { COMPANY } from '../../pages/legal/LegalPage';
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -10,17 +11,22 @@ export function Footer() {
     <footer className="relative overflow-hidden bg-navy-950 text-navy-200">
       <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-gold-500/10 blur-3xl" aria-hidden />
       <Container className="relative grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-12">
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-3">
           <Logo light />
           <p className="mt-5 max-w-sm text-sm leading-relaxed text-navy-300">
             Free, honest guidance for Indian students heading to the UK and Europe, from career counselling to
             settling in abroad.
           </p>
+          <p className="mt-6 max-w-sm border-t border-white/10 pt-5 text-xs leading-relaxed text-navy-400" data-company-info>
+            AHat International Educational Consultancy is a trading name of {COMPANY.name}, registered in England and Wales
+            (company number {COMPANY.number}).
+          </p>
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <h3 className="font-sans text-sm font-semibold uppercase tracking-wider text-white">Explore</h3>
-          <ul className="mt-4 space-y-3 text-sm">
+          {/* Two columns, so the list stays short */}
+          <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
             {navLinks.map((l) => (
               <li key={l.href}>
                 <Link to={`/${l.href}`} className="transition hover:text-gold-300">
@@ -28,16 +34,20 @@ export function Footer() {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link to="/referrer/register" className="transition hover:text-gold-300">
-                Become a referrer
-              </Link>
-            </li>
-            <li>
-              <Link to="/referrer/login" className="transition hover:text-gold-300">
-                Referrer login
-              </Link>
-            </li>
+          </ul>
+          <h3 className="mt-8 font-sans text-sm font-semibold uppercase tracking-wider text-white">Referrals</h3>
+          <ul className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {[
+              { to: '/refer', label: 'How it works' },
+              { to: '/referrer/register', label: 'Become a referrer' },
+              { to: '/referrer/login', label: 'Referrer login' },
+            ].map((l) => (
+              <li key={l.to}>
+                <Link to={l.to} className="transition hover:text-gold-300">
+                  {l.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -81,7 +91,7 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <Container className="flex flex-col items-center justify-between gap-3 py-6 text-xs text-navy-400 sm:flex-row">
-          <p>© {year} AHat International Educational Consultancy, a trading name of AnayaSD Limited.</p>
+          <p>© {year} AHat International Educational Consultancy. All rights reserved.</p>
           <p className="flex gap-5">
             <Link to="/privacy" className="hover:text-gold-300">Privacy notice</Link>
             <Link to="/terms" className="hover:text-gold-300">Terms of use</Link>

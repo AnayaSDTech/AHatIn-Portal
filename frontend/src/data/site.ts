@@ -79,7 +79,7 @@ export const services: Service[] = [
     title: 'Career Counselling & Course Selection',
     description: 'Find the course that fits your goals.',
     details: [
-      'One-to-one sessions with your own counsellor',
+      'One-to-one sessions with your dedicated counsellor',
       'Courses matched to your academics, interests and career plans',
       'Clear advice on entry requirements and job prospects',
     ],
@@ -176,9 +176,9 @@ export const services: Service[] = [
 ];
 
 export const aboutPoints = [
-  { title: 'Free for students', text: 'No fees, from day one to settling in.' },
-  { title: 'Your own counsellor', text: 'One expert with you at every step.' },
-  { title: 'Honest advice', text: 'We tell you which universities pay us commission.' },
+  { title: 'No fees, from start to finish', text: 'Expert guidance, completely free, funded by university partnerships.' },
+  { title: 'Dedicated counsellor', text: 'Guidance from graduates who understand your journey' },
+  { title: 'Honest advice', text: 'Clear, realistic guidance on courses, costs and your chances.' },
   { title: 'Track everything', text: 'Applications, documents and deadlines in one portal.' },
 ];
 
@@ -266,7 +266,7 @@ export const testimonials: { name: string; university: string; course?: string; 
 export const faqs = [
   {
     q: 'Is AHat’s guidance really free?',
-    a: 'Yes. Universities and partner agencies pay us when you enrol, and we always tell you which ones.',
+    a: 'Yes. Our services are completely free for students. We receive commissions directly from partner universities, so you pay nothing at any stage of your journey.',
   },
   {
     q: 'Which countries do you help with?',

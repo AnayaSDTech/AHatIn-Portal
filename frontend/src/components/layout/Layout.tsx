@@ -33,7 +33,7 @@ export function Layout({ hideFooter }: { hideFooter?: boolean }) {
         Skip to content
       </a>
       <ScrollManager />
-      <Navbar />
+      <Navbar showAnnouncement={!hideFooter} />
       <main id="main" className="flex-1">
         <Outlet />
       </main>
