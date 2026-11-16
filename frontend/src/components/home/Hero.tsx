@@ -1,9 +1,16 @@
-import { ArrowRight, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, BadgeIndianRupee, CheckCircle2, GraduationCap, Scale, ShieldCheck, Sparkles } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { ButtonLink } from '../ui/Button';
 import { SmartImage } from '../ui/SmartImage';
 import { images, stats } from '../../data/site';
 import { cn } from '../../lib/utils';
+
+/** The three promises under the hero buttons. */
+const pillars = [
+  { icon: BadgeIndianRupee, title: 'Zero consultancy fees' },
+  { icon: GraduationCap, title: 'Guidance from university alumni' },
+  { icon: Scale, title: 'Honest, unbiased advice' },
+];
 
 /**
  * Example journey shown in the hero card (a preview of the student portal, not a real student). The stages don't all fit, so the
@@ -51,11 +58,10 @@ export function Hero() {
             Free guidance · UK · Europe
           </span>
           <h1 className="mt-6 animate-fade-up text-4xl font-semibold leading-[1.1] text-white [animation-delay:100ms] sm:text-5xl lg:text-6xl">
-            Study at a world-class university.{' '}
-            <span className="italic text-gold-400">We guide every step.</span>
+            We have been <span className="italic text-gold-400">where you want to go.</span>
           </h1>
           <p className="mt-6 max-w-xl animate-fade-up text-lg leading-relaxed text-navy-100 [animation-delay:200ms]">
-            Honest advice, your own counsellor and a portal that always shows what's next.
+            Honest advice from counsellors who have studied abroad themselves, and personal guidance to help you make the right decisions at every step.
           </p>
           <div className="mt-9 flex animate-fade-up flex-col gap-3 [animation-delay:300ms] sm:flex-row">
             <ButtonLink to="/register" variant="gold" size="lg">
@@ -66,11 +72,11 @@ export function Hero() {
               Get a call back
             </ButtonLink>
           </div>
-          <ul className="mt-8 flex animate-fade-up flex-wrap gap-x-6 gap-y-2 text-sm text-navy-200 [animation-delay:400ms]">
-            {['No fees', 'Your own counsellor', 'Honest advice'].map((t) => (
-              <li key={t} className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-gold-400" aria-hidden />
-                {t}
+          <ul className="mt-8 flex animate-fade-up flex-wrap gap-x-6 gap-y-2.5 text-sm font-medium text-navy-100 [animation-delay:400ms]" data-hero-pillars>
+            {pillars.map(({ icon: Icon, title }) => (
+              <li key={title} className="flex items-center gap-2">
+                <Icon className="h-4 w-4 shrink-0 text-gold-400" aria-hidden />
+                {title}
               </li>
             ))}
           </ul>

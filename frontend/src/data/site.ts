@@ -33,7 +33,7 @@ export const navLinks = [
 
 /** DEMO figures, shown with a "demo content" label on the page. */
 export const stats = [
-  { value: '101+', label: 'Students guided' },
+  { value: '500+', label: 'Students guided' },
   { value: '95%', label: 'Visa success rate' },
   { value: '50+', label: 'Universities reached' },
   { value: '₹0', label: 'Consultancy fee' },

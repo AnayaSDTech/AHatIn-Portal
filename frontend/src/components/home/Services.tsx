@@ -60,11 +60,11 @@ export function Services() {
         <SectionHeading
           light
           eyebrow="Our services"
-          title={<>Nine services. <span className="italic text-gold-400">One seamless journey.</span></>}
+          title={<>Every step covered. <span className="italic text-gold-400">One seamless journey.</span></>}
           description="All free. All connected. Tracked in your portal."
         />
 
-        {/* Nine cards in an even 3 × 3 grid (one column on phones). */}
+        {/* The service cards, three per row (one column on phones). */}
         <ol className="mt-16 grid gap-5 md:grid-cols-3">
           {services.map((s, i) => {
             // Touch screens: a plain card with its details always shown.
