@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Clock, Mail, MapPin } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Logo } from '../ui/Logo';
+import { SocialLinks } from './SocialLinks';
 import { contact, destinations, navLinks, services } from '../../data/site';
 import { COMPANY } from '../../pages/legal/LegalPage';
 
@@ -86,6 +87,7 @@ export function Footer() {
               <span>{contact.hours}</span>
             </li>
           </ul>
+          <SocialLinks className="mt-6" />
         </div>
       </Container>
 

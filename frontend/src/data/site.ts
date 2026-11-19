@@ -292,6 +292,17 @@ export const faqs = [
 
 export const contact = {
   email: 'contact@ahat.in',
+  /** Opens a WhatsApp chat with AHat (app on phones, WhatsApp Web on computers), with the first message already typed. */
+  whatsapp: {
+    link: `https://wa.me/919145634804?text=${encodeURIComponent("Hi AHat, I'd like to know more about studying abroad.")}`,
+    display: '+91 91456 34804',
+  },
+  /** Social media profiles, shown as icons in the footer. */
+  social: {
+    instagram: 'https://www.instagram.com/ahat_education',
+    facebook: 'https://www.facebook.com/ahat.edu',
+    linkedin: 'https://www.linkedin.com/company/ahat.in',
+  },
   offices: ['India', 'Nepal', 'United Kingdom'],
   hours: 'Mon–Sat, 10:00–19:00 IST',
 };

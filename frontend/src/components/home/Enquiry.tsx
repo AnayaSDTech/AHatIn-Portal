@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CheckCircle2, Clock, Mail, MapPin, Send } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle2, Clock, Mail, MapPin, MessageCircle, Send } from 'lucide-react';
 import { Container } from '../ui/Container';
 import { Reveal } from '../ui/Reveal';
 import { Button } from '../ui/Button';
@@ -96,7 +96,7 @@ export function Enquiry() {
                 No account needed. A counsellor usually calls back the same working day.
               </p>
               <ul className="relative mt-8 space-y-3 text-sm text-navy-100">
-                {['Free, no obligation', 'Honest UK and Europe advice', 'One counsellor, start to finish'].map((t) => (
+                {['Free, no obligation', 'Honest UK and Europe advice', 'Dedicated counsellor, start to finish'].map((t) => (
                   <li key={t} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
                     {t}
@@ -106,6 +106,9 @@ export function Enquiry() {
               <div className="relative mt-10 space-y-3 border-t border-white/10 pt-8 text-sm">
                 <a href={`mailto:${contact.email}`} className="flex items-center gap-3 text-white hover:text-gold-300">
                   <Mail className="h-4 w-4 text-gold-400" aria-hidden /> {contact.email}
+                </a>
+                <a href={contact.whatsapp.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-white hover:text-gold-300" data-enquiry-whatsapp>
+                  <MessageCircle className="h-4 w-4 text-gold-400" aria-hidden /> WhatsApp {contact.whatsapp.display}
                 </a>
                 <p className="flex items-center gap-3 text-navy-200">
                   <Clock className="h-4 w-4 text-gold-400" aria-hidden /> {contact.hours}
