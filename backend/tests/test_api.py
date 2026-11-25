@@ -2096,3 +2096,18 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await student.post("/students/s1/documents/d8/upload-complete", {"uploadId": up["uploadId"]})).status_code == 200
     check = await get_db().follow_ups.find_one({"personId": "s1", "action": "Verify uploaded document: Updated CV", "done": False})
     assert check["rule"] == "Document uploaded · 2 working days"
+
+
+async def test_overdue_alert_shows_the_due_time_in_ist():
+    from datetime import datetime, timezone
+
+    from app import worker
+
+    db = get_db()
+    # Due 25 Nov 2026 at 09:30 UTC = 15:00 IST.
+    due = datetime(2026, 11, 25, 9, 30, tzinfo=timezone.utc)
+    await db.follow_ups.insert_one({"_id": "fu-late", "counsellorId": "c1", "person": "Ananya Sharma", "personId": "s1", "personType": "student", "action": "Verify uploaded document: CV", "rule": "Document uploaded · 1 working day", "dueAt": due, "type": "verify", "done": False, "createdAt": due})
+    await worker.escalate_overdue()
+    sent = await db.notifications.find_one({"subject": "Overdue follow-up: Ananya Sharma", "body": {"$regex": "Verify uploaded document: CV"}})
+    assert "was due 25 Nov 2026, 15:00 IST." in sent["body"] and "UTC" not in sent["body"], sent["body"]
+    assert (await db.follow_ups.find_one({"_id": "fu-late"}))["escalatedAt"]  # managers are alerted once

@@ -131,6 +131,8 @@ These apply to all four phases:
 
 ### Task 2.3: Overdue alerts show UTC instead of IST
 
+**Status:** built on 26 November 2026, not released yet. Overdue alerts to managers now read, for example, "was due 25 Nov 2026, 15:00 IST".
+
 **Today:** the email to managers about an overdue follow-up shows the due time in **UTC**. A task due at 15:00 IST reads "09:30", which is confusing.
 
 **Solution:** show the due time in business time, as "25 Nov 15:00 IST", using the existing business time zone setting.

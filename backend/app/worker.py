@@ -7,11 +7,11 @@ so running it in several places at once is safe.
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from app.config import get_settings
 from app.core import policy
-from app.core.clock import local_dt, now, today, today_iso
+from app.core.clock import UTC, local_dt, now, today, today_iso, tz
 from app.core.locks import lock
 from app.core.errors import ApiError
 from app.db import ensure_indexes, get_db
@@ -23,6 +23,12 @@ from app.services.workflow import create_follow_up
 log = logging.getLogger("ahat.worker")
 
 
+def local_time(at: datetime) -> str:
+    """A stored (UTC) time in business time for people to read, e.g. '25 Nov 2026, 15:00 IST'."""
+    local = (at if at.tzinfo else at.replace(tzinfo=UTC)).astimezone(tz())
+    return f"{local:%d %b %Y, %H:%M} {local.tzname()}"
+
+
 async def escalate_overdue() -> None:
     """Overdue follow-ups alert the managers once."""
     db = get_db()
@@ -30,7 +36,7 @@ async def escalate_overdue() -> None:
         c = await db.users.find_one({"_id": f["counsellorId"]}, {"name": 1})
         await notify.email_admins(
             f"Overdue follow-up: {f['person']}",
-            f"{f['action']} ({f['person']}) for {c['name'] if c else 'an unassigned counsellor'} was due {f['dueAt']:%d %b %H:%M} UTC.\nRule: {f['rule']}",
+            f"{f['action']} ({f['person']}) for {c['name'] if c else 'an unassigned counsellor'} was due {local_time(f['dueAt'])}.\nRule: {f['rule']}",
             dedupe_key=f"escalate:{f['_id']}",
         )
         await db.follow_ups.update_one({"_id": f["_id"]}, {"$set": {"escalatedAt": now()}})
