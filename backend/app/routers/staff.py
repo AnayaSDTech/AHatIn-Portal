@@ -299,14 +299,15 @@ def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, bool]]
     """(rule, new value, old value, leads only) for each changed rule that sets a deadline for staff."""
     p = policy
     wh = lambda w: f"{p.days_label(w['days'])}, {w['start']}–{w['end']} IST"  # noqa: E731
+    # (section, key, rule and what staff must do, how to show the value, leads only)
     rules = [
-        ("workingHours", None, "Working hours", wh, False),
-        ("followUps", "firstContactMinutes", "New enquiry, in working hours", lambda v: f"make first contact within {p.plural(v, 'minute')}", True),
-        ("followUps", "firstContactNextDay", "New enquiry, out of hours", lambda v: f"make first contact by {v} on the next working day", True),
-        ("followUps", "bookSessionHours", "Contacted, no session booked", lambda v: f"follow up within {p.plural(v, 'hour')}", True),
-        ("followUps", "planFollowUpHours", "Plan shared, not registered", lambda v: f"follow up within {p.plural(v, 'hour')}", True),
-        ("followUps", "documentCheckWorkingDays", "Document uploaded", lambda v: f"verify or reject within {p.plural(v, 'working day')}", False),
-        ("followUps", "deadlineReminderDays", "Application and scholarship deadlines", lambda v: f"reminders {p.deadline_days_label(v)}", False),
+        ("workingHours", None, "Working hours:", wh, False),
+        ("followUps", "firstContactMinutes", "New enquiry, in working hours: make first contact within", lambda v: p.plural(v, "minute"), True),
+        ("followUps", "firstContactNextDay", "New enquiry, out of hours: make first contact on the next working day by", str, True),
+        ("followUps", "bookSessionHours", "Contacted, no session booked: follow up within", lambda v: p.plural(v, "hour"), True),
+        ("followUps", "planFollowUpHours", "Plan shared, not registered: follow up within", lambda v: p.plural(v, "hour"), True),
+        ("followUps", "documentCheckWorkingDays", "Document uploaded: verify or reject within", lambda v: p.plural(v, "working day"), False),
+        ("followUps", "deadlineReminderDays", "Application and scholarship deadlines: reminders", p.deadline_days_label, False),
     ]
     out = []
     for section, key, label, show, leads_only in rules:
@@ -326,16 +327,32 @@ async def _tell_staff_about_rule_changes(before: dict, after: dict, admin: dict)
     everyone = ("counsellor", "officer", "finance_officer", "visa_officer", "admin")
     roles = ("counsellor",) if all(leads_only for *_, leads_only in changes) else everyone
     t = now()
-    async for u in get_db().users.find({"role": {"$in": list(roles)}, "status": "active", "_id": {"$ne": admin["_id"]}}, {"role": 1}):
+    async for u in get_db().users.find({"role": {"$in": list(roles)}, "status": "active", "_id": {"$ne": admin["_id"]}}, {"role": 1, "name": 1, "email": 1}):
         mine = [c for c in changes if not c[3] or u["role"] in ("counsellor", "admin")]  # lead rules only matter to those who handle leads
         if not mine:
             continue
-        lines = "\n".join(f"• {label}: {new} (was {old})." for label, new, old, _ in mine)
-        text = f"{admin['name']} changed the follow-up rules:\n{lines}\nNew follow-ups use the new times; tasks already in your list keep their due times."
-        await notify.email_counsellor(
-            u["_id"], "Follow-up rules changed", text, path="/admin/settings" if u["role"] == "admin" else "/staff",
-            dedupe_key=f"rules-changed:{t.timestamp()}:{u['_id']}", kind="update", alert_key="rules-changed",
+        path = "/admin/settings" if u["role"] == "admin" else "/staff"
+        # The email lists every change; the notification (limited to 300 characters) lists as many as fit.
+        lines = "\n".join(f"• {label} {new} (was {old})." for label, new, old, _ in mine)
+        await notify.alert_staff(u["_id"], "Follow-up rules changed", _short_summary(mine), path=path, kind="update", key="rules-changed")
+        body = (
+            f"Hello {u['name'].split(' ')[0]},\n\n{admin['name']} changed the follow-up rules:\n{lines}\n\n"
+            f"New follow-ups use the new times; tasks already in your list keep their due times.\n\nOpen the staff portal: {notify.portal_link(path)}\n\nAHat"
         )
+        await notify.queue_email(u["email"], "Follow-up rules changed", body, dedupe_key=f"rules-changed:{t.timestamp()}:{u['_id']}")
+
+
+def _short_summary(changes: list[tuple[str, str, str, bool]], limit: int = 280) -> str:
+    """'Plan shared, not registered: follow up within 24 hours (was 48 hours).' for as many changes as fit; the rest are counted."""
+    parts: list[str] = []
+    for i, (label, new, old, _) in enumerate(changes):
+        part = f"{label} {new} (was {old})."
+        rest = len(changes) - i - 1
+        tail = f" And {rest} more: see your email." if rest else ""
+        if parts and len(" ".join([*parts, part])) + len(tail) > limit:
+            return " ".join(parts) + f" And {len(changes) - i} more: see your email."
+        parts.append(part)
+    return " ".join(parts)
 
 
 __all__ = ["router", "iso"]

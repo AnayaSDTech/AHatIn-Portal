@@ -2018,8 +2018,15 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await counsellor.get("/settings")).json()["quietHours"] == {"start": "22:00", "end": "07:00"}
     # The staff affected are told what changed; officers only about the rules that apply to them; not the admin who saved.
     db = get_db()
+    c1 = await db.users.find_one({"_id": "c1"})
     c_alert = await db.staff_alerts.find_one({"userId": "c1", "key": "rules-changed"})
-    assert c_alert["title"] == "Follow-up rules changed" and "Plan shared, not registered: follow up within 72 hours (was 48 hours)" in c_alert["text"]
+    # The notification fits as many changes as it can and points to the email for the rest; the email lists them all.
+    assert c_alert["title"] == "Follow-up rules changed" and c_alert["text"].startswith("Working hours: Monday – Friday, 09:00–17:00 IST")
+    assert len(c_alert["text"]) <= 300 and c_alert["text"].endswith("more: see your email.")
+    c_email = await db.notifications.find_one({"to": c1["email"], "subject": "Follow-up rules changed"})
+    assert "• Plan shared, not registered: follow up within 72 hours (was 48 hours)." in c_email["body"]
+    assert "• Application and scholarship deadlines: reminders 10, 5 and 2 days before (was 14, 7 and 2 days before)." in c_email["body"]
+    assert "• New enquiry, out of hours: make first contact on the next working day by 10:00 (was 11:00)." in c_email["body"]
     officer = await db.users.find_one({"role": {"$in": ["finance_officer", "visa_officer"]}, "status": "active"})
     o_alert = await db.staff_alerts.find_one({"userId": officer["_id"], "key": "rules-changed"})
     assert "Working hours" in o_alert["text"] and "Plan shared" not in o_alert["text"]
