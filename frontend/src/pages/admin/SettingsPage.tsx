@@ -89,7 +89,8 @@ export function SettingsPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel title="Working hours" icon={<Clock className="h-4 w-4" aria-hidden />} action={edit('workingHours')}>
-          <p className="text-sm text-navy-700">{workingHours.label}</p>
+          {/* An older backend sends the days as text, with no label. */}
+          <p className="text-sm text-navy-700">{workingHours.label ?? String(workingHours.days)}</p>
           <p className="font-display text-2xl text-navy-900">{workingHours.start} – {workingHours.end} IST</p>
           <p className="mt-2 text-xs text-navy-400">Follow-up time limits count only working hours where a rule says so.</p>
         </Panel>

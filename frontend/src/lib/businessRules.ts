@@ -16,7 +16,9 @@ export interface BusinessRules {
 
 /** The current rules (null until loaded). Shares its data with the Settings page, so a saved change shows everywhere. */
 export function useBusinessRules(): BusinessRules | null {
-  return useApi<BusinessRules | null>('/settings', null)[0];
+  const rules = useApi<BusinessRules | null>('/settings', null)[0];
+  // An older backend doesn't send these yet: then the info icons simply don't show.
+  return rules?.followUpLimits && rules.workingHours?.label ? rules : null;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
