@@ -20,6 +20,7 @@ import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 from app import db as dbmod  # noqa: E402
+from app.core import policy  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import demo_totp_secret, seed  # noqa: E402
 from app.services import storage  # noqa: E402
@@ -77,6 +78,7 @@ def bucket(monkeypatch) -> FakeBucket:
 async def fresh_data(bucket):
     dbmod._client = None  # a new client for each test's event loop
     await dbmod.client().drop_database(os.environ["MONGODB_DB"])
+    policy.forget()  # the Settings page rules start from their defaults in every test
     await seed(keep_logins=False)
     yield
 

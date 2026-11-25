@@ -1,5 +1,7 @@
 """Business vocabulary shared by every module (mirrors the frontend's constants)."""
 
+from app.core import policy
+
 STAGES = [
     "new_lead",
     "contacted",
@@ -122,16 +124,21 @@ PROFILE_INTAKES = ["January 2027", "September 2027", "January 2028", "September 
 REGISTER_INTAKES = ["2027-01", "2027-09", "2028-01", "2028-09"]
 ENGLISH_TESTS = ["IELTS", "PTE", "TOEFL", "Duolingo", "Not taken yet"]
 
-FOLLOW_UP_RULES = [
-    {"trigger": "New enquiry (working hours)", "action": "Make first contact", "limit": "15 minutes", "escalation": "Manager alerted"},
-    {"trigger": "New enquiry (out of hours)", "action": "Make first contact", "limit": "11:00 next working day", "escalation": "Manager alerted"},
-    {"trigger": "Contacted, no session booked", "action": "Follow up", "limit": "48 hours, then 7 days", "escalation": "Nurture after 3 failed tries"},
-    {"trigger": "Assessment done", "action": "Share the plan", "limit": "24 hours", "escalation": "Manager alerted"},
-    {"trigger": "Document uploaded", "action": "Verify or reject", "limit": "1 working day", "escalation": "Manager alerted"},
-    {"trigger": "Application or scholarship deadline", "action": "Remind student and staff", "limit": "14, 7 and 2 days before", "escalation": "Manager alerted at 2 days"},
-    {"trigger": "Planned arrival", "action": "Confirm safe arrival", "limit": "24 hours", "escalation": "Counsellor and manager alerted"},
-    {"trigger": "Urgent support message", "action": "Respond", "limit": "2 hours, any day", "escalation": "Manager alerted immediately"},
-]
+def follow_up_rules() -> list[dict]:
+    """The follow-up rules as the Settings page shows them. Rows with a `setting` take their time limit from the rules an admin can
+    edit (app.core.policy); the others are fixed for now."""
+    fu = policy.current()["followUps"]
+    days = sorted(fu["deadlineReminderDays"], reverse=True)
+    return [
+        {"trigger": "New enquiry (working hours)", "action": "Make first contact", "limit": policy.plural(fu["firstContactMinutes"], "minute"), "escalation": "Manager alerted", "setting": "firstContactMinutes"},
+        {"trigger": "New enquiry (out of hours)", "action": "Make first contact", "limit": f"{fu['firstContactNextDay']} next working day", "escalation": "Manager alerted", "setting": "firstContactNextDay"},
+        {"trigger": "Contacted, no session booked", "action": "Follow up", "limit": f"{policy.plural(fu['bookSessionHours'], 'hour')}, then 7 days", "escalation": "Nurture after 3 failed tries", "setting": "bookSessionHours"},
+        {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": policy.plural(fu["planFollowUpHours"], "hour"), "escalation": "Manager alerted", "setting": "planFollowUpHours"},
+        {"trigger": "Document uploaded", "action": "Verify or reject", "limit": policy.plural(fu["documentCheckWorkingDays"], "working day"), "escalation": "Manager alerted", "setting": "documentCheckWorkingDays"},
+        {"trigger": "Application or scholarship deadline", "action": "Remind student and staff", "limit": policy.deadline_days_label(days), "escalation": f"Manager alerted at {policy.plural(days[-1], 'day')}", "setting": "deadlineReminderDays"},
+        {"trigger": "Planned arrival", "action": "Confirm safe arrival", "limit": "24 hours", "escalation": "Counsellor and manager alerted"},
+        {"trigger": "Urgent support message", "action": "Respond", "limit": "2 hours, any day", "escalation": "Manager alerted immediately"},
+    ]
 
 
 def empty_journey() -> dict:

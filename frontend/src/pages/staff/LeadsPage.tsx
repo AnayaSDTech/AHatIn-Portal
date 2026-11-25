@@ -10,6 +10,8 @@ import { Pill } from '../../components/dashboard/Panel';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { SelectField } from '../../components/ui/FormField';
+import { InfoTip } from '../../components/ui/InfoTip';
+import { useBusinessRules, leadStageRule } from '../../lib/businessRules';
 import { STAGES, activeCounsellors, counsellorName, counsellors, stageIndex, stageLabel, type Lead, type StageKey } from '../../data/staff';
 import { cn, formatDateTime, relativeTime } from '../../lib/utils';
 
@@ -36,6 +38,7 @@ function LeadDetails({ lead, onClose, isAdmin }: { lead: Lead; onClose: () => vo
   const [outcome, setOutcome] = useState('');
   const [notes, setNotes] = useState('');
   const [stage, setStage] = useState<string>(lead.stage);
+  const rules = useBusinessRules();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -92,7 +95,14 @@ function LeadDetails({ lead, onClose, isAdmin }: { lead: Lead; onClose: () => vo
           <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" aria-hidden /> {lead.city}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Pill tone={stageTone(lead.stage)}>{stageLabel(lead.stage)}</Pill>
+          <span className="inline-flex items-center gap-1">
+            <Pill tone={stageTone(lead.stage)}>{stageLabel(lead.stage)}</Pill>
+            {rules && (
+              <InfoTip label={`What to do at ${stageLabel(lead.stage)}`} align="left">
+                {leadStageRule(lead.stage, rules)}
+              </InfoTip>
+            )}
+          </span>
           <span className="text-navy-500">Source: <span className="font-medium text-navy-800">{lead.source}</span> (can't be changed)</span>
           <span className="text-navy-500">Enquired {relativeTime(lead.createdAt)}</span>
           <span className="text-navy-500">
@@ -198,6 +208,7 @@ export function LeadsPage() {
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StageFilter>('all');
+  const rules = useBusinessRules();
   const openId = params.get('open');
   const openLead = leads.find((l) => l.id === openId);
 
@@ -235,7 +246,19 @@ export function LeadsPage() {
       )}
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <SearchBox value={query} onChange={setQuery} placeholder="Search name, email, city…" />
-        <FilterChips label="Filter by stage" options={options} value={filter} onChange={setFilter} />
+        <div className="flex items-center gap-1">
+          <FilterChips label="Filter by stage" options={options} value={filter} onChange={setFilter} />
+          {rules && (
+            <InfoTip label="What to do at each stage" align="right">
+              <span className="mb-1.5 block font-semibold text-white">Time limits for each stage</span>
+              {LEAD_STAGES.map((s) => (
+                <span key={s.key} className="mt-1.5 block">
+                  <span className="font-semibold text-gold-300">{s.label}:</span> {leadStageRule(s.key, rules)}
+                </span>
+              ))}
+            </InfoTip>
+          )}
+        </div>
       </div>
 
       {visible.length === 0 ? (

@@ -14,7 +14,7 @@ from fastapi.responses import PlainTextResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
-from app.core import errors
+from app.core import errors, policy
 from app.core.auth import csrf_middleware
 from app.db import client, ensure_indexes
 from app.routers import admin, auth, chat, courses, delegates, messages, public, referrals, schedule, scholarships, staff, students
@@ -29,6 +29,7 @@ async def lifespan(_: FastAPI):
     settings.check_production()
     await ensure_indexes()
     await sync_scholarships()
+    await policy.reload()
     tasks: list[asyncio.Task] = []
     if settings.run_background_jobs:
         from app import worker
@@ -61,6 +62,14 @@ class SecurityHeaders(BaseHTTPMiddleware):
         if settings.cookie_secure:
             response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         return response
+
+
+@app.middleware("http")
+async def fresh_business_rules(request, call_next):
+    """Picks up working hours, quiet hours and follow-up limits changed on the Settings page (by any server) within half a minute."""
+    if request.url.path.startswith("/api/"):
+        await policy.refresh_if_stale()
+    return await call_next(request)
 
 
 csrf_middleware(app)

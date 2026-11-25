@@ -390,7 +390,8 @@ async def update_agency(agency_id: str, body: AgencyBody, admin: Admin):
 
 @router.post("/demo/reset", status_code=204)
 async def reset_demo(admin: Admin):
-    if not get_settings().is_dev:
+    # Only on a test database: a development backend may be connected to the live one.
+    if not get_settings().can_load_demo_data:
         raise not_found()
     from app.seed import seed
 

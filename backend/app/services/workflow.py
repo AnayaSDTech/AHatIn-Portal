@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
+from app.core import policy
 from app.core.clock import add_working_hours, local_now, now
 from app.db import get_db, new_id
 
@@ -19,14 +20,22 @@ async def next_reference() -> str:
 
 
 def first_contact_due(at: datetime) -> datetime:
-    """New enquiry: 15 minutes in working hours; otherwise 11:00 the next working day."""
+    """New enquiry: within N minutes during working hours; otherwise by a set time on the next working day (Settings page)."""
+    rules = policy.current()
+    wh, fu = rules["workingHours"], rules["followUps"]
+    days = set(wh["days"]) or {0, 1, 2, 3, 4, 5}
+    start, end = policy.minutes(wh["start"]), policy.minutes(wh["end"])
     local = at.astimezone(local_now().tzinfo)
-    if local.weekday() != 6 and 10 <= local.hour < 19 and (local + timedelta(minutes=15)).hour < 19:
-        return at + timedelta(minutes=15)
-    nxt = local + timedelta(days=1) if local.hour >= 10 else local
-    while nxt.weekday() == 6:
+    mins = local.hour * 60 + local.minute
+    working_day = local.weekday() in days
+    if working_day and start <= mins and mins + fu["firstContactMinutes"] < end:
+        return at + timedelta(minutes=fu["firstContactMinutes"])
+    # Before opening on a working day: later that morning. Otherwise: the next working day.
+    nxt = local if working_day and mins < start else local + timedelta(days=1)
+    while nxt.weekday() not in days:
         nxt += timedelta(days=1)
-    return nxt.replace(hour=11, minute=0, second=0, microsecond=0)
+    h, m = (int(x) for x in fu["firstContactNextDay"].split(":"))
+    return nxt.replace(hour=h, minute=m, second=0, microsecond=0)
 
 
 async def create_follow_up(
@@ -69,5 +78,10 @@ async def close_follow_ups(source_prefix: str) -> None:
     )
 
 
+def working_days_from_now(days: float) -> datetime:
+    """`days` full working days from now (a working day is as long as the working hours on the Settings page)."""
+    return add_working_hours(now(), days * policy.working_day_hours())
+
+
 def one_working_day_from_now() -> datetime:
-    return add_working_hours(now(), 9)
+    return working_days_from_now(1)

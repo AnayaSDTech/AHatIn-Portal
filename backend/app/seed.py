@@ -539,6 +539,11 @@ async def seed(keep_logins: bool = True) -> None:
     s = get_settings()
     if not s.is_dev:
         raise SystemExit("Demo data can only be loaded in development.")
+    if not s.can_load_demo_data:
+        raise SystemExit(
+            f"Refusing to load demo data into the database '{s.mongodb_db}': it isn't a local or test database, and loading would replace its "
+            "leads, students and sessions. Use a local MongoDB or a database named …_test or …_e2e (set MONGODB_DB)."
+        )
     db = get_db()
     await ensure_indexes()
     for name in BUSINESS:

@@ -10,6 +10,7 @@ import logging
 from datetime import timedelta
 
 from app.config import get_settings
+from app.core import policy
 from app.core.clock import local_dt, now, today, today_iso
 from app.core.locks import lock
 from app.core.errors import ApiError
@@ -53,10 +54,13 @@ async def session_reminders() -> None:
 
 
 async def deadline_reminders() -> None:
-    """Application and scholarship deadlines: follow-ups 14, 7 and 2 days before."""
+    """Application and scholarship deadlines: follow-ups on the reminder days set on the Settings page (14, 7 and 2 days before at
+    first). Managers are alerted on the last of them."""
     db = get_db()
     t = today()
-    for days in (14, 7, 2):
+    reminder_days = sorted(policy.current()["followUps"]["deadlineReminderDays"], reverse=True)
+    last = reminder_days[-1]
+    for days in reminder_days:
         target = (t + timedelta(days=days)).isoformat()
         async for a in db.applications.find({"deadline": target, "state": "draft"}):
             s = await db.students.find_one({"_id": a["studentId"]})
@@ -67,8 +71,11 @@ async def deadline_reminders() -> None:
                 action=f"Submit {a['university']} application (deadline in {days} days)", rule=f"Application deadline · {days} days before",
                 due_at=local_dt(t.isoformat(), "18:00"), type_="reminder", source_event=f"deadline:app:{a['_id']}:{days}",
             )
-            if days == 2:
-                await notify.email_admins(f"Deadline in 2 days: {s['name']}", f"{a['university']} ({a['course']}) is still a draft; the deadline is {format_date(target)}.", dedupe_key=f"deadline:app:{a['_id']}:2")
+            if days == last:
+                await notify.email_admins(
+                    f"Deadline in {policy.plural(days, 'day')}: {s['name']}", f"{a['university']} ({a['course']}) is still a draft; the deadline is {format_date(target)}.",
+                    dedupe_key=f"deadline:app:{a['_id']}:{days}",
+                )
         async for s in db.students.find({"journey.funding.scholarships": {"$elemMatch": {"deadline": target, "status": "to_apply"}}}):
             for sch in s["journey"]["funding"]["scholarships"]:
                 if sch.get("deadline") == target and sch["status"] == "to_apply":
@@ -114,6 +121,7 @@ async def _loop(name: str, fn, every: int) -> None:
     while True:
         try:
             async with lock(f"job:{name}", timeout_seconds=0, ttl_seconds=max(every * 2, 60)):
+                await policy.refresh_if_stale()  # rules changed on the Settings page, maybe by another process
                 await fn()
         except ApiError:
             pass  # another process is running this job

@@ -790,5 +790,65 @@ class AgencyBody(Body):
     status: Literal["Active", "Inactive"] = "Active"
 
 
+def _mins(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+class WorkingHoursBody(Body):
+    days: list[Annotated[int, Field(ge=0, le=6)]] = Field(min_length=1, max_length=7)
+    start: Time
+    end: Time
+
+    @field_validator("days")
+    @classmethod
+    def unique_days(cls, v: list[int]) -> list[int]:
+        return sorted(set(v))
+
+    @model_validator(mode="after")
+    def sensible(self):
+        if _mins(self.end) - _mins(self.start) < 60:
+            raise ValueError("The working day must end at least an hour after it starts.")
+        return self
+
+
+class QuietHoursBody(Body):
+    start: Time
+    end: Time
+
+    @model_validator(mode="after")
+    def not_same(self):
+        if self.start == self.end:
+            raise ValueError("Quiet hours must start and end at different times.")
+        return self
+
+
+class FollowUpLimitsBody(Body):
+    firstContactMinutes: int = Field(ge=5, le=240)
+    firstContactNextDay: Time
+    bookSessionHours: int = Field(ge=1, le=168)
+    planFollowUpHours: int = Field(ge=1, le=168)
+    documentCheckWorkingDays: int = Field(ge=1, le=10)
+    deadlineReminderDays: list[Annotated[int, Field(ge=1, le=60)]] = Field(min_length=1, max_length=5)
+
+    @field_validator("deadlineReminderDays")
+    @classmethod
+    def unique_days(cls, v: list[int]) -> list[int]:
+        return sorted(set(v), reverse=True)
+
+
+class BusinessRulesBody(Body):
+    """Any of the three sections of the Settings page; each one is saved whole."""
+
+    workingHours: WorkingHoursBody | None = None
+    quietHours: QuietHoursBody | None = None
+    followUps: FollowUpLimitsBody | None = None
+
+    @model_validator(mode="after")
+    def something(self):
+        if not (self.workingHours or self.quietHours or self.followUps):
+            raise ValueError("Nothing to save.")
+        return self
+
 
 DEPARTURE_KEYS = set(DEPARTURE_TASKS)

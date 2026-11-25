@@ -1958,3 +1958,113 @@ async def test_admin_deletes_a_deactivated_staff_user(make_api):
     assert (await db.users.find_one({"_id": new["id"]}))["name"] == "Temp Counsellor"
     assert (await admin.post("/admin/staff", {"name": "Temp Again", "email": "temp.c@ahatin.example", "role": "counsellor"})).status_code == 200
     assert (await admin.delete(f"/admin/staff/{new['id']}")).status_code == 404
+
+
+async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_api, bucket, monkeypatch):
+    from datetime import datetime
+
+    from app.core.clock import add_working_hours, tz
+    from app.services import notify
+    from app.services.workflow import first_contact_due
+
+    def ist(y, m, d, h, mi):
+        return datetime(y, m, d, h, mi, tzinfo=tz())
+
+    # Everyone on the staff side sees the rules; only an admin can change them.
+    counsellor = await make_api()
+    await counsellor.staff_login()
+    body = (await counsellor.get("/settings")).json()
+    assert body["canEdit"] is False and body["workingHours"]["label"] == "Monday – Saturday"
+    assert body["followUpRules"][0]["limit"] == "15 minutes" and body["staffSecurity"]["twoStep"] is True
+    assert (await counsellor.put("/settings", {"quietHours": {"start": "22:00", "end": "07:00"}})).status_code == 403
+
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    assert (await admin.get("/settings")).json()["canEdit"] is True
+    # Checks.
+    assert (await admin.put("/settings", {})).status_code == 422
+    r = await admin.put("/settings", {"workingHours": {"days": [0, 1], "start": "11:00", "end": "11:30"}})
+    assert r.status_code == 422 and "at least an hour" in r.text
+    assert (await admin.put("/settings", {"workingHours": {"days": [], "start": "09:00", "end": "17:00"}})).status_code == 422
+    assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "22:00"}})).status_code == 422
+    assert (await admin.put("/settings", {"quietHours": {"start": "25:00", "end": "07:00"}})).status_code == 422
+    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "deadlineReminderDays": [2, 10, 5]}
+    r = await admin.put("/settings", {"followUps": limits})
+    assert r.status_code == 400 and "within working hours" in r.text
+
+    r = await admin.put(
+        "/settings",
+        {
+            "workingHours": {"days": [4, 0, 1, 2, 3, 0], "start": "09:00", "end": "17:00"},
+            "quietHours": {"start": "22:00", "end": "07:00"},
+            "followUps": {**limits, "firstContactNextDay": "10:00"},
+        },
+    )
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["workingHours"]["days"] == [0, 1, 2, 3, 4] and out["workingHours"]["label"] == "Monday – Friday"
+    assert out["followUpLimits"]["deadlineReminderDays"] == [10, 5, 2]
+    rows = {row["trigger"]: row for row in out["followUpRules"]}
+    assert rows["New enquiry (working hours)"]["limit"] == "30 minutes"
+    assert rows["New enquiry (out of hours)"]["limit"] == "10:00 next working day"
+    assert rows["Contacted, no session booked"]["limit"].startswith("24 hours")
+    assert rows["Plan shared, not registered"] == {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": "72 hours", "escalation": "Manager alerted", "setting": "planFollowUpHours"}
+    assert "Assessment done" not in rows
+    assert rows["Document uploaded"]["limit"] == "2 working days"
+    assert rows["Application or scholarship deadline"]["limit"] == "10, 5 and 2 days before"
+    assert rows["Application or scholarship deadline"]["escalation"] == "Manager alerted at 2 days"
+    logged = await get_db().audit_log.find_one({"action": "settings.update"})
+    assert logged["data"]["before"]["quietHours"] == {"start": "21:00", "end": "08:00"} and logged["data"]["after"]["quietHours"]["start"] == "22:00"
+    assert (await counsellor.get("/settings")).json()["quietHours"] == {"start": "22:00", "end": "07:00"}
+    # The staff affected are told what changed; officers only about the rules that apply to them; not the admin who saved.
+    db = get_db()
+    c_alert = await db.staff_alerts.find_one({"userId": "c1", "key": "rules-changed"})
+    assert c_alert["title"] == "Follow-up rules changed" and "Plan shared, not registered: follow up within 72 hours (was 48 hours)" in c_alert["text"]
+    officer = await db.users.find_one({"role": {"$in": ["finance_officer", "visa_officer"]}, "status": "active"})
+    o_alert = await db.staff_alerts.find_one({"userId": officer["_id"], "key": "rules-changed"})
+    assert "Working hours" in o_alert["text"] and "Plan shared" not in o_alert["text"]
+    admin_id = (await db.users.find_one({"email": "demo.admin@ahatin.example"}))["_id"]
+    assert not await db.staff_alerts.find_one({"userId": admin_id, "key": "rules-changed"})
+    assert await db.notifications.find_one({"subject": "Follow-up rules changed"})
+    # Saving the same values again tells no one.
+    await db.staff_alerts.delete_many({"key": "rules-changed"})
+    assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "07:00"}})).status_code == 200
+    assert not await db.staff_alerts.find_one({"key": "rules-changed"})
+
+    # Working hours: Monday–Friday 09:00–17:00 (Wednesday 25 November 2026).
+    assert first_contact_due(ist(2026, 11, 25, 12, 0)) == ist(2026, 11, 25, 12, 30)
+    assert first_contact_due(ist(2026, 11, 25, 16, 45)) == ist(2026, 11, 26, 10, 0)  # 30 minutes would run past 17:00
+    assert first_contact_due(ist(2026, 11, 25, 8, 0)) == ist(2026, 11, 25, 10, 0)  # before opening: that morning
+    assert first_contact_due(ist(2026, 11, 27, 18, 0)) == ist(2026, 11, 30, 10, 0)  # Friday evening: Monday (Saturday is now off)
+    assert add_working_hours(ist(2026, 11, 27, 15, 0), 8) == ist(2026, 11, 30, 15, 0)  # one 8-hour working day
+
+    # Quiet hours: 22:00–07:00.
+    real_clock = notify.local_now
+    monkeypatch.setattr(notify, "local_now", lambda: ist(2026, 11, 25, 21, 30))
+    assert not notify.in_quiet_hours()
+    monkeypatch.setattr(notify, "local_now", lambda: ist(2026, 11, 25, 23, 0))
+    assert notify.in_quiet_hours() and notify._after_quiet_hours() == ist(2026, 11, 26, 7, 0)
+    monkeypatch.setattr(notify, "local_now", lambda: ist(2026, 11, 26, 6, 30))
+    assert notify.in_quiet_hours() and notify._after_quiet_hours() == ist(2026, 11, 26, 7, 0)
+    monkeypatch.setattr(notify, "local_now", real_clock)
+
+    # New follow-ups use the new limits.
+    t0 = now()
+    assert (await admin.post("/leads/l1/contacts", {"channel": "Call", "outcome": "Reached"})).status_code == 200
+    book = await get_db().follow_ups.find_one({"personId": "l1", "sourceEvent": "lead:l1:book"})
+    assert book["rule"] == "Contacted, no session booked · 24 hours"
+    assert timedelta(hours=23, minutes=59) < book["dueAt"].replace(tzinfo=t0.tzinfo) - t0 < timedelta(hours=24, minutes=1)
+    # Marking a lead "Assessed / plan shared" (the stage itself is unchanged) gives a follow-up with the saved hours.
+    assert (await admin.post("/leads/l4/stage", {"stage": "assessed"})).status_code == 200
+    plan = await get_db().follow_ups.find_one({"personId": "l4", "sourceEvent": "lead:l4:plan"})
+    assert plan["action"] == "Follow up on shared plan" and plan["rule"] == "Plan shared, not registered · 72 hours"
+    assert timedelta(hours=71, minutes=59) < plan["dueAt"].replace(tzinfo=t0.tzinfo) - t0 < timedelta(hours=72, minutes=1)
+    assert (await get_db().leads.find_one({"_id": "l4"}))["stage"] == "assessed"
+    student = await make_api()
+    await student.student_login()
+    pdf = b"%PDF-1.4 sample cv" + b"." * (60 * 1024)
+    up = (await student.post("/students/s1/documents/d8/upload-url", {"fileName": "cv.pdf", "contentType": "application/pdf", "size": len(pdf)})).json()
+    bucket.put_url(up["url"], pdf)
+    assert (await student.post("/students/s1/documents/d8/upload-complete", {"uploadId": up["uploadId"]})).status_code == 200
+    check = await get_db().follow_ups.find_one({"personId": "s1", "action": "Verify uploaded document: Updated CV", "done": False})
+    assert check["rule"] == "Document uploaded · 2 working days"

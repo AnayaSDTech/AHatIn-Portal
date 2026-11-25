@@ -58,14 +58,19 @@ def add_days_iso(n: int, base: date | None = None) -> str:
 
 
 def add_working_hours(start: datetime, hours: float) -> datetime:
-    """Adds working time (Mon–Sat, 10:00–19:00 business time) to a moment."""
+    """Adds working time (the working days and hours on the Settings page, business time) to a moment."""
+    from app.core import policy
+
+    wh = policy.current()["workingHours"]
+    days = set(wh["days"]) or {0, 1, 2, 3, 4, 5}  # never loop forever on an empty list
+    (sh, sm), (eh, em) = (map(int, wh["start"].split(":")), map(int, wh["end"].split(":")))
     remaining = timedelta(hours=hours)
     t = start.astimezone(tz())
     while remaining > timedelta(0):
-        day_start = t.replace(hour=10, minute=0, second=0, microsecond=0)
-        day_end = t.replace(hour=19, minute=0, second=0, microsecond=0)
-        if t.weekday() == 6 or t >= day_end:  # Sunday, or after hours: next working morning
-            t = (t + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+        day_start = t.replace(hour=sh, minute=sm, second=0, microsecond=0)
+        day_end = t.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if t.weekday() not in days or t >= day_end:  # a day off, or after hours: the next working morning
+            t = (t + timedelta(days=1)).replace(hour=sh, minute=sm, second=0, microsecond=0)
             continue
         if t < day_start:
             t = day_start

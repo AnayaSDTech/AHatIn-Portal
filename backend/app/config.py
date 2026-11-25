@@ -98,6 +98,20 @@ class Settings(BaseSettings):
     def is_dev(self) -> bool:
         return self.app_env in ("development", "test")
 
+    @property
+    def uses_test_database(self) -> bool:
+        """A MongoDB on this computer, or a database named for testing (…_test, …_e2e). A developer's .env can point a
+        development backend at the live database, so development mode alone doesn't mean the data is disposable."""
+        rest = self.mongodb_uri.split("://", 1)[-1]
+        hosts = rest.split("/", 1)[0].rsplit("@", 1)[-1]
+        local = all(h.split(":")[0].strip("[]") in ("localhost", "127.0.0.1", "::1") for h in hosts.split(",") if h)
+        return local or self.mongodb_db.endswith(("_test", "_e2e"))
+
+    @property
+    def can_load_demo_data(self) -> bool:
+        """Loading (or resetting) the demo data replaces business data, so only in development and only on a test database."""
+        return self.is_dev and self.uses_test_database
+
     def show_demo_codes(self, email: str) -> bool:
         """Whether a staff member's authenticator code is shown on screen (the "Demo authenticator app"). Only for
         accounts that aren't real people: the demo accounts (in development, or with DEMO_LOGINS on) and, in

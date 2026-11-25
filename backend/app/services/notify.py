@@ -12,6 +12,7 @@ import httpx
 from pymongo.errors import DuplicateKeyError
 
 from app.config import get_settings, undeliverable
+from app.core import policy
 from app.core.clock import local_now, now
 from app.db import get_db, new_id
 
@@ -93,9 +94,17 @@ async def email_admins(subject: str, body: str, dedupe_key: str | None = None, *
         await queue_email(r, subject, body, dedupe_key=f"{dedupe_key}:{r}" if dedupe_key else None)
 
 
+def _quiet_window() -> tuple[int, int]:
+    q = policy.current()["quietHours"]
+    return policy.minutes(q["start"]), policy.minutes(q["end"])
+
+
 def in_quiet_hours() -> bool:
-    h = local_now().hour
-    return h >= 21 or h < 8
+    """Quiet hours from the Settings page; the window may run past midnight (21:00–08:00)."""
+    start, end = _quiet_window()
+    t = local_now()
+    mins = t.hour * 60 + t.minute
+    return (start <= mins or mins < end) if start > end else start <= mins < end
 
 
 async def _send_resend(n: dict) -> None:
@@ -202,7 +211,8 @@ async def email_counsellor(
 def _after_quiet_hours() -> datetime | None:
     if not in_quiet_hours():
         return None
+    start, end = _quiet_window()
     t = local_now()
-    if t.hour >= 21:
+    if start > end and t.hour * 60 + t.minute >= start:  # evening part of an overnight window: ends tomorrow morning
         t = t + timedelta(days=1)
-    return t.replace(hour=8, minute=0, second=0, microsecond=0)
+    return t.replace(hour=end // 60, minute=end % 60, second=0, microsecond=0)

@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from app import career, universities
 from app.config import get_settings
+from app.core import policy
 from app.core.audit import audit
 from app.core.auth import Admin, CurrentUser, Staff, is_staff
 from app.core.clock import iso, now, now_iso
@@ -67,7 +68,7 @@ from app.services import notify, storage
 from app.services.assignment import assign_counsellor, assign_default_officers, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
 from app.services.team import COUNSELLOR_HANDLES, applications_done, assign_officer, check_handover, cover_by_counsellor, covered, owner_for, require_area, team_of
-from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
+from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now, working_days_from_now
 
 router = APIRouter(tags=["students"])
 
@@ -872,14 +873,15 @@ async def finish_upload(student: dict, doc_id: str, body: UploadCompleteBody, *,
     if previous_key and previous_key != up["key"]:
         await storage.delete(previous_key)
     await add_note(sid, by, f"Uploaded “{up['fileName']}” for {d['name']}.")
+    check_days = policy.current()["followUps"]["documentCheckWorkingDays"]
     await create_follow_up(
         counsellor_id=owner_for(student, DOC_AREA.get(d.get("category", "general"), "counsellor")),
         person=student["name"],
         person_id=sid,
         person_type="student",
         action=f"Verify uploaded document: {d['name']}",
-        rule="Document uploaded · 1 working day",
-        due_at=one_working_day_from_now(),
+        rule=f"Document uploaded · {policy.plural(check_days, 'working day')}",
+        due_at=working_days_from_now(check_days),
         type_="verify",
         source_event=f"doc:{doc_id}:{up['_id']}",
     )

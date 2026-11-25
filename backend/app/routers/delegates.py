@@ -10,6 +10,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Request
 
 from app.config import get_settings
+from app.core import policy
 from app.core.audit import audit
 from app.core.auth import CurrentUser, is_staff
 from app.core.clock import iso, now
@@ -139,5 +140,5 @@ async def delegate_upload_complete(token: str, doc_id: str, body: UploadComplete
     by = f"{d['name']} ({d['relation']})"
     await finish_upload(student, doc_id, body, actor=None, by=by, uploaded_by=by)
     await get_db().delegates.update_one({"_id": d["_id"]}, {"$inc": {"uploads": 1}, "$set": {"lastUsedAt": now()}})
-    await notify.email_student(student, f"{d['name']} uploaded a document", f"{d['name']} uploaded {doc['name']} for you. We'll check it within 1 working day.")
+    await notify.email_student(student, f"{d['name']} uploaded a document", f"{d['name']} uploaded {doc['name']} for you. We'll check it within {policy.plural(policy.current()['followUps']['documentCheckWorkingDays'], 'working day')}.")
     return {"ok": True}

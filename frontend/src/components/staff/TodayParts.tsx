@@ -8,7 +8,8 @@ import { useStaffNotifications } from '../../hooks/useStaffData';
 import { api } from '../../lib/api/client';
 import { act } from '../../lib/api/store';
 import type { Session } from '../../lib/scheduling';
-import { cn, initials, relativeTime } from '../../lib/utils';
+import { cn, formatDateTime, initials, relativeTime } from '../../lib/utils';
+import { InfoTip } from '../ui/InfoTip';
 
 /* The building blocks of the staff "Today" dashboards (counsellors, admins and officers). */
 
@@ -195,6 +196,17 @@ export function TasksSection({ tasks, current, onTab, showCounsellor }: { tasks:
                 <span className={cn('shrink-0 text-xs font-semibold', late ? 'text-red-600' : f.done ? 'text-emerald-600' : 'text-navy-400')}>
                   {f.done ? 'Done' : late ? `${relativeTime(f.dueAt).replace(' ago', '')} late` : relativeTime(f.dueAt)}
                 </span>
+                <InfoTip label={`Time limit for: ${f.action}, ${f.person}`} align="right" className="shrink-0">
+                  {f.rule && (
+                    <span className="block">
+                      <span className="font-semibold text-gold-300">Rule:</span> {f.rule}
+                    </span>
+                  )}
+                  <span className="mt-1 block">
+                    <span className="font-semibold text-gold-300">Due:</span> {formatDateTime(f.dueAt)}
+                  </span>
+                  {!f.done && <span className="mt-1.5 block text-navy-300">If it isn't done in time, managers are alerted.</span>}
+                </InfoTip>
                 {!f.done && (
                   <button
                     type="button"

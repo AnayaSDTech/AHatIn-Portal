@@ -5,6 +5,7 @@ from datetime import timedelta
 from fastapi import APIRouter
 
 from app.config import get_settings
+from app.core import policy
 from app.core.audit import audit
 from app.core.auth import Admin, CurrentUser, Staff, is_staff, public_user
 from app.core.clock import iso, now
@@ -12,9 +13,9 @@ from app.core.errors import ApiError, not_found
 from app.core.scope import active_grant_filter, scope_for, visible_lead
 from app import matching
 from app.db import get_db
-from app.domain import FOLLOW_UP_RULES, LEAD_STAGES, STAGE_LABELS, stage_index
+from app.domain import LEAD_STAGES, STAGE_LABELS, follow_up_rules, stage_index
 from app.records import serialize_alert, serialize_counsellor, serialize_follow_up, serialize_grant, serialize_lead
-from app.schemas import ContactBody, LeadStageBody, MatchingProfileBody, OwnNameBody, ReassignBody
+from app.schemas import BusinessRulesBody, ContactBody, LeadStageBody, MatchingProfileBody, OwnNameBody, ReassignBody
 from app.services import notify
 from app.services.students import own_record
 from app.services.team import team_of
@@ -140,9 +141,11 @@ async def log_contact(lead_id: str, body: ContactBody, user: Staff):
     if body.outcome == "Reached":
         await close_follow_ups(f"lead:{lead_id}:first-contact")
     if reached_new:
+        hours = policy.current()["followUps"]["bookSessionHours"]
         await create_follow_up(
             counsellor_id=lead["counsellorId"], person=lead["name"], person_id=lead_id, person_type="lead",
-            action="Book an assessment session", rule="Contacted, no session booked · 48 hours", due_at=t + timedelta(hours=48), type_="call", source_event=f"lead:{lead_id}:book",
+            action="Book an assessment session", rule=f"Contacted, no session booked · {policy.plural(hours, 'hour')}", due_at=t + timedelta(hours=hours), type_="call",
+            source_event=f"lead:{lead_id}:book",
         )
     return serialize_lead(lead)
 
@@ -164,9 +167,11 @@ async def set_lead_stage(lead_id: str, body: LeadStageBody, user: Staff):
         await close_follow_ups(f"lead:{lead_id}:book")
         await close_follow_ups(f"lead:{lead_id}:first-contact")
     if body.stage == "assessed":
+        hours = policy.current()["followUps"]["planFollowUpHours"]  # editable on the Settings page
         await create_follow_up(
             counsellor_id=lead["counsellorId"], person=lead["name"], person_id=lead_id, person_type="lead",
-            action="Follow up on shared plan", rule="Plan shared, not registered · 48 hours", due_at=now() + timedelta(hours=48), type_="call", source_event=f"lead:{lead_id}:plan",
+            action="Follow up on shared plan", rule=f"Plan shared, not registered · {policy.plural(hours, 'hour')}", due_at=now() + timedelta(hours=hours), type_="call",
+            source_event=f"lead:{lead_id}:plan",
         )
     return serialize_lead(lead)
 
@@ -250,16 +255,87 @@ async def list_agencies(user: Staff):
     return await agencies_with_counts()
 
 
+def _settings_out(user: dict) -> dict:
+    s = get_settings()
+    rules = policy.current()
+    wh = rules["workingHours"]
+    return {
+        "workingHours": {**wh, "label": policy.days_label(wh["days"])},
+        "quietHours": rules["quietHours"],
+        "followUpLimits": rules["followUps"],
+        # Security settings stay in the server configuration, not on this page.
+        "staffSecurity": {"twoStep": True, "idleMinutes": s.staff_idle_minutes, "maxHours": s.staff_max_hours},
+        "followUpRules": follow_up_rules(),
+        "canEdit": user["role"] == "admin",
+        # The "Reset demo data" panel: development on a test database only, never against live data.
+        "demoTools": s.can_load_demo_data,
+    }
+
+
 @router.get("/settings")
 async def settings(user: Staff):
-    s = get_settings()
-    return {
-        "workingHours": {"days": "Monday – Saturday", "start": "10:00", "end": "19:00"},
-        "quietHours": {"start": "21:00", "end": "08:00"},
-        "staffSecurity": {"twoStep": True, "idleMinutes": s.staff_idle_minutes, "maxHours": s.staff_max_hours},
-        "followUpRules": FOLLOW_UP_RULES,
-        "demoTools": s.is_dev,
-    }
+    await policy.reload()  # always the saved values here, not a cached copy
+    return _settings_out(user)
+
+
+@router.put("/settings")
+async def update_settings(body: BusinessRulesBody, user: Admin):
+    """Admins change working hours, quiet hours or follow-up time limits. New follow-ups use the new values; ones already in staff
+    lists keep their due times."""
+    changes = body.model_dump(exclude_none=True)
+    current = await policy.reload()
+    wh = changes.get("workingHours", current["workingHours"])
+    fu = changes.get("followUps", current["followUps"])
+    if not policy.minutes(wh["start"]) <= policy.minutes(fu["firstContactNextDay"]) < policy.minutes(wh["end"]):
+        message = f"Choose a time within working hours ({wh['start']}–{wh['end']})."
+        raise ApiError(400, message, {"firstContactNextDay": message})
+    before, after = await policy.save(changes)
+    await audit(user, "settings.update", "settings", policy.DOC_ID, {"before": {k: before[k] for k in changes}, "after": {k: after[k] for k in changes}})
+    await _tell_staff_about_rule_changes(before, after, user)
+    return _settings_out(user)
+
+
+def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, bool]]:
+    """(rule, new value, old value, leads only) for each changed rule that sets a deadline for staff."""
+    p = policy
+    wh = lambda w: f"{p.days_label(w['days'])}, {w['start']}–{w['end']} IST"  # noqa: E731
+    rules = [
+        ("workingHours", None, "Working hours", wh, False),
+        ("followUps", "firstContactMinutes", "New enquiry, in working hours", lambda v: f"make first contact within {p.plural(v, 'minute')}", True),
+        ("followUps", "firstContactNextDay", "New enquiry, out of hours", lambda v: f"make first contact by {v} on the next working day", True),
+        ("followUps", "bookSessionHours", "Contacted, no session booked", lambda v: f"follow up within {p.plural(v, 'hour')}", True),
+        ("followUps", "planFollowUpHours", "Plan shared, not registered", lambda v: f"follow up within {p.plural(v, 'hour')}", True),
+        ("followUps", "documentCheckWorkingDays", "Document uploaded", lambda v: f"verify or reject within {p.plural(v, 'working day')}", False),
+        ("followUps", "deadlineReminderDays", "Application and scholarship deadlines", lambda v: f"reminders {p.deadline_days_label(v)}", False),
+    ]
+    out = []
+    for section, key, label, show, leads_only in rules:
+        old = before[section] if key is None else before[section][key]
+        new = after[section] if key is None else after[section][key]
+        if old != new:
+            out.append((label, show(new), show(old), leads_only))
+    return out
+
+
+async def _tell_staff_about_rule_changes(before: dict, after: dict, admin: dict) -> None:
+    """A changed deadline is shown to the staff it affects (notification and email): counsellors for lead rules, and every counsellor,
+    officer and the other admins for rules about students and working hours. Quiet hours only affect emails to students, so no one is told."""
+    changes = _rule_changes(before, after)
+    if not changes:
+        return
+    everyone = ("counsellor", "officer", "finance_officer", "visa_officer", "admin")
+    roles = ("counsellor",) if all(leads_only for *_, leads_only in changes) else everyone
+    t = now()
+    async for u in get_db().users.find({"role": {"$in": list(roles)}, "status": "active", "_id": {"$ne": admin["_id"]}}, {"role": 1}):
+        mine = [c for c in changes if not c[3] or u["role"] in ("counsellor", "admin")]  # lead rules only matter to those who handle leads
+        if not mine:
+            continue
+        lines = "\n".join(f"• {label}: {new} (was {old})." for label, new, old, _ in mine)
+        text = f"{admin['name']} changed the follow-up rules:\n{lines}\nNew follow-ups use the new times; tasks already in your list keep their due times."
+        await notify.email_counsellor(
+            u["_id"], "Follow-up rules changed", text, path="/admin/settings" if u["role"] == "admin" else "/staff",
+            dedupe_key=f"rules-changed:{t.timestamp()}:{u['_id']}", kind="update", alert_key="rules-changed",
+        )
 
 
 __all__ = ["router", "iso"]
