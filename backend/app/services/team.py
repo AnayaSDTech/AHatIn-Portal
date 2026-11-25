@@ -13,7 +13,7 @@ without an officer stays in the admin's officer queue until one is assigned. Onc
 from app.core.clock import now
 from app.core.errors import ApiError
 from app.db import get_db
-from app.domain import AREA_OF_ROLE, OFFICER_FIELD, OFFICER_TITLE
+from app.domain import AREA_OF_ROLE, DOC_AREA, OFFICER_FIELD, OFFICER_TITLE
 from app.records import add_note, serialize_counsellor
 from app.services import notify
 from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
@@ -170,6 +170,28 @@ async def cover_by_counsellor(student: dict, area: str, by: dict, reason: str) -
         )
 
 
+async def follow_up_area(f: dict) -> str:
+    """Whose area a student's follow-up belongs to (counsellor, finance or visa), from the event that created it."""
+    event = f.get("sourceEvent") or ""
+    if event.startswith(("arrival:", "visa:")):
+        return "visa"
+    if event.startswith("deadline:sch:"):
+        return "finance"
+    if event.startswith("doc:"):
+        doc = await get_db().documents.find_one({"_id": event.split(":")[1]}, {"category": 1})
+        return DOC_AREA.get((doc or {}).get("category", "general"), "counsellor")
+    return "counsellor"
+
+
+async def move_area_follow_ups(sid: str, area: str, from_id: str, to_id: str) -> int:
+    """Moves a student's open follow-ups for one area from one staff member to another; returns how many moved."""
+    db = get_db()
+    ids = [f["_id"] async for f in db.follow_ups.find({"personId": sid, "done": False, "counsellorId": from_id}) if await follow_up_area(f) == area]
+    if ids:
+        await db.follow_ups.update_many({"_id": {"$in": ids}}, {"$set": {"counsellorId": to_id}})
+    return len(ids)
+
+
 async def assign_officer(student: dict, area: str, officer: dict, by: dict, reason: str) -> None:
     db = get_db()
     field = OFFICER_FIELD[area]
@@ -183,6 +205,10 @@ async def assign_officer(student: dict, area: str, officer: dict, by: dict, reas
     if previous:
         await db.follow_ups.update_many({"personId": sid, "done": False, "counsellorId": previous}, {"$set": {"counsellorId": officer["_id"]}})
         await db.staff_alerts.delete_many({"userId": previous, "studentId": sid})
+    elif student.get("counsellorId"):
+        # The counsellor was looking after this area: its open tasks (e.g. the arrival check-in) go to the new officer;
+        # the counsellor's own tasks stay with them.
+        await move_area_follow_ups(sid, area, student["counsellorId"], officer["_id"])
     await add_note(sid, by["name"], f"{'Changed' if previous else 'Assigned'} {title}: {officer['name']}. {reason}")
     await notify.alert_student(sid, f"{officer['name']} is your {title}", target="counsellor", kind="team")
     first = officer["name"].split(" ")[0]

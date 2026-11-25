@@ -829,6 +829,7 @@ class FollowUpLimitsBody(Body):
     bookSessionHours: int = Field(ge=1, le=168)
     planFollowUpHours: int = Field(ge=1, le=168)
     documentCheckWorkingDays: int = Field(ge=1, le=10)
+    arrivalCheckInDays: int = Field(ge=1, le=30)
     deadlineReminderDays: list[Annotated[int, Field(ge=1, le=60)]] = Field(min_length=1, max_length=5)
 
     @field_validator("deadlineReminderDays")

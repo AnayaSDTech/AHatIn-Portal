@@ -1076,9 +1076,11 @@ async def confirm_arrival(sid: str, user: CurrentUser):
     await _journey(sid, fn)
     await advance_stage(sid, "arrived")
     await add_note(sid, actor_name(user), "Confirmed safe arrival.")
+    days = policy.current()["followUps"]["arrivalCheckInDays"]  # editable on the Settings page
     await create_follow_up(
         counsellor_id=owner_for(student, "visa"), person=student["name"], person_id=sid, person_type="student",
-        action="1-week check-in after arrival", rule="After arrival · 1 week", due_at=now() + timedelta(days=7), type_="checkin", source_event=f"arrival:{sid}",
+        action=f"Check in after arrival ({policy.plural(days, 'day')})", rule=f"Student confirmed safe arrival · {policy.plural(days, 'day')}",
+        due_at=now() + timedelta(days=days), type_="checkin", source_event=f"arrival:{sid}",
     )
     await notify.email_counsellor(owner_for(student, "visa"), f"{student['name']} has arrived safely", f"{student['name']} confirmed their safe arrival.", path=f"/staff/students/{sid}")
     return await load_student(sid)

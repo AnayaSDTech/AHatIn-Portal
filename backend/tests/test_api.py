@@ -902,7 +902,9 @@ async def test_full_student_journey(make_api, bucket, monkeypatch):
     assert (await student.post(f"/students/{sid}/arrival")).status_code == 200
     rec = await snap("Arrived")
     assert rec["stage"] == "arrived"
-    assert await db.follow_ups.find_one({"sourceEvent": f"arrival:{sid}", "counsellorId": "u7", "done": False})
+    arrival = await db.follow_ups.find_one({"sourceEvent": f"arrival:{sid}", "counsellorId": "u7", "done": False})
+    assert arrival["action"] == "Check in after arrival (7 days)" and arrival["rule"] == "Student confirmed safe arrival · 7 days"
+    assert timedelta(days=6, hours=23) < arrival["dueAt"].replace(tzinfo=now().tzinfo) - now() <= timedelta(days=7)
     assert (await sneha.post(f"/students/{sid}/final-check-in", {"note": "Settled in well, classes started."})).status_code == 200
     rec = await snap("Final check-in")
     assert rec["stage"] == "settled" and not await open_follow_up(f"arrival:{sid}")
@@ -1938,6 +1940,22 @@ async def test_counsellor_handles_an_officer_area(make_api):
     assert (await db.follow_ups.find_one({"_id": "fu-test"}))["counsellorId"] == "c1"
     assert rec["officerHistory"][-1]["from"] == "u6" and rec["officerHistory"][-1]["to"] == "counsellor"
 
+    # When an officer is assigned to an area the counsellor was covering, the counsellor's open tasks for THAT area go to the
+    # officer; the counsellor's own tasks stay with them.
+    def task(_id, event):
+        return {"_id": _id, "counsellorId": "c1", "person": "Ananya", "personId": "s1", "personType": "student", "action": _id, "rule": "", "dueAt": now(), "type": "reminder", "done": False, "sourceEvent": event}
+
+    await db.follow_ups.insert_many([task("t-sch", "deadline:sch:x:7"), task("t-app", "deadline:app:x:7"), task("t-arrival", "arrival:s1")])
+    rec = (await admin.post("/students/s1/officer", {"kind": "finance", "officerId": "u6"})).json()
+    assert rec["financeOfficerId"] == "u6"
+    owners = {f["_id"]: f["counsellorId"] async for f in db.follow_ups.find({"_id": {"$in": ["t-sch", "t-app", "t-arrival", "fu-test"]}})}
+    assert owners == {"t-sch": "u6", "t-app": "c1", "t-arrival": "c1", "fu-test": "c1"}, owners
+    visa = await db.users.find_one({"role": "visa_officer", "status": "active"})
+    await db.students.update_one({"_id": "s1"}, {"$set": {"visaOfficerId": None}, "$pull": {"counsellorCovers": "visa"}})
+    assert (await admin.post("/students/s1/officer", {"kind": "visa", "officerId": visa["_id"]})).status_code == 200
+    assert (await db.follow_ups.find_one({"_id": "t-arrival"}))["counsellorId"] == visa["_id"]
+    assert (await db.follow_ups.find_one({"_id": "t-app"}))["counsellorId"] == "c1"
+
 
 async def test_admin_deletes_a_deactivated_staff_user(make_api):
     admin = await make_api()
@@ -1988,7 +2006,7 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await admin.put("/settings", {"workingHours": {"days": [], "start": "09:00", "end": "17:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "22:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "25:00", "end": "07:00"}})).status_code == 422
-    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "deadlineReminderDays": [2, 10, 5]}
+    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "deadlineReminderDays": [2, 10, 5]}
     r = await admin.put("/settings", {"followUps": limits})
     assert r.status_code == 400 and "within working hours" in r.text
 
@@ -2010,6 +2028,8 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert rows["Contacted, no session booked"]["limit"].startswith("24 hours")
     assert rows["Plan shared, not registered"] == {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": "72 hours", "escalation": "Manager alerted", "setting": "planFollowUpHours"}
     assert "Assessment done" not in rows
+    assert rows["Student confirms safe arrival"] == {"trigger": "Student confirms safe arrival", "action": "Check in with the student", "limit": "10 days", "escalation": "Manager alerted", "setting": "arrivalCheckInDays"}
+    assert "Planned arrival" not in rows
     assert rows["Document uploaded"]["limit"] == "2 working days"
     assert rows["Application or scholarship deadline"]["limit"] == "10, 5 and 2 days before"
     assert rows["Application or scholarship deadline"]["escalation"] == "Manager alerted at 2 days"
@@ -2027,6 +2047,7 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert "• Plan shared, not registered: follow up within 72 hours (was 48 hours)." in c_email["body"]
     assert "• Application and scholarship deadlines: reminders 10, 5 and 2 days before (was 14, 7 and 2 days before)." in c_email["body"]
     assert "• New enquiry, out of hours: make first contact on the next working day by 10:00 (was 11:00)." in c_email["body"]
+    assert "• Student confirms safe arrival: check in within 10 days (was 7 days)." in c_email["body"]
     officer = await db.users.find_one({"role": {"$in": ["finance_officer", "visa_officer"]}, "status": "active"})
     o_alert = await db.staff_alerts.find_one({"userId": officer["_id"], "key": "rules-changed"})
     assert "Working hours" in o_alert["text"] and "Plan shared" not in o_alert["text"]

@@ -136,7 +136,7 @@ def follow_up_rules() -> list[dict]:
         {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": policy.plural(fu["planFollowUpHours"], "hour"), "escalation": "Manager alerted", "setting": "planFollowUpHours"},
         {"trigger": "Document uploaded", "action": "Verify or reject", "limit": policy.plural(fu["documentCheckWorkingDays"], "working day"), "escalation": "Manager alerted", "setting": "documentCheckWorkingDays"},
         {"trigger": "Application or scholarship deadline", "action": "Remind student and staff", "limit": policy.deadline_days_label(days), "escalation": f"Manager alerted at {policy.plural(days[-1], 'day')}", "setting": "deadlineReminderDays"},
-        {"trigger": "Planned arrival", "action": "Confirm safe arrival", "limit": "24 hours", "escalation": "Counsellor and manager alerted"},
+        {"trigger": "Student confirms safe arrival", "action": "Check in with the student", "limit": policy.plural(fu["arrivalCheckInDays"], "day"), "escalation": "Manager alerted", "setting": "arrivalCheckInDays"},
         {"trigger": "Urgent support message", "action": "Respond", "limit": "2 hours, any day", "escalation": "Manager alerted immediately"},
     ]
 

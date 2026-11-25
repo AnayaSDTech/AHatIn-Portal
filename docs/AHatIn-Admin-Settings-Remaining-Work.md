@@ -14,7 +14,7 @@ The Settings page has four panels. Admins can now edit three of them; staff see 
 | --- | --- | --- |
 | **Working hours** (days, opening and closing time, IST) | Yes | "Working day" deadlines skip days off and count only working time. New-enquiry due times use it. |
 | **Quiet hours** (start and end, may run past midnight) | Yes | Non-urgent emails to students are held until quiet hours end. Login codes and other urgent emails are sent straight away. |
-| **Follow-up rules** (time limits only) | Yes, for six limits | First reply to a new enquiry (minutes); out-of-hours reply time on the next working day; "contacted, no session booked" (hours); "plan shared, not registered" (hours, added in Task 2.1); document check (working days); deadline reminder days (e.g. 14, 7, 2). |
+| **Follow-up rules** (time limits only) | Yes, for seven limits | First reply to a new enquiry (minutes); out-of-hours reply time on the next working day; "contacted, no session booked" (hours); "plan shared, not registered" (hours, added in Task 2.1); document check (working days); check-in after a student confirms arrival (days, added in Task 2.2); deadline reminder days (e.g. 14, 7, 2). |
 | **Staff security** | No, by design | 2-step verification is always required. Idle sign-out (30 minutes) and maximum session (12 hours) stay in the server configuration. |
 
 How the editable settings work:
@@ -112,6 +112,8 @@ These apply to all four phases:
 **Tests:** marking a lead "Assessed / plan shared" creates the follow-up with the saved number of hours.
 
 ### Task 2.2: "Planned arrival: confirm safe arrival within 24 hours"
+
+**Status:** built on 25 November 2026, not released yet. The row now reads "Student confirms safe arrival → Check in with the student → 7 days → Manager alerted", and the days are editable on the Settings page. The staff task now reads "Check in after arrival (7 days)".
 
 **Today:**
 - The **Pre-departure** stage has a checklist of six tick-boxes: accommodation, flight, insurance, money, briefing and documents. **No travel or arrival date** is recorded.

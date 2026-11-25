@@ -307,6 +307,7 @@ def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, bool]]
         ("followUps", "bookSessionHours", "Contacted, no session booked: follow up within", lambda v: p.plural(v, "hour"), True),
         ("followUps", "planFollowUpHours", "Plan shared, not registered: follow up within", lambda v: p.plural(v, "hour"), True),
         ("followUps", "documentCheckWorkingDays", "Document uploaded: verify or reject within", lambda v: p.plural(v, "working day"), False),
+        ("followUps", "arrivalCheckInDays", "Student confirms safe arrival: check in within", lambda v: p.plural(v, "day"), False),
         ("followUps", "deadlineReminderDays", "Application and scholarship deadlines: reminders", p.deadline_days_label, False),
     ]
     out = []
