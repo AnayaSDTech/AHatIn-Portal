@@ -25,6 +25,7 @@ DEFAULTS: dict[str, Any] = {
         "firstContactMinutes": 15,  # new enquiry during working hours
         "firstContactNextDay": "11:00",  # new enquiry out of hours: by this time on the next working day
         "bookSessionHours": 48,  # lead contacted, no session booked yet
+        "nextFollowUpDays": 7,  # …then, after each further contact attempt, the next follow-up
         "planFollowUpHours": 48,  # lead marked "Assessed / plan shared", not registered yet
         "documentCheckWorkingDays": 1,  # verify or reject an uploaded document
         "arrivalCheckInDays": 7,  # check in with a student after they confirm their safe arrival

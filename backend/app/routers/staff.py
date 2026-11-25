@@ -137,6 +137,7 @@ async def log_contact(lead_id: str, body: ContactBody, user: Staff):
     if reached_new:
         # Reaching a new lead moves it to "Contacted" automatically.
         extra["stage"] = "contacted"
+    was_contacted = lead["stage"] == "contacted"
     lead = await _push_activity(lead_id, activity, extra)
     if body.outcome == "Reached":
         await close_follow_ups(f"lead:{lead_id}:first-contact")
@@ -147,7 +148,53 @@ async def log_contact(lead_id: str, body: ContactBody, user: Staff):
             action="Book an assessment session", rule=f"Contacted, no session booked · {policy.plural(hours, 'hour')}", due_at=t + timedelta(hours=hours), type_="call",
             source_event=f"lead:{lead_id}:book",
         )
+    elif was_contacted:
+        await _chase_contacted_lead(lead, user)
     return serialize_lead(lead)
+
+
+UNANSWERED = ("No answer", "Call back later", "Wrong number")
+COLD_LEAD_TRIES = 3
+
+
+def unanswered_tries(lead: dict) -> int:
+    """Unanswered contact attempts since the lead was last reached (activities are newest first)."""
+    tries = 0
+    for a in lead.get("activities", []):
+        if a.get("channel") == "System":
+            continue
+        if a.get("outcome") == "Reached":
+            break
+        if a.get("outcome") in UNANSWERED:
+            tries += 1
+    return tries
+
+
+async def _chase_contacted_lead(lead: dict, user: dict) -> None:
+    """A contact was logged on a lead that is contacted but has no assessment booked yet. The current "book a session" task is
+    replaced by the next one, due in N days (Settings page). After 3 unanswered tries no more tasks are created and the managers
+    are alerted once; "Not interested" ends the follow-ups."""
+    lead_id = lead["_id"]
+    await close_follow_ups(f"lead:{lead_id}:book")
+    if lead["activities"][0].get("outcome") == "Not interested":
+        return
+    tries = unanswered_tries(lead)
+    if tries == 0 and lead.get("coldAlertAt"):  # reached again: a later run of unanswered tries alerts the managers again
+        await get_db().leads.update_one({"_id": lead_id}, {"$unset": {"coldAlertAt": ""}})
+    if tries >= COLD_LEAD_TRIES:
+        if not lead.get("coldAlertAt"):
+            await get_db().leads.update_one({"_id": lead_id}, {"$set": {"coldAlertAt": now()}})
+            owner = await get_db().users.find_one({"_id": lead["counsellorId"]}, {"name": 1}) if lead["counsellorId"] else None
+            text = f"{lead['name']}: {tries} unanswered contact attempts ({owner['name'] if owner else 'handled by the admin'}). Consider reassigning or closing the lead."
+            await notify.email_admins(f"Lead gone cold: {lead['name']}", text, dedupe_key=f"cold-lead:{lead_id}", alert_path=f"/staff/leads?open={lead_id}", alert_text=text)
+        return
+    days = policy.current()["followUps"]["nextFollowUpDays"]
+    attempt = sum(1 for a in lead["activities"] if a.get("channel") != "System")
+    await create_follow_up(
+        counsellor_id=lead["counsellorId"], person=lead["name"], person_id=lead_id, person_type="lead",
+        action="Book an assessment session", rule=f"Contacted, no session booked · then {policy.plural(days, 'day')}", due_at=now() + timedelta(days=days), type_="call",
+        source_event=f"lead:{lead_id}:book:{attempt}",
+    )
 
 
 @router.post("/leads/{lead_id}/stage")
@@ -305,6 +352,7 @@ def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, bool]]
         ("followUps", "firstContactMinutes", "New enquiry, in working hours: make first contact within", lambda v: p.plural(v, "minute"), True),
         ("followUps", "firstContactNextDay", "New enquiry, out of hours: make first contact on the next working day by", str, True),
         ("followUps", "bookSessionHours", "Contacted, no session booked: follow up within", lambda v: p.plural(v, "hour"), True),
+        ("followUps", "nextFollowUpDays", "Contacted, no session booked: after that, follow up every", lambda v: p.plural(v, "day"), True),
         ("followUps", "planFollowUpHours", "Plan shared, not registered: follow up within", lambda v: p.plural(v, "hour"), True),
         ("followUps", "documentCheckWorkingDays", "Document uploaded: verify or reject within", lambda v: p.plural(v, "working day"), False),
         ("followUps", "arrivalCheckInDays", "Student confirms safe arrival: check in within", lambda v: p.plural(v, "day"), False),

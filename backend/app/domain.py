@@ -132,7 +132,7 @@ def follow_up_rules() -> list[dict]:
     return [
         {"trigger": "New enquiry (working hours)", "action": "Make first contact", "limit": policy.plural(fu["firstContactMinutes"], "minute"), "escalation": "Manager alerted", "setting": "firstContactMinutes"},
         {"trigger": "New enquiry (out of hours)", "action": "Make first contact", "limit": f"{fu['firstContactNextDay']} next working day", "escalation": "Manager alerted", "setting": "firstContactNextDay"},
-        {"trigger": "Contacted, no session booked", "action": "Follow up", "limit": f"{policy.plural(fu['bookSessionHours'], 'hour')}, then 7 days", "escalation": "Nurture after 3 failed tries", "setting": "bookSessionHours"},
+        {"trigger": "Contacted, no session booked", "action": "Follow up", "limit": f"{policy.plural(fu['bookSessionHours'], 'hour')}, then {policy.plural(fu['nextFollowUpDays'], 'day')}", "escalation": "Manager alerted after 3 unanswered tries", "setting": "bookSessionHours"},
         {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": policy.plural(fu["planFollowUpHours"], "hour"), "escalation": "Manager alerted", "setting": "planFollowUpHours"},
         {"trigger": "Document uploaded", "action": "Verify or reject", "limit": policy.plural(fu["documentCheckWorkingDays"], "working day"), "escalation": "Manager alerted", "setting": "documentCheckWorkingDays"},
         {"trigger": "Application or scholarship deadline", "action": "Remind student and staff", "limit": policy.deadline_days_label(days), "escalation": f"Manager alerted at {policy.plural(days[-1], 'day')}", "setting": "deadlineReminderDays"},

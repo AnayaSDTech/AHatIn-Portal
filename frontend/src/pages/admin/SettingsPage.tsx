@@ -27,6 +27,7 @@ interface FollowUpLimits {
   firstContactMinutes: number;
   firstContactNextDay: string;
   bookSessionHours: number;
+  nextFollowUpDays: number;
   planFollowUpHours: number;
   documentCheckWorkingDays: number;
   arrivalCheckInDays: number;
@@ -182,6 +183,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
     firstContactMinutes: String(limits.firstContactMinutes),
     firstContactNextDay: limits.firstContactNextDay,
     bookSessionHours: String(limits.bookSessionHours),
+    nextFollowUpDays: String(limits.nextFollowUpDays),
     planFollowUpHours: String(limits.planFollowUpHours),
     documentCheckWorkingDays: String(limits.documentCheckWorkingDays),
     arrivalCheckInDays: String(limits.arrivalCheckInDays),
@@ -200,6 +202,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
         firstContactMinutes: Number(follow.firstContactMinutes),
         firstContactNextDay: follow.firstContactNextDay,
         bookSessionHours: Number(follow.bookSessionHours),
+        nextFollowUpDays: Number(follow.nextFollowUpDays),
         planFollowUpHours: Number(follow.planFollowUpHours),
         documentCheckWorkingDays: Number(follow.documentCheckWorkingDays),
         arrivalCheckInDays: Number(follow.arrivalCheckInDays),
@@ -282,6 +285,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
           <TextField label="New enquiry, in working hours (minutes)" type="number" min={5} max={240} required value={follow.firstContactMinutes} error={errors.firstContactMinutes} onChange={set('firstContactMinutes')} />
           <TextField label="New enquiry, out of hours (by, next working day)" type="time" required value={follow.firstContactNextDay} error={errors.firstContactNextDay} onChange={set('firstContactNextDay')} />
           <TextField label="Contacted, no session booked (hours)" type="number" min={1} max={168} required value={follow.bookSessionHours} error={errors.bookSessionHours} onChange={set('bookSessionHours')} />
+          <TextField label="Contacted, no session booked: then every (days)" type="number" min={1} max={30} required value={follow.nextFollowUpDays} error={errors.nextFollowUpDays} hint="After 3 unanswered tries, managers are alerted instead." onChange={set('nextFollowUpDays')} />
           <TextField label="Plan shared, not registered (hours)" type="number" min={1} max={168} required value={follow.planFollowUpHours} error={errors.planFollowUpHours} onChange={set('planFollowUpHours')} />
           <TextField label="Document uploaded (working days)" type="number" min={1} max={10} required value={follow.documentCheckWorkingDays} error={errors.documentCheckWorkingDays} onChange={set('documentCheckWorkingDays')} />
           <TextField label="Student confirms safe arrival: check in (days)" type="number" min={1} max={30} required value={follow.arrivalCheckInDays} error={errors.arrivalCheckInDays} onChange={set('arrivalCheckInDays')} />

@@ -155,6 +155,8 @@ These apply to all four phases:
 
 ### Task 3.1: "Contacted, no session booked": 48 hours, then 7 days, cold-lead alert
 
+**Status:** built on 26 November 2026, not released yet. The row now reads "48 hours, then 7 days → Manager alerted after 3 unanswered tries", and both times are editable. "Not interested" ends the follow-ups, and reaching the lead again starts them over.
+
 **Today:**
 - When staff log the first **Reached** contact with a new lead, the lead moves to **Contacted**, and a follow-up "Book an assessment session" is created, due in 48 hours (editable).
 - That follow-up closes when the lead reaches **Assessment booked**.
@@ -175,6 +177,8 @@ These apply to all four phases:
 **Tests:** 48-hour then 7-day follow-ups; the third failed attempt stops follow-ups and alerts admins; booking an assessment closes everything.
 
 ### Task 3.2: Deadline reminders: "remind student and staff", "manager alerted"
+
+**Status:** built on 26 November 2026, not released yet. Students are now emailed about application deadlines, and managers are alerted about scholarship deadlines on the last reminder day.
 
 **Today:**
 - A background job runs every hour and checks each reminder day (14, 7 and 2 days before, editable).

@@ -827,6 +827,7 @@ class FollowUpLimitsBody(Body):
     firstContactMinutes: int = Field(ge=5, le=240)
     firstContactNextDay: Time
     bookSessionHours: int = Field(ge=1, le=168)
+    nextFollowUpDays: int = Field(ge=1, le=30)
     planFollowUpHours: int = Field(ge=1, le=168)
     documentCheckWorkingDays: int = Field(ge=1, le=10)
     arrivalCheckInDays: int = Field(ge=1, le=30)

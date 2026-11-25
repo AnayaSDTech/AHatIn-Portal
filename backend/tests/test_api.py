@@ -2006,7 +2006,7 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await admin.put("/settings", {"workingHours": {"days": [], "start": "09:00", "end": "17:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "22:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "25:00", "end": "07:00"}})).status_code == 422
-    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "deadlineReminderDays": [2, 10, 5]}
+    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "nextFollowUpDays": 5, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "deadlineReminderDays": [2, 10, 5]}
     r = await admin.put("/settings", {"followUps": limits})
     assert r.status_code == 400 and "within working hours" in r.text
 
@@ -2025,7 +2025,8 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     rows = {row["trigger"]: row for row in out["followUpRules"]}
     assert rows["New enquiry (working hours)"]["limit"] == "30 minutes"
     assert rows["New enquiry (out of hours)"]["limit"] == "10:00 next working day"
-    assert rows["Contacted, no session booked"]["limit"].startswith("24 hours")
+    assert rows["Contacted, no session booked"]["limit"] == "24 hours, then 5 days"
+    assert rows["Contacted, no session booked"]["escalation"] == "Manager alerted after 3 unanswered tries"
     assert rows["Plan shared, not registered"] == {"trigger": "Plan shared, not registered", "action": "Follow up", "limit": "72 hours", "escalation": "Manager alerted", "setting": "planFollowUpHours"}
     assert "Assessment done" not in rows
     assert rows["Student confirms safe arrival"] == {"trigger": "Student confirms safe arrival", "action": "Check in with the student", "limit": "10 days", "escalation": "Manager alerted", "setting": "arrivalCheckInDays"}
@@ -2111,3 +2112,87 @@ async def test_overdue_alert_shows_the_due_time_in_ist():
     sent = await db.notifications.find_one({"subject": "Overdue follow-up: Ananya Sharma", "body": {"$regex": "Verify uploaded document: CV"}})
     assert "was due 25 Nov 2026, 15:00 IST." in sent["body"] and "UTC" not in sent["body"], sent["body"]
     assert (await db.follow_ups.find_one({"_id": "fu-late"}))["escalatedAt"]  # managers are alerted once
+
+
+async def test_contacted_lead_follow_ups_then_cold_lead_alert(make_api):
+    db = get_db()
+    staff = await make_api()
+    await staff.staff_login()  # Priya Desai (c1); lead l2 is hers, a new lead
+
+    async def log(outcome):
+        r = await staff.post("/leads/l2/contacts", {"channel": "Call", "outcome": outcome})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def open_book():
+        return db.follow_ups.find({"personId": "l2", "sourceEvent": {"$regex": "^lead:l2:book"}, "done": False}).to_list(None)
+
+    # Reached: Contacted, and a task to book a session within 48 hours.
+    lead = await log("Reached")
+    assert lead["stage"] == "contacted" and "coldAlertAt" not in lead
+    tasks = await open_book()
+    assert [t["rule"] for t in tasks] == ["Contacted, no session booked · 48 hours"]
+
+    # Each further attempt replaces it with the next one, due in 7 days.
+    await log("No answer")
+    tasks = await open_book()
+    assert len(tasks) == 1 and tasks[0]["rule"] == "Contacted, no session booked · then 7 days" and tasks[0]["counsellorId"] == "c1"
+    assert timedelta(days=6, hours=23) < tasks[0]["dueAt"].replace(tzinfo=now().tzinfo) - now() <= timedelta(days=7)
+    await log("Call back later")
+    assert len(await open_book()) == 1
+    assert not await db.notifications.find_one({"subject": "Lead gone cold: Diya Patel"})
+
+    # The third unanswered try: no more tasks, and the managers are alerted once.
+    await log("No answer")
+    assert await open_book() == []
+    alert = await db.notifications.find_one({"subject": "Lead gone cold: Diya Patel"})
+    assert "3 unanswered contact attempts (Priya Desai)" in alert["body"]
+    admin = await db.users.find_one({"email": "demo.admin@ahatin.example"})
+    assert await db.staff_alerts.find_one({"userId": admin["_id"], "path": "/staff/leads?open=l2"})
+    await log("Wrong number")
+    assert await open_book() == [] and await db.notifications.count_documents({"subject": "Lead gone cold: Diya Patel"}) == 1
+
+    # Reached again: the follow-ups start over.
+    await log("Reached")
+    assert len(await open_book()) == 1 and not (await db.leads.find_one({"_id": "l2"})).get("coldAlertAt")
+    # "Not interested" ends them; booking an assessment closes any that are open.
+    await log("Not interested")
+    assert await open_book() == []
+    await log("No answer")
+    assert len(await open_book()) == 1
+    assert (await staff.post("/leads/l2/stage", {"stage": "assessment_booked"})).status_code == 200
+    assert await open_book() == []
+
+
+async def test_deadline_reminders_reach_students_staff_and_managers():
+    from app import worker
+
+    db = get_db()
+    in_days = lambda n: (today() + timedelta(days=n)).isoformat()  # noqa: E731
+    await db.applications.insert_many([
+        {"_id": "app-14", "studentId": "s1", "university": "University of Leeds", "course": "MSc AI", "agency": "", "state": "draft", "deadline": in_days(14), "history": [], "createdAt": now()},
+        {"_id": "app-2", "studentId": "s1", "university": "University of Bristol", "course": "MSc Data Science", "agency": "", "state": "draft", "deadline": in_days(2), "history": [], "createdAt": now()},
+        {"_id": "app-done", "studentId": "s1", "university": "University of Bath", "course": "MSc AI", "agency": "", "state": "submitted", "deadline": in_days(2), "history": [], "createdAt": now()},
+    ])
+    await db.students.update_one({"_id": "s1"}, {"$push": {"journey.funding.scholarships": {"id": "sch-2", "name": "Chevening", "amount": "", "deadline": in_days(2), "status": "to_apply"}}})
+
+    for _ in range(2):  # the job runs every hour: nothing is sent twice
+        await worker.deadline_reminders()
+
+    async def emails(subject):
+        return await db.notifications.find({"subject": subject}).to_list(None)
+
+    student = "demo.student@ahatin.example"
+    # Applications: the student on every reminder day, the managers on the last one; submitted ones are left alone.
+    assert [e["to"] for e in await emails("University of Leeds application deadline in 14 days")] == [student]
+    leeds = (await emails("University of Leeds application deadline in 14 days"))[0]["body"]
+    assert "Your application to University of Leeds (MSc AI) is due on" in leeds and "hasn't been submitted yet" in leeds
+    assert [e["to"] for e in await emails("University of Bristol application deadline in 2 days")] == [student]
+    assert len(await emails("Deadline in 2 days: Ananya Sharma")) >= 1
+    assert not await db.notifications.find_one({"subject": {"$regex": "University of Bath"}})
+    # Scholarships: the student as before, and now the managers on the last reminder day.
+    assert [e["to"] for e in await emails("Scholarship deadline in 2 days")] == [student]
+    managers = await emails("Scholarship deadline in 2 days: Ananya Sharma")
+    assert managers and all(e["to"] != student for e in managers) and "Chevening hasn't been applied for yet" in managers[0]["body"]
+    # Staff tasks as before.
+    assert await db.follow_ups.find_one({"sourceEvent": "deadline:app:app-14:14"}) and await db.follow_ups.find_one({"sourceEvent": "deadline:sch:sch-2:2"})

@@ -130,7 +130,7 @@ def serialize_counsellor(u: dict) -> dict:
 
 
 def serialize_lead(l: dict) -> dict:
-    out = _clean(l, drop=("mobileDigits", "registrationInvite", "convertedStudentId", "updatedAt", "firstContactAt", "nurtureAt"))
+    out = _clean(l, drop=("mobileDigits", "registrationInvite", "convertedStudentId", "updatedAt", "firstContactAt", "nurtureAt", "coldAlertAt"))
     out["createdAt"] = iso_or(l["createdAt"])
     out["activities"] = [{**a, "at": iso_or(a["at"])} for a in l.get("activities", [])]
     return out

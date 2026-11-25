@@ -60,8 +60,8 @@ async def session_reminders() -> None:
 
 
 async def deadline_reminders() -> None:
-    """Application and scholarship deadlines: follow-ups on the reminder days set on the Settings page (14, 7 and 2 days before at
-    first). Managers are alerted on the last of them."""
+    """Application and scholarship deadlines, on the reminder days set on the Settings page (14, 7 and 2 days before at first): a
+    follow-up for the staff member and an email to the student each time; the managers are alerted on the last of them."""
     db = get_db()
     t = today()
     reminder_days = sorted(policy.current()["followUps"]["deadlineReminderDays"], reverse=True)
@@ -77,6 +77,13 @@ async def deadline_reminders() -> None:
                 action=f"Submit {a['university']} application (deadline in {days} days)", rule=f"Application deadline · {days} days before",
                 due_at=local_dt(t.isoformat(), "18:00"), type_="reminder", source_event=f"deadline:app:{a['_id']}:{days}",
             )
+            # The student is reminded too (held during quiet hours, like their other emails).
+            await notify.email_student(
+                s, f"{a['university']} application deadline in {policy.plural(days, 'day')}",
+                f"Your application to {a['university']} ({a['course']}) is due on {format_date(target)} and hasn't been submitted yet. "
+                "Your counsellor will help you finish it in time.",
+                dedupe_key=f"deadline:app:{a['_id']}:{days}:student",
+            )
             if days == last:
                 await notify.email_admins(
                     f"Deadline in {policy.plural(days, 'day')}: {s['name']}", f"{a['university']} ({a['course']}) is still a draft; the deadline is {format_date(target)}.",
@@ -90,7 +97,15 @@ async def deadline_reminders() -> None:
                         action=f"Remind about scholarship: {sch['name']} (deadline in {days} days)", rule=f"Scholarship deadline · {days} days before",
                         due_at=local_dt(t.isoformat(), "18:00"), type_="reminder", source_event=f"deadline:sch:{sch['id']}:{days}",
                     )
-                    await notify.email_student(s, f"Scholarship deadline in {days} days", f"The deadline for {sch['name']} is {format_date(target)}.", dedupe_key=f"deadline:sch:{sch['id']}:{days}:student")
+                    await notify.email_student(
+                        s, f"Scholarship deadline in {policy.plural(days, 'day')}", f"The deadline for {sch['name']} is {format_date(target)}.", dedupe_key=f"deadline:sch:{sch['id']}:{days}:student",
+                    )
+                    if days == last:  # managers are alerted on the last reminder day, as for applications
+                        await notify.email_admins(
+                            f"Scholarship deadline in {policy.plural(days, 'day')}: {s['name']}",
+                            f"{sch['name']} hasn't been applied for yet; the deadline is {format_date(target)}.",
+                            dedupe_key=f"deadline:sch:{sch['id']}:{days}:admins",
+                        )
 
 
 async def clean_up() -> None:

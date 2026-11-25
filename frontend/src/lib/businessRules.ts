@@ -8,6 +8,7 @@ export interface BusinessRules {
     firstContactMinutes: number;
     firstContactNextDay: string;
     bookSessionHours: number;
+    nextFollowUpDays: number;
     planFollowUpHours: number;
     documentCheckWorkingDays: number;
     arrivalCheckInDays: number;
@@ -32,7 +33,7 @@ export function leadStageRule(stage: string, rules: BusinessRules): string {
     case 'new_lead':
       return `Make first contact within ${plural(f.firstContactMinutes, 'minute')} during working hours (${wh.label}, ${wh.start}–${wh.end} IST). Enquiries that arrive out of hours: by ${f.firstContactNextDay} on the next working day. If missed, managers are alerted.`;
     case 'contacted':
-      return `Book an assessment session within ${plural(f.bookSessionHours, 'hour')} of first reaching them. If missed, managers are alerted.`;
+      return `Book an assessment session within ${plural(f.bookSessionHours, 'hour')} of first reaching them. Not booked yet? After each further contact attempt, follow up again within ${plural(f.nextFollowUpDays, 'day')}. After 3 unanswered attempts, managers are alerted. If a follow-up is missed, managers are alerted too.`;
     case 'assessment_booked':
       return 'No time limit. Hold the assessment session, then share the plan and move the lead to "Assessed / plan shared".';
     case 'assessed':
