@@ -197,6 +197,8 @@ These apply to all four phases:
 
 ### Task 3.3: Reply deadline for student messages (replaces "Urgent support message: 2 hours")
 
+**Status:** built on 26 November 2026, not released yet. The row now reads "Student message → Reply → 1 working day → Manager alerted", and the working days (1–5) are editable. With Tasks 3.1 and 3.2, Phase 3 is complete.
+
 **Today:**
 - Students message their counsellor, Financial Aid Officer or Visa Officer in separate chats.
 - Each student message gives the staff member an in-portal alert and an email (at most one email per chat per hour).

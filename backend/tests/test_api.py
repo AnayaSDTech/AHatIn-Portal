@@ -2006,7 +2006,7 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await admin.put("/settings", {"workingHours": {"days": [], "start": "09:00", "end": "17:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "22:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "25:00", "end": "07:00"}})).status_code == 422
-    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "nextFollowUpDays": 5, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "deadlineReminderDays": [2, 10, 5]}
+    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "nextFollowUpDays": 5, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "replyWorkingDays": 2, "deadlineReminderDays": [2, 10, 5]}
     r = await admin.put("/settings", {"followUps": limits})
     assert r.status_code == 400 and "within working hours" in r.text
 
@@ -2031,6 +2031,8 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert "Assessment done" not in rows
     assert rows["Student confirms safe arrival"] == {"trigger": "Student confirms safe arrival", "action": "Check in with the student", "limit": "10 days", "escalation": "Manager alerted", "setting": "arrivalCheckInDays"}
     assert "Planned arrival" not in rows
+    assert rows["Student message"] == {"trigger": "Student message", "action": "Reply", "limit": "2 working days", "escalation": "Manager alerted", "setting": "replyWorkingDays"}
+    assert "Urgent support message" not in rows
     assert rows["Document uploaded"]["limit"] == "2 working days"
     assert rows["Application or scholarship deadline"]["limit"] == "10, 5 and 2 days before"
     assert rows["Application or scholarship deadline"]["escalation"] == "Manager alerted at 2 days"
@@ -2196,3 +2198,35 @@ async def test_deadline_reminders_reach_students_staff_and_managers():
     assert managers and all(e["to"] != student for e in managers) and "Chevening hasn't been applied for yet" in managers[0]["body"]
     # Staff tasks as before.
     assert await db.follow_ups.find_one({"sourceEvent": "deadline:app:app-14:14"}) and await db.follow_ups.find_one({"sourceEvent": "deadline:sch:sch-2:2"})
+
+
+async def test_student_message_gives_staff_a_reply_task(make_api):
+    from app.services.team import follow_up_area
+
+    db = get_db()
+    student, staff = await make_api(), await make_api()
+    await student.student_login()  # Ananya Sharma (s1), counsellor Priya Desai (c1)
+    await staff.staff_login()
+
+    def open_tasks():
+        return db.follow_ups.find({"personId": "s1", "done": False, "sourceEvent": {"$regex": "^msg:s1:counsellor:"}}).to_list(None)
+
+    assert (await student.post("/messages", {"text": "Can you check my SOP?"})).status_code == 200
+    tasks = await open_tasks()
+    assert len(tasks) == 1 and tasks[0]["counsellorId"] == "c1" and tasks[0]["action"] == "Reply to Ananya's message"
+    assert tasks[0]["rule"] == "Student message · 1 working day" and tasks[0]["type"] == "whatsapp"
+    assert tasks[0]["dueAt"].replace(tzinfo=now().tzinfo) > now()
+    # A second message while one is waiting doesn't add another task.
+    assert (await student.post("/messages", {"text": "Also my CV, please."})).status_code == 200
+    assert len(await open_tasks()) == 1
+    # The counsellor replies in the chat: the task is done.
+    assert (await staff.post("/messages", {"studentId": "s1", "text": "Yes, I'll look today."})).status_code == 200
+    assert await open_tasks() == []
+    assert (await db.follow_ups.find_one({"_id": tasks[0]["_id"]}))["done"] is True
+    # A new message later gives a new task.
+    assert (await student.post("/messages", {"text": "Thank you!"})).status_code == 200
+    assert len(await open_tasks()) == 1
+    # Officer chats belong to the officer's area when tasks are handed over.
+    assert await follow_up_area({"sourceEvent": "msg:s1:visa:m1"}) == "visa"
+    assert await follow_up_area({"sourceEvent": "msg:s1:finance:m1"}) == "finance"
+    assert await follow_up_area({"sourceEvent": "msg:s1:counsellor:m1"}) == "counsellor"

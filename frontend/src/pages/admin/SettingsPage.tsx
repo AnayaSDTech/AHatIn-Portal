@@ -31,6 +31,7 @@ interface FollowUpLimits {
   planFollowUpHours: number;
   documentCheckWorkingDays: number;
   arrivalCheckInDays: number;
+  replyWorkingDays: number;
   deadlineReminderDays: number[];
 }
 
@@ -187,6 +188,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
     planFollowUpHours: String(limits.planFollowUpHours),
     documentCheckWorkingDays: String(limits.documentCheckWorkingDays),
     arrivalCheckInDays: String(limits.arrivalCheckInDays),
+    replyWorkingDays: String(limits.replyWorkingDays),
     deadlineReminderDays: limits.deadlineReminderDays.join(', '),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -206,6 +208,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
         planFollowUpHours: Number(follow.planFollowUpHours),
         documentCheckWorkingDays: Number(follow.documentCheckWorkingDays),
         arrivalCheckInDays: Number(follow.arrivalCheckInDays),
+        replyWorkingDays: Number(follow.replyWorkingDays),
         deadlineReminderDays: days,
       },
     };
@@ -289,6 +292,7 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
           <TextField label="Plan shared, not registered (hours)" type="number" min={1} max={168} required value={follow.planFollowUpHours} error={errors.planFollowUpHours} onChange={set('planFollowUpHours')} />
           <TextField label="Document uploaded (working days)" type="number" min={1} max={10} required value={follow.documentCheckWorkingDays} error={errors.documentCheckWorkingDays} onChange={set('documentCheckWorkingDays')} />
           <TextField label="Student confirms safe arrival: check in (days)" type="number" min={1} max={30} required value={follow.arrivalCheckInDays} error={errors.arrivalCheckInDays} onChange={set('arrivalCheckInDays')} />
+          <TextField label="Student message: reply within (working days)" type="number" min={1} max={5} required value={follow.replyWorkingDays} error={errors.replyWorkingDays} onChange={set('replyWorkingDays')} />
         </div>
         <TextField
           label="Deadline reminders (days before)"

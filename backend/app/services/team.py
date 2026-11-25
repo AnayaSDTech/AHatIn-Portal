@@ -177,6 +177,9 @@ async def follow_up_area(f: dict) -> str:
         return "visa"
     if event.startswith("deadline:sch:"):
         return "finance"
+    if event.startswith("msg:"):  # msg:{student}:{chat}:{message}: the chat's area
+        chat = event.split(":")[2]
+        return chat if chat in ("finance", "visa") else "counsellor"
     if event.startswith("doc:"):
         doc = await get_db().documents.find_one({"_id": event.split(":")[1]}, {"category": 1})
         return DOC_AREA.get((doc or {}).get("category", "general"), "counsellor")

@@ -29,6 +29,7 @@ DEFAULTS: dict[str, Any] = {
         "planFollowUpHours": 48,  # lead marked "Assessed / plan shared", not registered yet
         "documentCheckWorkingDays": 1,  # verify or reject an uploaded document
         "arrivalCheckInDays": 7,  # check in with a student after they confirm their safe arrival
+        "replyWorkingDays": 1,  # reply to a student's message
         "deadlineReminderDays": [14, 7, 2],  # application and scholarship deadlines; managers are alerted at the last one
     },
 }

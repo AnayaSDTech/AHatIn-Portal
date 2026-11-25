@@ -12,6 +12,7 @@ export interface BusinessRules {
     planFollowUpHours: number;
     documentCheckWorkingDays: number;
     arrivalCheckInDays: number;
+    replyWorkingDays: number;
     deadlineReminderDays: number[];
   };
 }
