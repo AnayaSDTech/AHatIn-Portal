@@ -1,9 +1,10 @@
-"""Public endpoints (no account): the website enquiry form."""
+"""Public endpoints (no account): the website enquiry form and the office hours."""
 
 from datetime import date
 
 from fastapi import APIRouter, Request
 
+from app.core import policy
 from app.core.clock import now
 from app.core.ratelimit import hit
 from app.db import get_db, new_id
@@ -29,6 +30,13 @@ async def _name(counsellor_id: str | None) -> str | None:
     """Who will reply: the counsellor looking after the person, or None for the AHat team (admin)."""
     c = await get_db().users.find_one({"_id": counsellor_id}, {"name": 1}) if counsellor_id else None
     return c["name"] if c else None
+
+
+@router.get("/office-hours")
+async def office_hours():
+    """The office hours set on the admin's Settings page, for the public website (no account needed)."""
+    wh = policy.current()["workingHours"]
+    return {"label": policy.office_hours(), "days": wh["days"], "start": wh["start"], "end": wh["end"]}
 
 
 @router.post("/enquiries")

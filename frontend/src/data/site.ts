@@ -304,5 +304,6 @@ export const contact = {
     linkedin: 'https://www.linkedin.com/company/ahat.in',
   },
   offices: ['India', 'Nepal', 'United Kingdom'],
+  /** Shown only until the office hours from the admin's Settings page have loaded (lib/officeHours.ts). */
   hours: 'Mon–Sat, 10:00–19:00 IST',
 };

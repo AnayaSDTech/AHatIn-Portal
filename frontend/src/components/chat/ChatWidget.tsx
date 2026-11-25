@@ -7,7 +7,7 @@ import { api } from '../../lib/api/client';
 import { ApiError } from '../../lib/api/types';
 import type { EnquiryResult } from '../../lib/enquiry';
 import { chatCallBackSchema, type ChatCallBackForm } from '../../lib/validation';
-import { contact } from '../../data/site';
+import { useOfficeHours } from '../../lib/officeHours';
 import { cn } from '../../lib/utils';
 
 interface Msg {
@@ -137,6 +137,7 @@ function CallBackForm({ lastQuestion }: { lastQuestion: string }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<EnquiryResult | null>(null);
+  const hours = useOfficeHours();
 
   if (done) {
     const text =
@@ -144,7 +145,7 @@ function CallBackForm({ lastQuestion }: { lastQuestion: string }) {
         ? 'You already have an account, so we have passed this to your AHat team. Log in to see your progress.'
         : done.kind === 'lead'
           ? `Added to your earlier enquiry. ${done.counsellor ?? 'The AHat team'} will call you.`
-          : `Thank you. We'll call you within working hours (${contact.hours}).`;
+          : `Thank you. We'll call you within working hours (${hours}).`;
     return (
       <p role="status" className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {text}

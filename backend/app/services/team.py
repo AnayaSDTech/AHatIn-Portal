@@ -10,13 +10,14 @@ without an officer stays in the admin's officer queue until one is assigned. Onc
 (students who were already under way before officers existed keep working as before).
 """
 
+from app.core import policy
 from app.core.clock import now
 from app.core.errors import ApiError
 from app.db import get_db
 from app.domain import AREA_OF_ROLE, DOC_AREA, OFFICER_FIELD, OFFICER_TITLE
 from app.records import add_note, serialize_counsellor
 from app.services import notify
-from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now
+from app.services.workflow import close_follow_ups, create_follow_up, working_days_from_now
 
 DONE = ("completed", "not_needed")
 # Chosen instead of an officer: the counsellor handles that area.
@@ -89,9 +90,10 @@ async def check_handover(sid: str) -> None:
     event = f"student:{sid}:assign-{area}"
     if await get_db().follow_ups.find_one({"sourceEvent": event}):
         return  # already raised
+    days = policy.current()["followUps"]["assignWorkingDays"]  # editable on the Settings page
     await create_follow_up(
         counsellor_id=None, person=student["name"], person_id=sid, person_type="student",
-        action=f"Assign a {title}", rule=f"{done} complete · 1 working day", due_at=one_working_day_from_now(), type_="reminder", source_event=event,
+        action=f"Assign a {title}", rule=f"{done} complete · {policy.plural(days, 'working day')}", due_at=working_days_from_now(days), type_="reminder", source_event=event,
     )
     await add_note(sid, "System", f"{done} complete. Waiting for the admin to assign a {title}.")
     await notify.email_admins(

@@ -32,6 +32,8 @@ interface FollowUpLimits {
   documentCheckWorkingDays: number;
   arrivalCheckInDays: number;
   replyWorkingDays: number;
+  assignWorkingDays: number;
+  sessionReminderHours: number;
   deadlineReminderDays: number[];
 }
 
@@ -189,6 +191,8 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
     documentCheckWorkingDays: String(limits.documentCheckWorkingDays),
     arrivalCheckInDays: String(limits.arrivalCheckInDays),
     replyWorkingDays: String(limits.replyWorkingDays),
+    assignWorkingDays: String(limits.assignWorkingDays),
+    sessionReminderHours: String(limits.sessionReminderHours),
     deadlineReminderDays: limits.deadlineReminderDays.join(', '),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -209,6 +213,8 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
         documentCheckWorkingDays: Number(follow.documentCheckWorkingDays),
         arrivalCheckInDays: Number(follow.arrivalCheckInDays),
         replyWorkingDays: Number(follow.replyWorkingDays),
+        assignWorkingDays: Number(follow.assignWorkingDays),
+        sessionReminderHours: Number(follow.sessionReminderHours),
         deadlineReminderDays: days,
       },
     };
@@ -293,6 +299,8 @@ function EditModal({ section, settings, onClose, onSaved }: { section: Section; 
           <TextField label="Document uploaded (working days)" type="number" min={1} max={10} required value={follow.documentCheckWorkingDays} error={errors.documentCheckWorkingDays} onChange={set('documentCheckWorkingDays')} />
           <TextField label="Student confirms safe arrival: check in (days)" type="number" min={1} max={30} required value={follow.arrivalCheckInDays} error={errors.arrivalCheckInDays} onChange={set('arrivalCheckInDays')} />
           <TextField label="Student message: reply within (working days)" type="number" min={1} max={5} required value={follow.replyWorkingDays} error={errors.replyWorkingDays} onChange={set('replyWorkingDays')} />
+          <TextField label="Student ready: assign a counsellor or officer (working days)" type="number" min={1} max={10} required value={follow.assignWorkingDays} error={errors.assignWorkingDays} onChange={set('assignWorkingDays')} />
+          <TextField label="Session reminder email to the student (hours before)" type="number" min={1} max={72} required value={follow.sessionReminderHours} error={errors.sessionReminderHours} onChange={set('sessionReminderHours')} />
         </div>
         <TextField
           label="Deadline reminders (days before)"

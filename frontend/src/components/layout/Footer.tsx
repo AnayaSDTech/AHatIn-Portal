@@ -5,9 +5,11 @@ import { Logo } from '../ui/Logo';
 import { SocialLinks } from './SocialLinks';
 import { contact, destinations, navLinks, services } from '../../data/site';
 import { COMPANY } from '../../pages/legal/LegalPage';
+import { useOfficeHours } from '../../lib/officeHours';
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const hours = useOfficeHours(); // from the admin's Settings page
   return (
     <footer className="relative overflow-hidden bg-navy-950 text-navy-200">
       <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-gold-500/10 blur-3xl" aria-hidden />
@@ -84,7 +86,7 @@ export function Footer() {
             </li>
             <li className="flex gap-3">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" aria-hidden />
-              <span>{contact.hours}</span>
+              <span>{hours}</span>
             </li>
           </ul>
           <SocialLinks className="mt-6" />

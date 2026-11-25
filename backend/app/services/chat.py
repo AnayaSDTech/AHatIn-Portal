@@ -11,6 +11,7 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
+from app.core import policy
 from app.core.clock import now
 from app.db import get_db
 from app.scholarship_catalog import ALL_INDIA, GROUPS, LEVELS, SUPPORT_TYPES, sort_key
@@ -31,7 +32,7 @@ ABOUT AHAT
 - We give free, honest guidance to students (mainly from India) who want to study in the UK and Europe, from choosing a course to settling in abroad.
 - Our services are completely free for students. We receive commissions directly from partner universities, so students pay nothing at any stage of their journey.
 - Every student gets a dedicated counsellor, and tracks applications, documents and deadlines in the AHat student portal. Parents can be invited to follow progress.
-- Offices: India, Nepal and United Kingdom. Email: contact@ahat.in. Hours: Monday to Saturday, 10:00 to 19:00 IST.
+- Offices: India, Nepal and United Kingdom. Email: contact@ahat.in. Hours: {office_hours}.
 - Students register free at https://ahat.in/register. After registering they complete their profile, and an AHat counsellor is assigned.
 
 DESTINATIONS
@@ -120,7 +121,9 @@ PREVIEW_FIELDS = ("name", "offeredBy", "type", "state", "levels", "supportType",
 
 
 def system_prompt() -> str:
-    return f"{RULES}\n\nToday's date: {now().strftime('%d %B %Y')}.\n\nAHAT KNOWLEDGE\n{KNOWLEDGE}"
+    # The office hours come from the admin's Settings page, so the assistant always gives the current ones.
+    knowledge = KNOWLEDGE.replace("{office_hours}", policy.office_hours(short=False))
+    return f"{RULES}\n\nToday's date: {now().strftime('%d %B %Y')}.\n\nAHAT KNOWLEDGE\n{knowledge}"
 
 
 async def search_scholarships(args: dict) -> dict:

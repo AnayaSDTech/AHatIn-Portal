@@ -8,6 +8,7 @@ import { Reveal } from '../ui/Reveal';
 import { Button } from '../ui/Button';
 import { SelectField, TextField } from '../ui/FormField';
 import { contact } from '../../data/site';
+import { useOfficeHours } from '../../lib/officeHours';
 import { enquirySchema, type EnquiryForm } from '../../lib/validation';
 import { callTimes, enquiryDestinations, enquiryIntakes, submitEnquiry, type EnquiryResult } from '../../lib/enquiry';
 import { ApiError } from '../../lib/api/types';
@@ -16,6 +17,7 @@ const blank: EnquiryForm = { name: '', email: '', mobile: '', destination: '', i
 
 function ThankYou({ name, result, onAgain }: { name: string; result: EnquiryResult; onAgain: () => void }) {
   const first = name.trim().split(/\s+/)[0];
+  const hours = useOfficeHours();
   const text =
     result.kind === 'student'
       ? result.counsellor
@@ -23,7 +25,7 @@ function ThankYou({ name, result, onAgain }: { name: string; result: EnquiryResu
         : "You already have an account, so the AHat team will get back to you. Log in to see your progress."
       : result.kind === 'lead'
         ? `Added to your earlier enquiry. ${result.counsellor ?? 'The AHat team'} will call you.`
-        : `We'll call you within working hours (${contact.hours}).`;
+        : `We'll call you within working hours (${hours}).`;
   return (
     <div role="status" className="flex h-full flex-col items-center justify-center py-8 text-center">
       <span className="grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
@@ -52,6 +54,7 @@ export function Enquiry() {
   const [params] = useSearchParams();
   const [done, setDone] = useState<{ name: string; result: EnquiryResult } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const hours = useOfficeHours();
   const {
     register,
     handleSubmit,
@@ -111,7 +114,7 @@ export function Enquiry() {
                   <MessageCircle className="h-4 w-4 text-gold-400" aria-hidden /> WhatsApp {contact.whatsapp.display}
                 </a>
                 <p className="flex items-center gap-3 text-navy-200">
-                  <Clock className="h-4 w-4 text-gold-400" aria-hidden /> {contact.hours}
+                  <Clock className="h-4 w-4 text-gold-400" aria-hidden /> {hours}
                 </p>
                 <p className="flex items-center gap-3 text-navy-200">
                   <MapPin className="h-4 w-4 text-gold-400" aria-hidden /> {contact.offices.join(' · ')}

@@ -68,7 +68,7 @@ from app.services import notify, storage
 from app.services.assignment import assign_counsellor, assign_default_officers, auto_assign
 from app.services.students import counsellor_of, has_complete_profile, own_record, profile_in, profile_out, student_for
 from app.services.team import COUNSELLOR_HANDLES, applications_done, assign_officer, check_handover, cover_by_counsellor, covered, owner_for, require_area, team_of
-from app.services.workflow import close_follow_ups, create_follow_up, one_working_day_from_now, working_days_from_now
+from app.services.workflow import close_follow_ups, create_follow_up, working_days_from_now
 
 router = APIRouter(tags=["students"])
 
@@ -191,9 +191,11 @@ async def save_profile(body: ProfileBody, user: CurrentUser):
         # The student joins the admin's "Waiting for a counsellor" list (always, unless automatic assignment is on).
         await add_note(sid, "System", "Waiting for the admin to assign a counsellor.")
         await notify.email_admins(f"Assign a counsellor: {record['name']}", f"{record['name']} ({record['reference']}) has completed their profile and is waiting for a counsellor, Financial Aid Officer and Visa Officer.", alert_path="/admin/assign")
+        days = policy.current()["followUps"]["assignWorkingDays"]  # editable on the Settings page
         await create_follow_up(
             counsellor_id=None, person=record["name"], person_id=sid, person_type="student",
-            action="Assign a counsellor (profile complete)", rule="Profile complete · 1 working day", due_at=one_working_day_from_now(), type_="reminder", source_event=f"student:{sid}:assign",
+            action="Assign a counsellor (profile complete)", rule=f"Profile complete · {policy.plural(days, 'working day')}", due_at=working_days_from_now(days),
+            type_="reminder", source_event=f"student:{sid}:assign",
         )
         return {**profile, "mobile": mobile}
 

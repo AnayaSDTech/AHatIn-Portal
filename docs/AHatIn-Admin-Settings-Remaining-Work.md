@@ -233,6 +233,8 @@ These apply to all four phases:
 
 ### Task 4.1: Office hours shown to the public follow Settings
 
+**Status:** built on 26 November 2026, not released yet. The website footer, Enquiry section, both call-back confirmations (the enquiry form and the chatbot's form) and the chatbot's answers now use the working hours from Settings, e.g. "Mon–Sat, 10:00–19:00 IST".
+
 **Today:** "Mon–Sat, 10:00–19:00 IST" is fixed text in:
 - the website footer and Enquiry section;
 - the enquiry confirmation message ("We'll call you within working hours");
@@ -249,6 +251,8 @@ If an admin changes working hours, these stay as they are.
 **Tests:** after changing working hours, the public hours and the chatbot's hours line show the new values.
 
 ### Task 4.2: More follow-up limits editable
+
+**Status:** built on 26 November 2026, not released yet. Both are editable and shown as rows in the rules table: "Student ready for a counsellor or officer → Assign one (admin) → 1 working day" and "Session booked → Email the student a reminder → 24 hours before". With this, all four phases are built.
 
 These deadlines are used by the system but still fixed:
 

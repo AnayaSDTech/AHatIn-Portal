@@ -138,6 +138,8 @@ def follow_up_rules() -> list[dict]:
         {"trigger": "Application or scholarship deadline", "action": "Remind student and staff", "limit": policy.deadline_days_label(days), "escalation": f"Manager alerted at {policy.plural(days[-1], 'day')}", "setting": "deadlineReminderDays"},
         {"trigger": "Student confirms safe arrival", "action": "Check in with the student", "limit": policy.plural(fu["arrivalCheckInDays"], "day"), "escalation": "Manager alerted", "setting": "arrivalCheckInDays"},
         {"trigger": "Student message", "action": "Reply", "limit": policy.plural(fu["replyWorkingDays"], "working day"), "escalation": "Manager alerted", "setting": "replyWorkingDays"},
+        {"trigger": "Student ready for a counsellor or officer", "action": "Assign one (admin)", "limit": policy.plural(fu["assignWorkingDays"], "working day"), "escalation": "Manager alerted", "setting": "assignWorkingDays"},
+        {"trigger": "Session booked", "action": "Email the student a reminder", "limit": f"{policy.plural(fu['sessionReminderHours'], 'hour')} before", "escalation": "Sent automatically", "setting": "sessionReminderHours"},
     ]
 
 

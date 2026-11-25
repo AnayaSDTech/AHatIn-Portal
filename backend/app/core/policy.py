@@ -30,6 +30,8 @@ DEFAULTS: dict[str, Any] = {
         "documentCheckWorkingDays": 1,  # verify or reject an uploaded document
         "arrivalCheckInDays": 7,  # check in with a student after they confirm their safe arrival
         "replyWorkingDays": 1,  # reply to a student's message
+        "assignWorkingDays": 1,  # the admin assigns a counsellor or an officer once a student is ready for one
+        "sessionReminderHours": 24,  # the student's email reminder before a booked session
         "deadlineReminderDays": [14, 7, 2],  # application and scholarship deadlines; managers are alerted at the last one
     },
 }
@@ -105,6 +107,20 @@ def days_label(days: list[int]) -> str:
         return f"{WEEKDAYS[days[0]]} – {WEEKDAYS[days[-1]]}"
     names = [WEEKDAYS[d] for d in days]
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def office_hours(short: bool = True) -> str:
+    """The office hours as the public sees them: 'Mon–Sat, 10:00–19:00 IST' (website), or
+    'Monday to Saturday, 10:00 to 19:00 IST' (the website chatbot)."""
+    wh = current()["workingHours"]
+    days = sorted(wh["days"])
+    names = [WEEKDAYS[d][:3] if short else WEEKDAYS[d] for d in days]
+    run = len(days) >= 3 and days == list(range(days[0], days[-1] + 1))  # "Mon–Sat"; two days are listed
+    if short:
+        text = f"{names[0]}–{names[-1]}" if run else ", ".join(names)
+        return f"{text}, {wh['start']}–{wh['end']} IST"
+    text = f"{names[0]} to {names[-1]}" if run else (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1])
+    return f"{text}, {wh['start']} to {wh['end']} IST"
 
 
 def plural(n: int, word: str) -> str:

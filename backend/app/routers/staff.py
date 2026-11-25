@@ -342,43 +342,51 @@ async def update_settings(body: BusinessRulesBody, user: Admin):
     return _settings_out(user)
 
 
-def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, bool]]:
-    """(rule, new value, old value, leads only) for each changed rule that sets a deadline for staff."""
+# Who is told when a rule changes: everyone on the staff side, those who handle leads, or the admins only.
+EVERYONE = ("counsellor", "officer", "finance_officer", "visa_officer", "admin")
+LEAD_STAFF = ("counsellor", "admin")
+ADMINS = ("admin",)
+
+
+def _rule_changes(before: dict, after: dict) -> list[tuple[str, str, str, tuple[str, ...]]]:
+    """(rule, new value, old value, roles to tell) for each changed rule that sets a deadline for staff. Quiet hours and the
+    session reminder only change when students get emails, so no one on the staff side is told about them."""
     p = policy
     wh = lambda w: f"{p.days_label(w['days'])}, {w['start']}–{w['end']} IST"  # noqa: E731
-    # (section, key, rule and what staff must do, how to show the value, leads only)
+    # (section, key, rule and what staff must do, how to show the value, roles to tell)
     rules = [
-        ("workingHours", None, "Working hours:", wh, False),
-        ("followUps", "firstContactMinutes", "New enquiry, in working hours: make first contact within", lambda v: p.plural(v, "minute"), True),
-        ("followUps", "firstContactNextDay", "New enquiry, out of hours: make first contact on the next working day by", str, True),
-        ("followUps", "bookSessionHours", "Contacted, no session booked: follow up within", lambda v: p.plural(v, "hour"), True),
-        ("followUps", "nextFollowUpDays", "Contacted, no session booked: after that, follow up every", lambda v: p.plural(v, "day"), True),
-        ("followUps", "planFollowUpHours", "Plan shared, not registered: follow up within", lambda v: p.plural(v, "hour"), True),
-        ("followUps", "documentCheckWorkingDays", "Document uploaded: verify or reject within", lambda v: p.plural(v, "working day"), False),
-        ("followUps", "arrivalCheckInDays", "Student confirms safe arrival: check in within", lambda v: p.plural(v, "day"), False),
-        ("followUps", "replyWorkingDays", "Student message: reply within", lambda v: p.plural(v, "working day"), False),
-        ("followUps", "deadlineReminderDays", "Application and scholarship deadlines: reminders", p.deadline_days_label, False),
+        ("workingHours", None, "Working hours:", wh, EVERYONE),
+        ("followUps", "firstContactMinutes", "New enquiry, in working hours: make first contact within", lambda v: p.plural(v, "minute"), LEAD_STAFF),
+        ("followUps", "firstContactNextDay", "New enquiry, out of hours: make first contact on the next working day by", str, LEAD_STAFF),
+        ("followUps", "bookSessionHours", "Contacted, no session booked: follow up within", lambda v: p.plural(v, "hour"), LEAD_STAFF),
+        ("followUps", "nextFollowUpDays", "Contacted, no session booked: after that, follow up every", lambda v: p.plural(v, "day"), LEAD_STAFF),
+        ("followUps", "planFollowUpHours", "Plan shared, not registered: follow up within", lambda v: p.plural(v, "hour"), LEAD_STAFF),
+        ("followUps", "documentCheckWorkingDays", "Document uploaded: verify or reject within", lambda v: p.plural(v, "working day"), EVERYONE),
+        ("followUps", "arrivalCheckInDays", "Student confirms safe arrival: check in within", lambda v: p.plural(v, "day"), EVERYONE),
+        ("followUps", "replyWorkingDays", "Student message: reply within", lambda v: p.plural(v, "working day"), EVERYONE),
+        ("followUps", "deadlineReminderDays", "Application and scholarship deadlines: reminders", p.deadline_days_label, EVERYONE),
+        ("followUps", "assignWorkingDays", "Student ready for a counsellor or officer: assign one within", lambda v: p.plural(v, "working day"), ADMINS),
     ]
     out = []
-    for section, key, label, show, leads_only in rules:
+    for section, key, label, show, roles in rules:
         old = before[section] if key is None else before[section][key]
         new = after[section] if key is None else after[section][key]
         if old != new:
-            out.append((label, show(new), show(old), leads_only))
+            out.append((label, show(new), show(old), roles))
     return out
 
 
 async def _tell_staff_about_rule_changes(before: dict, after: dict, admin: dict) -> None:
-    """A changed deadline is shown to the staff it affects (notification and email): counsellors for lead rules, and every counsellor,
-    officer and the other admins for rules about students and working hours. Quiet hours only affect emails to students, so no one is told."""
+    """A changed deadline is shown to the staff it affects (notification and email), each person only the changes for their role:
+    lead rules to counsellors and admins, the assignment rule to admins, student rules and working hours to everyone. The admin who
+    saved isn't told."""
     changes = _rule_changes(before, after)
     if not changes:
         return
-    everyone = ("counsellor", "officer", "finance_officer", "visa_officer", "admin")
-    roles = ("counsellor",) if all(leads_only for *_, leads_only in changes) else everyone
+    roles = sorted({r for *_, rs in changes for r in rs})
     t = now()
-    async for u in get_db().users.find({"role": {"$in": list(roles)}, "status": "active", "_id": {"$ne": admin["_id"]}}, {"role": 1, "name": 1, "email": 1}):
-        mine = [c for c in changes if not c[3] or u["role"] in ("counsellor", "admin")]  # lead rules only matter to those who handle leads
+    async for u in get_db().users.find({"role": {"$in": roles}, "status": "active", "_id": {"$ne": admin["_id"]}}, {"role": 1, "name": 1, "email": 1}):
+        mine = [c for c in changes if u["role"] in c[3]]
         if not mine:
             continue
         path = "/admin/settings" if u["role"] == "admin" else "/staff"
@@ -392,7 +400,7 @@ async def _tell_staff_about_rule_changes(before: dict, after: dict, admin: dict)
         await notify.queue_email(u["email"], "Follow-up rules changed", body, dedupe_key=f"rules-changed:{t.timestamp()}:{u['_id']}")
 
 
-def _short_summary(changes: list[tuple[str, str, str, bool]], limit: int = 280) -> str:
+def _short_summary(changes: list[tuple[str, str, str, tuple[str, ...]]], limit: int = 280) -> str:
     """'Plan shared, not registered: follow up within 24 hours (was 48 hours).' for as many changes as fit; the rest are counted."""
     parts: list[str] = []
     for i, (label, new, old, _) in enumerate(changes):

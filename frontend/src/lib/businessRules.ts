@@ -13,6 +13,8 @@ export interface BusinessRules {
     documentCheckWorkingDays: number;
     arrivalCheckInDays: number;
     replyWorkingDays: number;
+    assignWorkingDays: number;
+    sessionReminderHours: number;
     deadlineReminderDays: number[];
   };
 }

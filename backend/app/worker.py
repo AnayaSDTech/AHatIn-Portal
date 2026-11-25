@@ -43,9 +43,10 @@ async def escalate_overdue() -> None:
 
 
 async def session_reminders() -> None:
-    """Students get a reminder the day before a session (and on the day if it was booked late)."""
+    """Students get a reminder N hours before a session (24 at first; set on the Settings page), or straight away if it was
+    booked later than that."""
     db = get_db()
-    soon = now() + timedelta(hours=24)
+    soon = now() + timedelta(hours=policy.current()["followUps"]["sessionReminderHours"])
     async for s in db.sessions.find({"status": "booked", "startsAt": {"$gt": now(), "$lte": soon}, "remindedAt": None}).limit(100):
         student = await db.students.find_one({"_id": s["studentId"]})
         if student:

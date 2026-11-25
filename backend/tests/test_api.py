@@ -1989,6 +1989,14 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
         return datetime(y, m, d, h, mi, tzinfo=tz())
 
     # Everyone on the staff side sees the rules; only an admin can change them.
+    from app.services import chat as chat_service
+
+    # The public website's office hours (no sign-in) match the website's fixed text until an admin changes them.
+    visitor = await make_api()
+    r = await visitor.get("/office-hours")
+    assert r.status_code == 200 and r.json()["label"] == "Mon–Sat, 10:00–19:00 IST"
+    assert "Hours: Monday to Saturday, 10:00 to 19:00 IST." in chat_service.system_prompt()
+
     counsellor = await make_api()
     await counsellor.staff_login()
     body = (await counsellor.get("/settings")).json()
@@ -2006,7 +2014,7 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert (await admin.put("/settings", {"workingHours": {"days": [], "start": "09:00", "end": "17:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "22:00", "end": "22:00"}})).status_code == 422
     assert (await admin.put("/settings", {"quietHours": {"start": "25:00", "end": "07:00"}})).status_code == 422
-    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "nextFollowUpDays": 5, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "replyWorkingDays": 2, "deadlineReminderDays": [2, 10, 5]}
+    limits = {"firstContactMinutes": 30, "firstContactNextDay": "20:00", "bookSessionHours": 24, "nextFollowUpDays": 5, "planFollowUpHours": 72, "documentCheckWorkingDays": 2, "arrivalCheckInDays": 10, "replyWorkingDays": 2, "assignWorkingDays": 1, "sessionReminderHours": 24, "deadlineReminderDays": [2, 10, 5]}
     r = await admin.put("/settings", {"followUps": limits})
     assert r.status_code == 400 and "within working hours" in r.text
 
@@ -2021,6 +2029,9 @@ async def test_admin_edits_working_hours_quiet_hours_and_follow_up_limits(make_a
     assert r.status_code == 200, r.text
     out = r.json()
     assert out["workingHours"]["days"] == [0, 1, 2, 3, 4] and out["workingHours"]["label"] == "Monday – Friday"
+    # The website and the chatbot show the new office hours.
+    assert (await visitor.get("/office-hours")).json()["label"] == "Mon–Fri, 09:00–17:00 IST"
+    assert "Hours: Monday to Friday, 09:00 to 17:00 IST." in chat_service.system_prompt()
     assert out["followUpLimits"]["deadlineReminderDays"] == [10, 5, 2]
     rows = {row["trigger"]: row for row in out["followUpRules"]}
     assert rows["New enquiry (working hours)"]["limit"] == "30 minutes"
@@ -2230,3 +2241,40 @@ async def test_student_message_gives_staff_a_reply_task(make_api):
     assert await follow_up_area({"sourceEvent": "msg:s1:visa:m1"}) == "visa"
     assert await follow_up_area({"sourceEvent": "msg:s1:finance:m1"}) == "finance"
     assert await follow_up_area({"sourceEvent": "msg:s1:counsellor:m1"}) == "counsellor"
+
+
+async def test_assignment_and_session_reminder_times_are_editable(make_api):
+    from app import worker
+
+    db = get_db()
+    admin = await make_api()
+    await admin.staff_login("demo.admin@ahatin.example", "Admin@1234")
+    limits = (await admin.get("/settings")).json()["followUpLimits"]
+    assert limits["assignWorkingDays"] == 1 and limits["sessionReminderHours"] == 24
+    r = await admin.put("/settings", {"followUps": {**limits, "assignWorkingDays": 2, "sessionReminderHours": 12}})
+    assert r.status_code == 200, r.text
+    rows = {row["trigger"]: row for row in r.json()["followUpRules"]}
+    assert rows["Student ready for a counsellor or officer"]["limit"] == "2 working days"
+    assert rows["Session booked"]["limit"] == "12 hours before"
+    # Only the other admins are told about the assignment rule; no one about the session reminder (it only affects students).
+    counsellor_alert = await db.staff_alerts.find_one({"userId": "c1", "key": "rules-changed"})
+    assert counsellor_alert is None
+
+    # A student completes their profile: the admin's "assign a counsellor" task is due in 2 working days.
+    student = await make_api()
+    await student.register_student("Kabir Shah", "kabir.shah@ahatin.example", "9811177777")  # a new student, no counsellor yet
+    assert (await student.put("/me/profile", PROFILE)).status_code == 200
+    me = (await student.get("/me/record")).json()["record"]
+    task = await db.follow_ups.find_one({"sourceEvent": f"student:{me['id']}:assign"})
+    assert task["rule"] == "Profile complete · 2 working days" and task["counsellorId"] is None
+
+    # Session reminders go out 12 hours before now, not 24.
+    def session(_id, hours):
+        start = now() + timedelta(hours=hours)
+        return {"_id": _id, "studentId": "s1", "counsellorId": "c1", "type": "Career counselling", "date": start.date().isoformat(), "time": "10:00", "durationMinutes": 45, "mode": "online",
+                "status": "booked", "bookedBy": "student", "history": [], "startsAt": start, "endsAt": start + timedelta(minutes=45), "remindedAt": None, "createdAt": now()}
+
+    await db.sessions.insert_many([session("ss-in-20h", 20), session("ss-in-10h", 10)])
+    await worker.session_reminders()
+    assert (await db.sessions.find_one({"_id": "ss-in-10h"}))["remindedAt"]
+    assert (await db.sessions.find_one({"_id": "ss-in-20h"}))["remindedAt"] is None
