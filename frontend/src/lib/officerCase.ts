@@ -1,5 +1,5 @@
 import { PiggyBank, Plane, type LucideIcon } from 'lucide-react';
-import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, visaStageLabel } from './journey';
+import { DEPARTURE_TASKS, VISA_PATH, counsellingSessions, earlyVisaDocuments, offerAccepted, visaStageLabel } from './journey';
 import { counsellorCovers, type StaffStudent } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
@@ -110,9 +110,7 @@ function ownCounsellorCase(s: StaffStudent, sessions: Session[]): OfficerCase {
 
   const shared = !!sl?.sharedAt || (!!sl && sl.status !== 'draft');
   if (!j.careerPlan) {
-    const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Career counselling');
-    const held = mine.find((x) => x.status === 'completed');
-    const booked = mine.find((x) => x.status === 'booked');
+    const { held, booked } = counsellingSessions(sessions, s.id); // a career counselling or application review session
     return {
       phase: 'Counselling',
       group: 'counselling',

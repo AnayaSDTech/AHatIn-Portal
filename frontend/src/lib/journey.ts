@@ -113,6 +113,17 @@ export interface Visa {
   history: { at: string; by: string; stage: VisaStage; note?: string }[];
 }
 
+/**
+ * Sessions with the counsellor during Career Counselling. The booking form suggests "Career counselling", but a student can pick
+ * "Application review" instead; either one is the counselling session, so the step is done once one is booked.
+ */
+export const COUNSELLING_SESSION_TYPES = ['Career counselling', 'Application review'];
+
+export function counsellingSessions(sessions: Session[], studentId: string) {
+  const mine = sessions.filter((x) => x.studentId === studentId && COUNSELLING_SESSION_TYPES.includes(x.type));
+  return { held: mine.find((x) => x.status === 'completed'), booked: mine.find((x) => x.status === 'booked') };
+}
+
 export const DEPARTURE_TASKS = [
   { key: 'accommodation', label: 'Accommodation booked' },
   { key: 'flight', label: 'Flight booked' },

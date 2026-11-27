@@ -1,4 +1,4 @@
-import { DEPARTURE_TASKS, VISA_PATH, earlyVisaDocuments, offerAccepted, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
+import { DEPARTURE_TASKS, VISA_PATH, counsellingSessions, earlyVisaDocuments, offerAccepted, scholarshipStatusLabel, visaStageLabel, type ServiceCode, type ServiceStatus } from './journey';
 import { appStateLabel, counsellorCovers, type AppState, type StaffStudent, type StudentApplication } from '../data/staff';
 import type { Session } from './scheduling';
 import { formatDate } from './utils';
@@ -97,16 +97,17 @@ export function stageSteps(code: ServiceCode, s: StaffStudent, sessions: Session
   const sequence = sequencer(status === 'in_progress' || status === 'completed');
   switch (code) {
     case 'S1': {
-      const mine = sessions.filter((x) => x.studentId === s.id && x.type === 'Career counselling');
-      const held = mine.find((x) => x.status === 'completed');
-      const booked = mine.find((x) => x.status === 'booked');
+      // A career counselling or application review session: either counts as the counselling session.
+      const { held, booked } = counsellingSessions(sessions, s.id);
+      const session = held ?? booked;
+      const kind = session?.type === 'Application review' ? 'Counselling session (application review)' : 'Career counselling session';
       const sl = j.shortlist;
       return { steps: sequence([
         { label: 'Counsellor assigned to you', done: !!s.counsellorId },
         {
-          label: held || (j.careerPlan && !booked) ? 'Career counselling session held' : booked ? 'Career counselling session booked' : 'Book a career counselling session',
+          label: held || (j.careerPlan && !booked) ? `${kind} held` : booked ? `${kind} booked` : 'Book a career counselling session',
           done: !!held || !!booked || !!j.careerPlan,
-          detail: on(held?.date ?? booked?.date),
+          detail: on(session?.date),
         },
         { label: 'Career plan agreed and shared with you', done: !!j.careerPlan, detail: on(j.careerPlan?.at) },
         { label: 'Your counsellor prepares a shortlist of universities', done: !!sl?.sharedAt || (!!sl && sl.status !== 'draft'), detail: sl?.items.length ? plural(sl.items.length, 'option') : undefined },
